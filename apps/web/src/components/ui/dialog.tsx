@@ -1,0 +1,1 @@
+'use client'\nexport function Dialog({children,...props}:any){return <div {...props}>{children || 'dialog'}</div>}\n

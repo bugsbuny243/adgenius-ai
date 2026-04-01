@@ -1,0 +1,1 @@
+export function Skeleton({children,...props}:any){return <div {...props}>{children || 'skeleton'}</div>}\n

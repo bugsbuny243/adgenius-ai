@@ -1,1 +1,1 @@
-export default function Page(){return <main><h1>AdGenius Network</h1></main>}
+export default function Home(){return <main className='p-10'><h1 className='text-4xl font-bold'>AdGenius Network</h1><p className='mt-4'>AI-powered ad network for advertisers and publishers.</p></main>}

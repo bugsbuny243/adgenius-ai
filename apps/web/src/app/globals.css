@@ -1,1 +1,4 @@
-body{font-family:Arial,sans-serif;margin:0}main{padding:24px}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+body { @apply bg-slate-50 text-slate-900; }

@@ -2,8 +2,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator
 from typing import List
 
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
+
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/adgenius"
     REDIS_URL: str = "redis://localhost:6379"
     SECRET_KEY: str = "change-me-in-production-use-a-long-random-string"
@@ -21,6 +25,9 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in v.split(",")]
         return v
 
+
 settings = Settings()
+
+
 def get_settings() -> Settings:
     return settings
