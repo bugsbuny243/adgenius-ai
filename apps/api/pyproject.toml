@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "adgenius-api"
 version = "1.0.0"
-description = "AdGenius FastAPI Backend"
+description = "AdGenius Network FastAPI Backend"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115.0",
@@ -23,6 +23,14 @@ dependencies = [
     "redis>=5.2.0",
     "python-multipart>=0.0.12",
     "google-generativeai>=0.8.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "httpx>=0.28.0",
+    "aiosqlite>=0.20.0",
 ]
 
 [tool.hatch.build.targets.wheel]

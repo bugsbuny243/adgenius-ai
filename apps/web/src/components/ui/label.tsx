@@ -1,0 +1,1 @@
+export function Label({children,...props}:any){return <div {...props}>{children || 'label'}</div>}\n

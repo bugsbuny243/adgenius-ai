@@ -1,0 +1,1 @@
+export function Input({children,...props}:any){return <div {...props}>{children || 'input'}</div>}\n

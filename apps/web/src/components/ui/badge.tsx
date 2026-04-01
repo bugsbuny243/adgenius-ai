@@ -1,0 +1,1 @@
+export function Badge({children,...props}:any){return <div {...props}>{children || 'badge'}</div>}\n

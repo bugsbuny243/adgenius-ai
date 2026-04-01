@@ -1,0 +1,1 @@
+export function Textarea({children,...props}:any){return <div {...props}>{children || 'textarea'}</div>}\n

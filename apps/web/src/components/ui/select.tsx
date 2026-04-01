@@ -1,0 +1,1 @@
+'use client'\nexport function Select({children,...props}:any){return <div {...props}>{children || 'select'}</div>}\n

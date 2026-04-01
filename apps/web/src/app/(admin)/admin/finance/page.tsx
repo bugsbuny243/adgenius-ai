@@ -1,1 +1,1 @@
-export default function Page(){return <main><h2>finance</h2></main>}
+export default function Page(){return <main className='p-6'><h2 className='text-2xl font-semibold'>Admin finance</h2></main>}
