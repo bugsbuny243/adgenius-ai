@@ -1,0 +1,10 @@
+from app.models.base import UUIDBase
+class Campaign(UUIDBase): __tablename__="campaigns"
+class Ad(UUIDBase): __tablename__="ads"
+class AdvertiserWallet(UUIDBase): __tablename__="advertiser_wallets"
+class AdvertiserTransaction(UUIDBase): __tablename__="advertiser_transactions"
+class PublisherEarning(UUIDBase): __tablename__="publisher_earnings"
+class AdRequest(UUIDBase): __tablename__="ad_requests"
+class DeliveryLog(UUIDBase): __tablename__="delivery_logs"
+class Impression(UUIDBase): __tablename__="impressions"
+class Click(UUIDBase): __tablename__="clicks"
