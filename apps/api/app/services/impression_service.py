@@ -60,15 +60,21 @@ async def record_impression(db: AsyncSession, ad_request_id: str, session_id: st
         db.add(
             AdImpression(
                 live_campaign_id=ad_request.live_campaign_id,
+                campaign_id=ad_request.campaign_id,
+                slot_id=ad_request.slot_id,
                 ad_request_id=ad_request.id,
                 ad_set_id=getattr(live_campaign, "ad_set_id", None),
                 ad_variant_id=getattr(live_campaign, "ad_variant_id", None),
                 ad_id=ad_request.ad_id,
+                session_id=session_id,
                 click_token=ad_request.click_token,
+                cost=gross_cost,
+                publisher_earnings=publisher_share,
+                site_url=ad_request.page_url,
                 country=ad_request.country,
                 device=ad_request.device,
                 telemetry={"session_id": session_id, "page_url": ad_request.page_url},
-                occurred_at=datetime.utcnow(),
+                served_at=datetime.utcnow(),
             )
         )
 

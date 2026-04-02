@@ -72,14 +72,15 @@ async def apply_ad_spend(db: AsyncSession, campaign: Campaign, slot: AdSlot, gro
         select(PacingCounter).where(PacingCounter.campaign_id == campaign.id, PacingCounter.hour_bucket == hour_bucket)
     )
     if not pacing_counter:
-        pacing_counter = PacingCounter(campaign_id=campaign.id, hour_bucket=hour_bucket, count=0)
+        pacing_counter = PacingCounter(campaign_id=campaign.id, hour_bucket=hour_bucket, count=0, spend_amount=Decimal("0"))
         db.add(pacing_counter)
     pacing_counter.count += 1
+    pacing_counter.spend_amount = Decimal(str(pacing_counter.spend_amount or 0)) + gross_cost
 
     db.add(
         BudgetLedger(
             campaign_id=campaign.id,
-            amount=float(-gross_cost),
+            amount=-gross_cost,
             entry_type=f"{event_type}_spend",
             reference_type="ad_request",
             reference_id=reference_id[:255],

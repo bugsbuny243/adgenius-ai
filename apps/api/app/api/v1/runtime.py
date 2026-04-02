@@ -11,7 +11,7 @@ from app.dependencies import get_current_user, get_db
 from app.models.adnet import Campaign, PricingModel
 from app.models.campaign import CampaignBrief
 from app.models.delivery import ApprovalStatus, LiveCampaign, LiveCampaignStatus, RuntimePricingModel
-from app.models.generation import GeneratedAdSet, GeneratedAdVariant, GenerationJob
+from app.models.generation import GeneratedAdSet, GeneratedAdVariant, GenerationJob, GenerationJobStatus
 from app.models.user import User
 
 router = APIRouter(prefix="/runtime", tags=["runtime"])
@@ -51,6 +51,7 @@ class GenerationJobIn(BaseModel):
     campaign_brief_id: str | None = None
     prompt: str | None = None
     model_name: str = "gemini-2.5-pro"
+    status: str = "QUEUED"
 
 
 @router.post("/live-campaigns", status_code=status.HTTP_201_CREATED)
@@ -113,12 +114,13 @@ async def create_generation_job(payload: GenerationJobIn, db: AsyncSession = Dep
     job = GenerationJob(
         campaign_id=payload.campaign_id,
         campaign_brief_id=payload.campaign_brief_id,
+        status=GenerationJobStatus(payload.status.upper()),
         prompt=payload.prompt,
         model_name=model_name,
     )
     db.add(job)
     await db.flush()
-    return {"id": str(job.id), "model_name": job.model_name, "status": job.status}
+    return {"id": str(job.id), "model_name": job.model_name, "status": job.status.value}
 
 
 @router.post("/generation/jobs/{job_id}/publish", status_code=status.HTTP_201_CREATED)
