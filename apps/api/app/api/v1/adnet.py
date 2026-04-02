@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field, AliasChoices
+from pydantic import AliasChoices, BaseModel, Field
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,23 +26,30 @@ router = APIRouter(tags=["adnet"])
 
 class CampaignIn(BaseModel):
     title: str = Field(validation_alias=AliasChoices("title", "name"))
-    total_budget: Decimal
+    budget: Decimal = Field(validation_alias=AliasChoices("budget", "total_budget"))
     daily_budget: Decimal | None = None
     pricing_model: str = "CPC"
     bid_amount: Decimal = Decimal("0.01")
+    targeting: dict | None = None
+    target_countries: list[str] | None = None
+    target_devices: list[str] | None = None
     landing_url: str
     category: str | None = None
+    status: str = "DRAFT"
 
 
 class CampaignOut(BaseModel):
     id: str
     title: str
     status: str
-    total_budget: Decimal
+    budget: Decimal = Field(serialization_alias="budget")
     daily_budget: Decimal | None = None
     pricing_model: str
     spent_amount: Decimal
     bid_amount: Decimal
+    targeting: dict | None = None
+    target_countries: list[str] | None = None
+    target_devices: list[str] | None = None
     landing_url: str
     category: str | None = None
 
@@ -106,10 +113,19 @@ def _ensure_admin(user: User):
         raise HTTPException(status_code=403, detail="Admin only")
 
 
+def _campaign_to_out(campaign: Campaign) -> CampaignOut:
+    return CampaignOut.model_validate({
+        **campaign.__dict__,
+        "budget": campaign.total_budget,
+        "status": campaign.status.value if hasattr(campaign.status, "value") else str(campaign.status),
+        "pricing_model": campaign.pricing_model.value if hasattr(campaign.pricing_model, "value") else str(campaign.pricing_model),
+    })
+
+
 @router.get("/advertiser/campaigns", response_model=list[CampaignOut])
 async def list_campaigns(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     result = await db.execute(select(Campaign).where(Campaign.user_id == current_user.id).order_by(Campaign.created_at.desc()))
-    return [CampaignOut.model_validate(c) for c in result.scalars().all()]
+    return [_campaign_to_out(c) for c in result.scalars().all()]
 
 
 @router.post("/advertiser/campaigns", response_model=CampaignOut, status_code=status.HTTP_201_CREATED)
@@ -117,17 +133,21 @@ async def create_campaign(payload: CampaignIn, db: AsyncSession = Depends(get_db
     campaign = Campaign(
         user_id=current_user.id,
         title=payload.title,
-        total_budget=payload.total_budget,
+        total_budget=payload.budget,
         daily_budget=payload.daily_budget,
         pricing_model=PricingModel(payload.pricing_model.upper()),
         bid_amount=payload.bid_amount,
         landing_url=payload.landing_url,
         category=payload.category,
+        targeting=payload.targeting,
+        target_countries=payload.target_countries,
+        target_devices=payload.target_devices,
+        status=CampaignStatus(payload.status.upper()),
     )
     db.add(campaign)
     await db.flush()
     await db.refresh(campaign)
-    return CampaignOut.model_validate(campaign)
+    return _campaign_to_out(campaign)
 
 
 @router.get("/advertiser/campaigns/{id}", response_model=CampaignOut)
@@ -135,7 +155,7 @@ async def get_campaign(id: str, db: AsyncSession = Depends(get_db), current_user
     campaign = await db.scalar(select(Campaign).where(Campaign.id == uuid.UUID(id), Campaign.user_id == current_user.id))
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
-    return CampaignOut.model_validate(campaign)
+    return _campaign_to_out(campaign)
 
 
 @router.put("/advertiser/campaigns/{id}", response_model=CampaignOut)
@@ -146,14 +166,18 @@ async def update_campaign(id: str, payload: CampaignIn, db: AsyncSession = Depen
     if campaign.status == CampaignStatus.ACTIVE and current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Active campaigns can only be set by admin")
     campaign.title = payload.title
-    campaign.total_budget = payload.total_budget
+    campaign.total_budget = payload.budget
     campaign.daily_budget = payload.daily_budget
     campaign.pricing_model = PricingModel(payload.pricing_model.upper())
     campaign.bid_amount = payload.bid_amount
     campaign.landing_url = payload.landing_url
     campaign.category = payload.category
+    campaign.targeting = payload.targeting
+    campaign.target_countries = payload.target_countries
+    campaign.target_devices = payload.target_devices
+    campaign.status = CampaignStatus(payload.status.upper())
     await db.flush()
-    return CampaignOut.model_validate(campaign)
+    return _campaign_to_out(campaign)
 
 
 @router.delete("/advertiser/campaigns/{id}")
