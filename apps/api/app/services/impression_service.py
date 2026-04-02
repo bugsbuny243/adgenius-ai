@@ -21,7 +21,13 @@ async def record_impression(db: AsyncSession, ad_request_id: str, session_id: st
     slot = await db.scalar(select(AdSlot).where(AdSlot.id == ad_request.slot_id))
     live_campaign = await db.scalar(select(LiveCampaign).where(LiveCampaign.id == ad_request.live_campaign_id)) if ad_request.live_campaign_id else None
 
-    if live_campaign and str(live_campaign.pricing_model).upper() == "CPM" and live_campaign.cpm_rate:
+    live_pricing_model = (
+        live_campaign.pricing_model.value
+        if live_campaign and hasattr(live_campaign.pricing_model, "value")
+        else (str(getattr(live_campaign, "pricing_model", "")) if live_campaign else "")
+    )
+
+    if live_campaign and live_pricing_model.upper() == "CPM" and live_campaign.cpm_rate:
         gross_cost = Decimal(str(live_campaign.cpm_rate)) / Decimal("1000")
     elif live_campaign and live_campaign.cpc_rate:
         gross_cost = Decimal(str(live_campaign.cpc_rate))

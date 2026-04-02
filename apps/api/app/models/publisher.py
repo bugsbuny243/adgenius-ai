@@ -2,7 +2,7 @@ import enum
 import uuid
 from decimal import Decimal
 from sqlalchemy import String, ForeignKey, Enum, Boolean, Numeric, Text, Integer
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import UUIDBase
 
@@ -45,7 +45,7 @@ class PublisherSite(UUIDBase):
     domain: Mapped[str] = mapped_column(String(255), unique=True)
     name: Mapped[str] = mapped_column(String(255), default="")
     category: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    allowed_categories: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
+    allowed_categories: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -69,7 +69,7 @@ class Placement(UUIDBase):
     app_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("publisher_apps.id"), nullable=True)
     name: Mapped[str] = mapped_column(String(255))
     page_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
-    context_tags: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
+    context_tags: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
@@ -81,7 +81,7 @@ class AdSlot(UUIDBase):
     slot_key: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     format: Mapped[SlotFormat] = mapped_column(Enum(SlotFormat), default=SlotFormat.BANNER)
     category: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    allowed_formats: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
+    allowed_formats: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     width: Mapped[int | None] = mapped_column(Integer, nullable=True)
     height: Mapped[int | None] = mapped_column(Integer, nullable=True)
     revenue_share_percent: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("70.00"))

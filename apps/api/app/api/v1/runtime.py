@@ -1,5 +1,7 @@
 """Runtime, AI generation and governance aligned endpoints."""
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -8,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies import get_current_user, get_db
 from app.models.adnet import Campaign, PricingModel
 from app.models.campaign import CampaignBrief
-from app.models.delivery import ApprovalStatus, LiveCampaign, LiveCampaignStatus
+from app.models.delivery import ApprovalStatus, LiveCampaign, LiveCampaignStatus, RuntimePricingModel
 from app.models.generation import GeneratedAdSet, GeneratedAdVariant, GenerationJob
 from app.models.user import User
 
@@ -17,21 +19,30 @@ router = APIRouter(prefix="/runtime", tags=["runtime"])
 
 class LiveCampaignIn(BaseModel):
     campaign_id: str
+    workspace_id: str | None = None
     campaign_brief_id: str | None = None
+    name: str | None = None
     ad_set_id: str | None = None
     ad_variant_id: str | None = None
     ad_id: str | None = None
     pricing_model: str = "CPC"
     cpm_rate: float = 0
     cpc_rate: float = 0
+    total_budget: float | None = None
+    spent_amount: float = 0
     daily_budget_cap: float | None = None
-    total_budget_cap: float | None = None
+    target_categories: list[str] | None = None
     target_regions: list[str] | None = None
     target_formats: list[str] | None = None
     runtime_targeting: dict | None = None
-    frequency_cap_per_user: int | None = None
+    frequency_cap_per_session: int | None = None
     priority: int = 0
+    is_approved: bool = False
+    approved_at: datetime | None = None
+    rejection_reason: str | None = None
     status: str = "PENDING"
+    start_date: datetime | None = None
+    end_date: datetime | None = None
     approval_status: str = "PENDING"
 
 
@@ -50,21 +61,30 @@ async def create_live_campaign(payload: LiveCampaignIn, db: AsyncSession = Depen
 
     live = LiveCampaign(
         campaign_id=payload.campaign_id,
+        workspace_id=payload.workspace_id,
         campaign_brief_id=payload.campaign_brief_id,
+        name=payload.name or campaign.title,
         ad_set_id=payload.ad_set_id,
         ad_variant_id=payload.ad_variant_id,
         ad_id=payload.ad_id,
-        pricing_model=payload.pricing_model.upper(),
+        pricing_model=RuntimePricingModel(payload.pricing_model.upper()),
         cpm_rate=payload.cpm_rate,
         cpc_rate=payload.cpc_rate,
+        total_budget=payload.total_budget if payload.total_budget is not None else float(campaign.total_budget or 0),
+        spent_amount=payload.spent_amount,
         daily_budget_cap=payload.daily_budget_cap,
-        total_budget_cap=payload.total_budget_cap,
+        target_categories=payload.target_categories,
         target_regions=payload.target_regions,
         target_formats=payload.target_formats,
         runtime_targeting=payload.runtime_targeting,
-        frequency_cap_per_user=payload.frequency_cap_per_user,
+        frequency_cap_per_session=payload.frequency_cap_per_session,
         priority=payload.priority,
+        is_approved=payload.is_approved,
+        approved_at=payload.approved_at,
+        rejection_reason=payload.rejection_reason,
         status=LiveCampaignStatus(payload.status.upper()),
+        start_date=payload.start_date,
+        end_date=payload.end_date,
         approval_status=ApprovalStatus(payload.approval_status.upper()),
     )
     db.add(live)
@@ -120,11 +140,18 @@ async def publish_generation_output(job_id: str, db: AsyncSession = Depends(get_
     live = LiveCampaign(
         campaign_id=job.campaign_id,
         campaign_brief_id=job.campaign_brief_id,
+        name=campaign.title,
         ad_set_id=ad_set.id,
         ad_variant_id=getattr(ad_variant, "id", None),
-        pricing_model=(campaign.pricing_model.value if isinstance(campaign.pricing_model, PricingModel) else str(campaign.pricing_model)).upper(),
+        pricing_model=RuntimePricingModel((campaign.pricing_model.value if isinstance(campaign.pricing_model, PricingModel) else str(campaign.pricing_model)).upper()),
+        total_budget=float(campaign.total_budget or 0),
+        spent_amount=float(campaign.spent_amount or 0),
+        target_categories=[campaign.category] if campaign.category else None,
+        target_regions=campaign.target_countries,
         cpc_rate=float(campaign.bid_amount or 0),
         status=LiveCampaignStatus.READY,
+        start_date=campaign.start_at,
+        end_date=campaign.end_at,
         approval_status=ApprovalStatus.PENDING,
     )
     db.add(live)

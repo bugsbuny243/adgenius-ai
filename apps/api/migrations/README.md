@@ -41,3 +41,26 @@ FROM information_schema.columns
 WHERE table_schema='public' AND table_name='campaigns'
 ORDER BY column_name;
 ```
+
+## 2026-04-02: full-schema completion pass
+
+Script: `sql/20260402_full_schema_completion.sql`
+
+### Purpose
+- Finalize JSONB-backed fields to match Supabase runtime/publisher schema:
+  - `publisher_sites.allowed_categories`
+  - `placements.context_tags`
+  - `ad_slots.allowed_formats`
+  - `live_campaigns.target_regions`
+  - `live_campaigns.target_formats`
+- Enforce enum-backed columns:
+  - `ad_slots.format`
+  - `live_campaigns.pricing_model`
+  - `publisher_profiles.status`
+  - `campaigns.status`
+- Reconcile `live_campaigns` with runtime budget/moderation/targeting fields and add additive parity columns for `ad_impressions`, `ad_clicks`, `budget_ledgers`, `pacing_counters`, and `delivery_rules`.
+
+### Execution
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/migrations/sql/20260402_full_schema_completion.sql
+```
