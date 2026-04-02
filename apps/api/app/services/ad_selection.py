@@ -143,7 +143,7 @@ async def select_best_ad(
     logger.info("Ad selected", request_id=str(ad_request.id), campaign_id=str(selected_campaign.id))
 
     return {
-        "request_id": str(ad_request.id),
+        "ad_request_id": str(ad_request.id),
         "ad_id": str(selected_ad.id),
         "campaign_id": str(selected_campaign.id),
         "headline": selected_ad.headline,
@@ -154,7 +154,7 @@ async def select_best_ad(
         "impression_url": "/api/v1/track/impression",
         "format": slot_format,
         "tracking_data": {
-            "request_id": str(ad_request.id),
+            "ad_request_id": str(ad_request.id),
             "campaign_id": str(selected_campaign.id),
             "ad_id": str(selected_ad.id),
             "slot_id": str(slot.id),

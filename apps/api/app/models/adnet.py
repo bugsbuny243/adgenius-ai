@@ -1,6 +1,7 @@
 import enum
 import uuid
 from decimal import Decimal
+from datetime import datetime
 from sqlalchemy import String, ForeignKey, Numeric, Integer, Enum, Boolean, DateTime, Text
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
@@ -15,6 +16,11 @@ class CampaignStatus(str, enum.Enum):
     ENDED = "ENDED"
 
 
+class PricingModel(str, enum.Enum):
+    CPC = "CPC"
+    CPM = "CPM"
+
+
 class PayoutStatus(str, enum.Enum):
     PENDING = "PENDING"
     APPROVED = "APPROVED"
@@ -24,12 +30,13 @@ class PayoutStatus(str, enum.Enum):
 class Campaign(UUIDBase):
     __tablename__ = "campaigns"
 
-    workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id"), index=True)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
-    name: Mapped[str] = mapped_column(String(255))
+    title: Mapped[str] = mapped_column(String(255))
     status: Mapped[CampaignStatus] = mapped_column(Enum(CampaignStatus), default=CampaignStatus.DRAFT)
+    pricing_model: Mapped[PricingModel] = mapped_column(Enum(PricingModel), default=PricingModel.CPC)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     total_budget: Mapped[Decimal] = mapped_column(Numeric(14, 6), default=Decimal("0"))
+    daily_budget: Mapped[Decimal | None] = mapped_column(Numeric(14, 6), nullable=True)
     spent_amount: Mapped[Decimal] = mapped_column(Numeric(14, 6), default=Decimal("0"))
     bid_amount: Mapped[Decimal] = mapped_column(Numeric(14, 6), default=Decimal("0.01"))
     landing_url: Mapped[str] = mapped_column(String(1024), default="https://example.com")
@@ -57,9 +64,8 @@ class AdvertiserWallet(UUIDBase):
     __tablename__ = "advertiser_wallets"
 
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), unique=True, index=True)
-    workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id"), index=True)
     balance: Mapped[Decimal] = mapped_column(Numeric(14, 6), default=Decimal("0"))
-    total_deposit: Mapped[Decimal] = mapped_column(Numeric(14, 6), default=Decimal("0"))
+    total_deposited: Mapped[Decimal] = mapped_column(Numeric(14, 6), default=Decimal("0"))
     total_spent: Mapped[Decimal] = mapped_column(Numeric(14, 6), default=Decimal("0"))
 
 
@@ -83,14 +89,20 @@ class PublisherEarning(UUIDBase):
     event_type: Mapped[str] = mapped_column(String(32), default="impression")
     amount: Mapped[Decimal] = mapped_column(Numeric(14, 6), default=Decimal("0"))
     reference_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    paid_out: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class PublisherPayout(UUIDBase):
     __tablename__ = "publisher_payouts"
 
     publisher_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("publisher_profiles.id"), index=True)
-    amount: Mapped[Decimal] = mapped_column(Numeric(14, 6))
+    gross_earnings: Mapped[Decimal] = mapped_column(Numeric(14, 6), default=Decimal("0"))
+    platform_share: Mapped[Decimal] = mapped_column(Numeric(14, 6), default=Decimal("0"))
+    publisher_share: Mapped[Decimal] = mapped_column(Numeric(14, 6), default=Decimal("0"))
+    impressions_count: Mapped[int] = mapped_column(Integer, default=0)
+    clicks_count: Mapped[int] = mapped_column(Integer, default=0)
+    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[PayoutStatus] = mapped_column(Enum(PayoutStatus), default=PayoutStatus.PENDING)
 
 
@@ -112,7 +124,7 @@ class DeliveryLog(UUIDBase):
     __tablename__ = "delivery_logs"
 
     event_type: Mapped[str] = mapped_column(String(32))
-    request_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("ad_requests.id"), nullable=True)
+    ad_request_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("ad_requests.id"), nullable=True)
     campaign_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("campaigns.id"), nullable=True)
     ad_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("ads.id"), nullable=True)
     slot_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("ad_slots.id"), nullable=True)
@@ -124,18 +136,22 @@ class DeliveryLog(UUIDBase):
 class Impression(UUIDBase):
     __tablename__ = "impressions"
 
-    request_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ad_requests.id"), index=True)
+    ad_request_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ad_requests.id"), index=True)
     campaign_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("campaigns.id"), index=True)
-    ad_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ads.id"), index=True)
     slot_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ad_slots.id"), index=True)
-    session_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    cost: Mapped[Decimal] = mapped_column(Numeric(14, 6), default=Decimal("0"))
+    publisher_earnings: Mapped[Decimal] = mapped_column(Numeric(14, 6), default=Decimal("0"))
+    site_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    served_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
 
 class Click(UUIDBase):
     __tablename__ = "clicks"
 
-    request_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ad_requests.id"), index=True)
     campaign_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("campaigns.id"), index=True)
-    ad_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ads.id"), index=True)
     slot_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ad_slots.id"), index=True)
-    session_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    click_token: Mapped[str] = mapped_column(String(1024), index=True)
+    destination_url: Mapped[str] = mapped_column(String(1024))
+    cost: Mapped[Decimal] = mapped_column(Numeric(14, 6), default=Decimal("0"))
+    publisher_earnings: Mapped[Decimal] = mapped_column(Numeric(14, 6), default=Decimal("0"))
+    clicked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)

@@ -33,7 +33,7 @@
 
   function renderAd(container, ad) {
     var clickUrl = API_BASE + ad.click_url
-    var requestId = (ad.tracking_data && ad.tracking_data.request_id) || ''
+    var adRequestId = (ad.tracking_data && (ad.tracking_data.ad_request_id || ad.tracking_data.request_id)) || ''
 
     container.innerHTML =
       '<a href="' + clickUrl + '" target="_blank" rel="noopener noreferrer" ' +
@@ -47,12 +47,12 @@
       '<span style="display:block;font-size:10px;color:#cbd5e1;margin-top:8px;">Reklam · AdGenius Network</span>' +
       '</a>'
 
-    if (requestId) {
+    if (adRequestId) {
       fetch(API_BASE + ad.impression_url, {
         method: 'POST',
         credentials: 'omit',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ request_id: requestId, session_id: getSessionId() }),
+        body: JSON.stringify({ ad_request_id: adRequestId, session_id: getSessionId() }),
       }).catch(function () {})
     }
   }

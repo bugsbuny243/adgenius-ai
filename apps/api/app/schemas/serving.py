@@ -1,8 +1,8 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, AliasChoices
 
 
 class ServeAdResponse(BaseModel):
-    request_id: str
+    ad_request_id: str = Field(validation_alias=AliasChoices("ad_request_id", "request_id"))
     ad_id: str
     campaign_id: str
     headline: str
@@ -16,7 +16,7 @@ class ServeAdResponse(BaseModel):
 
 
 class ImpressionTrackRequest(BaseModel):
-    request_id: str
+    ad_request_id: str = Field(validation_alias=AliasChoices("ad_request_id", "request_id"))
     session_id: str | None = None
 
 

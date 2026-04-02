@@ -1,16 +1,18 @@
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, AliasChoices
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_db, get_current_user
-from app.models.user import User, UserRole, Workspace
+from app.models.user import User, UserRole
 from app.models.publisher import PublisherProfile
 from app.models.adnet import (
     Campaign,
     CampaignStatus,
+    PricingModel,
     Ad,
     AdvertiserWallet,
     AdvertiserTransaction,
@@ -23,8 +25,10 @@ router = APIRouter(tags=["adnet"])
 
 
 class CampaignIn(BaseModel):
-    name: str
+    title: str = Field(validation_alias=AliasChoices("title", "name"))
     total_budget: Decimal
+    daily_budget: Decimal | None = None
+    pricing_model: str = "CPC"
     bid_amount: Decimal = Decimal("0.01")
     landing_url: str
     category: str | None = None
@@ -32,9 +36,11 @@ class CampaignIn(BaseModel):
 
 class CampaignOut(BaseModel):
     id: str
-    name: str
+    title: str
     status: str
     total_budget: Decimal
+    daily_budget: Decimal | None = None
+    pricing_model: str
     spent_amount: Decimal
     bid_amount: Decimal
     landing_url: str
@@ -65,7 +71,7 @@ class AdOut(BaseModel):
 class WalletOut(BaseModel):
     id: str
     balance: Decimal
-    total_deposit: Decimal
+    total_deposited: Decimal
     total_spent: Decimal
 
     model_config = {"from_attributes": True}
@@ -82,7 +88,14 @@ class PayoutIn(BaseModel):
 class PayoutOut(BaseModel):
     id: str
     publisher_id: str
-    amount: Decimal
+    gross_earnings: Decimal
+    platform_share: Decimal
+    publisher_share: Decimal
+    impressions_count: int
+    clicks_count: int
+    period_start: datetime
+    period_end: datetime
+    paid_at: datetime | None = None
     status: str
 
     model_config = {"from_attributes": True}
@@ -93,14 +106,6 @@ def _ensure_admin(user: User):
         raise HTTPException(status_code=403, detail="Admin only")
 
 
-async def _get_workspace(db: AsyncSession, user_id):
-    result = await db.execute(select(Workspace).where(Workspace.owner_id == user_id))
-    workspace = result.scalar_one_or_none()
-    if not workspace:
-        raise HTTPException(status_code=400, detail="Workspace not found")
-    return workspace
-
-
 @router.get("/advertiser/campaigns", response_model=list[CampaignOut])
 async def list_campaigns(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     result = await db.execute(select(Campaign).where(Campaign.user_id == current_user.id).order_by(Campaign.created_at.desc()))
@@ -109,12 +114,12 @@ async def list_campaigns(db: AsyncSession = Depends(get_db), current_user: User 
 
 @router.post("/advertiser/campaigns", response_model=CampaignOut, status_code=status.HTTP_201_CREATED)
 async def create_campaign(payload: CampaignIn, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    workspace = await _get_workspace(db, current_user.id)
     campaign = Campaign(
-        workspace_id=workspace.id,
         user_id=current_user.id,
-        name=payload.name,
+        title=payload.title,
         total_budget=payload.total_budget,
+        daily_budget=payload.daily_budget,
+        pricing_model=PricingModel(payload.pricing_model.upper()),
         bid_amount=payload.bid_amount,
         landing_url=payload.landing_url,
         category=payload.category,
@@ -140,8 +145,10 @@ async def update_campaign(id: str, payload: CampaignIn, db: AsyncSession = Depen
         raise HTTPException(status_code=404, detail="Campaign not found")
     if campaign.status == CampaignStatus.ACTIVE and current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Active campaigns can only be set by admin")
-    campaign.name = payload.name
+    campaign.title = payload.title
     campaign.total_budget = payload.total_budget
+    campaign.daily_budget = payload.daily_budget
+    campaign.pricing_model = PricingModel(payload.pricing_model.upper())
     campaign.bid_amount = payload.bid_amount
     campaign.landing_url = payload.landing_url
     campaign.category = payload.category
@@ -205,38 +212,36 @@ async def delete_ad(id: str, db: AsyncSession = Depends(get_db), current_user: U
 
 @router.get("/advertiser/wallet", response_model=WalletOut)
 async def wallet(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    wallet = await db.scalar(select(AdvertiserWallet).where(AdvertiserWallet.user_id == current_user.id))
-    if not wallet:
-        workspace = await _get_workspace(db, current_user.id)
-        wallet = AdvertiserWallet(user_id=current_user.id, workspace_id=workspace.id)
-        db.add(wallet)
+    wallet_obj = await db.scalar(select(AdvertiserWallet).where(AdvertiserWallet.user_id == current_user.id))
+    if not wallet_obj:
+        wallet_obj = AdvertiserWallet(user_id=current_user.id)
+        db.add(wallet_obj)
         await db.flush()
-    return WalletOut.model_validate(wallet)
+    return WalletOut.model_validate(wallet_obj)
 
 
 @router.post("/advertiser/wallet/deposit", response_model=WalletOut)
 async def wallet_deposit(payload: DepositIn, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     if payload.amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
-    wallet = await db.scalar(select(AdvertiserWallet).where(AdvertiserWallet.user_id == current_user.id))
-    if not wallet:
-        workspace = await _get_workspace(db, current_user.id)
-        wallet = AdvertiserWallet(user_id=current_user.id, workspace_id=workspace.id)
-        db.add(wallet)
+    wallet_obj = await db.scalar(select(AdvertiserWallet).where(AdvertiserWallet.user_id == current_user.id))
+    if not wallet_obj:
+        wallet_obj = AdvertiserWallet(user_id=current_user.id)
+        db.add(wallet_obj)
         await db.flush()
-    wallet.balance += payload.amount
-    wallet.total_deposit += payload.amount
-    db.add(AdvertiserTransaction(wallet_id=wallet.id, tx_type="deposit", amount=payload.amount, description="Wallet deposit"))
+    wallet_obj.balance += payload.amount
+    wallet_obj.total_deposited += payload.amount
+    db.add(AdvertiserTransaction(wallet_id=wallet_obj.id, tx_type="deposit", amount=payload.amount, description="Wallet deposit"))
     await db.flush()
-    return WalletOut.model_validate(wallet)
+    return WalletOut.model_validate(wallet_obj)
 
 
 @router.get("/advertiser/finance/dashboard")
 async def finance_dashboard(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    wallet = await db.scalar(select(AdvertiserWallet).where(AdvertiserWallet.user_id == current_user.id))
+    wallet_obj = await db.scalar(select(AdvertiserWallet).where(AdvertiserWallet.user_id == current_user.id))
     spend = await db.scalar(select(func.coalesce(func.sum(Campaign.spent_amount), 0)).where(Campaign.user_id == current_user.id))
     active = await db.scalar(select(func.count(Campaign.id)).where(Campaign.user_id == current_user.id, Campaign.status == CampaignStatus.ACTIVE))
-    return {"balance": getattr(wallet, "balance", Decimal("0")), "total_spent": spend, "active_campaigns": active}
+    return {"balance": getattr(wallet_obj, "balance", Decimal("0")), "total_spent": spend, "active_campaigns": active}
 
 
 @router.get("/publisher/earnings")
@@ -244,31 +249,48 @@ async def publisher_earnings(db: AsyncSession = Depends(get_db), current_user: U
     profile = await db.scalar(select(PublisherProfile).where(PublisherProfile.user_id == current_user.id))
     profile_id = profile.id if profile else uuid.uuid4()
     result = await db.execute(select(PublisherEarning).where(PublisherEarning.publisher_id == profile_id).order_by(PublisherEarning.created_at.desc()))
-    return [{"id": str(e.id), "amount": e.amount, "event_type": e.event_type, "paid_out": e.paid_out} for e in result.scalars().all()]
+    return [{"id": str(e.id), "amount": e.amount, "event_type": e.event_type} for e in result.scalars().all()]
 
 
 @router.get("/publisher/earnings/dashboard")
 async def publisher_earnings_dashboard(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     profile = await db.scalar(select(PublisherProfile).where(PublisherProfile.user_id == current_user.id))
     if not profile:
-        return {"total_earned": Decimal("0"), "available": Decimal("0"), "paid_out": Decimal("0")}
+        return {"total_earned": Decimal("0"), "available": Decimal("0"), "settled": Decimal("0")}
     total = await db.scalar(select(func.coalesce(func.sum(PublisherEarning.amount), 0)).where(PublisherEarning.publisher_id == profile.id))
-    available = await db.scalar(select(func.coalesce(func.sum(PublisherEarning.amount), 0)).where(PublisherEarning.publisher_id == profile.id, PublisherEarning.paid_out.is_(False)))
-    paid = total - available
-    return {"total_earned": total, "available": available, "paid_out": paid}
+    settled = await db.scalar(select(func.coalesce(func.sum(PublisherPayout.publisher_share), 0)).where(PublisherPayout.publisher_id == profile.id, PublisherPayout.status == PayoutStatus.APPROVED))
+    available = Decimal(str(total or 0)) - Decimal(str(settled or 0))
+    return {"total_earned": total, "available": available, "settled": settled}
 
 
 @router.post("/publisher/payout/request", response_model=PayoutOut, status_code=status.HTTP_201_CREATED)
 async def payout_request(payload: PayoutIn, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    if payload.amount <= 0:
-        raise HTTPException(status_code=400, detail="Amount must be positive")
+    # Deprecated old amount-based request; now emits period-based pending settlement for the trailing 30 days.
     profile = await db.scalar(select(PublisherProfile).where(PublisherProfile.user_id == current_user.id))
     if not profile:
         raise HTTPException(status_code=404, detail="Publisher profile not found")
-    available = await db.scalar(select(func.coalesce(func.sum(PublisherEarning.amount), 0)).where(PublisherEarning.publisher_id == profile.id, PublisherEarning.paid_out.is_(False)))
-    if payload.amount > available:
+    if payload.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+
+    period_end = datetime.now(timezone.utc)
+    period_start = period_end - timedelta(days=30)
+    gross = await db.scalar(select(func.coalesce(func.sum(PublisherEarning.amount), 0)).where(PublisherEarning.publisher_id == profile.id))
+    if payload.amount > Decimal(str(gross or 0)):
         raise HTTPException(status_code=400, detail="Insufficient available earnings")
-    payout = PublisherPayout(publisher_id=profile.id, amount=payload.amount, status=PayoutStatus.PENDING)
+    publisher_share = Decimal(str(payload.amount))
+    platform_share = Decimal("0")
+
+    payout = PublisherPayout(
+        publisher_id=profile.id,
+        gross_earnings=publisher_share + platform_share,
+        platform_share=platform_share,
+        publisher_share=publisher_share,
+        period_start=period_start,
+        period_end=period_end,
+        impressions_count=0,
+        clicks_count=0,
+        status=PayoutStatus.PENDING,
+    )
     db.add(payout)
     await db.flush()
     return PayoutOut.model_validate(payout)
@@ -289,13 +311,7 @@ async def approve_payout(id: str, db: AsyncSession = Depends(get_db), current_us
     if not payout:
         raise HTTPException(status_code=404, detail="Payout not found")
     payout.status = PayoutStatus.APPROVED
-    result = await db.execute(select(PublisherEarning).where(PublisherEarning.publisher_id == payout.publisher_id, PublisherEarning.paid_out.is_(False)).order_by(PublisherEarning.created_at.asc()))
-    remaining = Decimal(str(payout.amount))
-    for earning in result.scalars().all():
-        if remaining <= 0:
-            break
-        earning.paid_out = True
-        remaining -= Decimal(str(earning.amount))
+    payout.paid_at = datetime.now(timezone.utc)
     await db.flush()
     return PayoutOut.model_validate(payout)
 

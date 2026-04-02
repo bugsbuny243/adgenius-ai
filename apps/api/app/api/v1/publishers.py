@@ -1,7 +1,7 @@
 import secrets
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, AliasChoices
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,7 +14,6 @@ from app.models.publisher import (
     Placement,
     AdSlot,
     PublisherStatus,
-    PlacementType,
     SlotFormat,
 )
 
@@ -23,17 +22,20 @@ router = APIRouter(prefix="/publishers", tags=["publishers"])
 
 class ProfileIn(BaseModel):
     company_name: str
-    website: str | None = None
+    website_url: str | None = Field(default=None, validation_alias=AliasChoices("website_url", "website"))
     contact_email: str | None = None
-    notes: str | None = None
+    description: str | None = Field(default=None, validation_alias=AliasChoices("description", "notes"))
 
 
 class ProfileOut(BaseModel):
     id: str
     user_id: str
     company_name: str
-    website: str | None = None
+    website_url: str | None = None
     contact_email: str | None = None
+    description: str | None = None
+    rejection_reason: str | None = None
+    revenue_share_pct: float
     status: str
 
     model_config = {"from_attributes": True}
@@ -42,6 +44,10 @@ class ProfileOut(BaseModel):
 class SiteIn(BaseModel):
     domain: str
     name: str = ""
+    category: str | None = None
+    allowed_categories: list[str] | None = None
+    description: str | None = None
+    is_verified: bool = False
 
 
 class SiteOut(BaseModel):
@@ -49,6 +55,10 @@ class SiteOut(BaseModel):
     publisher_id: str
     domain: str
     name: str
+    category: str | None = None
+    allowed_categories: list[str] | None = None
+    description: str | None = None
+    is_verified: bool
     is_active: bool
 
     model_config = {"from_attributes": True}
@@ -75,7 +85,8 @@ class PlacementIn(BaseModel):
     name: str
     site_id: str | None = None
     app_id: str | None = None
-    type: str = "BANNER"
+    page_path: str | None = None
+    context_tags: list[str] | None = None
 
 
 class PlacementOut(BaseModel):
@@ -84,7 +95,8 @@ class PlacementOut(BaseModel):
     site_id: str | None = None
     app_id: str | None = None
     name: str
-    type: str
+    page_path: str | None = None
+    context_tags: list[str] | None = None
     is_active: bool
 
     model_config = {"from_attributes": True}
@@ -95,6 +107,9 @@ class SlotIn(BaseModel):
     slot_key: str | None = None
     format: str = "BANNER"
     category: str | None = None
+    allowed_formats: list[str] | None = None
+    width: int | None = None
+    height: int | None = None
 
 
 class SlotOut(BaseModel):
@@ -104,6 +119,9 @@ class SlotOut(BaseModel):
     slot_key: str
     format: str
     category: str | None = None
+    allowed_formats: list[str] | None = None
+    width: int | None = None
+    height: int | None = None
     is_active: bool
 
     model_config = {"from_attributes": True}
@@ -242,7 +260,8 @@ async def create_placement(payload: PlacementIn, db: AsyncSession = Depends(get_
         site_id=uuid.UUID(payload.site_id) if payload.site_id else None,
         app_id=uuid.UUID(payload.app_id) if payload.app_id else None,
         name=payload.name,
-        type=PlacementType(payload.type.upper()),
+        page_path=payload.page_path,
+        context_tags=payload.context_tags,
     )
     db.add(placement)
     await db.flush()
@@ -267,7 +286,8 @@ async def update_placement(id: str, payload: PlacementIn, db: AsyncSession = Dep
     placement.name = payload.name
     placement.site_id = uuid.UUID(payload.site_id) if payload.site_id else None
     placement.app_id = uuid.UUID(payload.app_id) if payload.app_id else None
-    placement.type = PlacementType(payload.type.upper())
+    placement.page_path = payload.page_path
+    placement.context_tags = payload.context_tags
     await db.flush()
     return PlacementOut.model_validate(placement)
 
@@ -294,6 +314,9 @@ async def create_slot(id: str, payload: SlotIn, db: AsyncSession = Depends(get_d
         slot_key=payload.slot_key or secrets.token_urlsafe(12),
         format=SlotFormat(payload.format.upper()),
         category=payload.category,
+        allowed_formats=payload.allowed_formats,
+        width=payload.width,
+        height=payload.height,
     )
     db.add(slot)
     await db.flush()
@@ -313,6 +336,9 @@ async def update_slot(id: str, payload: SlotIn, db: AsyncSession = Depends(get_d
         slot.slot_key = payload.slot_key
     slot.format = SlotFormat(payload.format.upper())
     slot.category = payload.category
+    slot.allowed_formats = payload.allowed_formats
+    slot.width = payload.width
+    slot.height = payload.height
     await db.flush()
     return SlotOut.model_validate(slot)
 

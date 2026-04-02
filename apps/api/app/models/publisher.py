@@ -1,7 +1,7 @@
 import enum
 import uuid
 from decimal import Decimal
-from sqlalchemy import String, ForeignKey, Enum, Boolean, Numeric, Text
+from sqlalchemy import String, ForeignKey, Enum, Boolean, Numeric, Text, Integer
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import UUIDBase
@@ -13,22 +13,10 @@ class PublisherStatus(str, enum.Enum):
     REJECTED = "REJECTED"
 
 
-class PublisherTier(str, enum.Enum):
-    BRONZE = "BRONZE"
-    SILVER = "SILVER"
-    GOLD = "GOLD"
-
-
 class SiteStatus(str, enum.Enum):
     PENDING = "PENDING"
     ACTIVE = "ACTIVE"
     DISABLED = "DISABLED"
-
-
-class PlacementType(str, enum.Enum):
-    BANNER = "BANNER"
-    NATIVE = "NATIVE"
-    VIDEO = "VIDEO"
 
 
 class SlotFormat(str, enum.Enum):
@@ -42,11 +30,12 @@ class PublisherProfile(UUIDBase):
 
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), unique=True, index=True)
     company_name: Mapped[str] = mapped_column(String(255))
-    website: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    website_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
     contact_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    revenue_share_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("70.00"))
     status: Mapped[PublisherStatus] = mapped_column(Enum(PublisherStatus), default=PublisherStatus.PENDING)
-    tier: Mapped[PublisherTier] = mapped_column(Enum(PublisherTier), default=PublisherTier.BRONZE)
 
 
 class PublisherSite(UUIDBase):
@@ -55,8 +44,10 @@ class PublisherSite(UUIDBase):
     publisher_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("publisher_profiles.id"), index=True)
     domain: Mapped[str] = mapped_column(String(255), unique=True)
     name: Mapped[str] = mapped_column(String(255), default="")
-    categories: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
-    status: Mapped[SiteStatus] = mapped_column(Enum(SiteStatus), default=SiteStatus.PENDING)
+    category: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    allowed_categories: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
@@ -77,7 +68,8 @@ class Placement(UUIDBase):
     site_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("publisher_sites.id"), nullable=True)
     app_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("publisher_apps.id"), nullable=True)
     name: Mapped[str] = mapped_column(String(255))
-    type: Mapped[PlacementType] = mapped_column(Enum(PlacementType), default=PlacementType.BANNER)
+    page_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    context_tags: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
@@ -89,5 +81,8 @@ class AdSlot(UUIDBase):
     slot_key: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     format: Mapped[SlotFormat] = mapped_column(Enum(SlotFormat), default=SlotFormat.BANNER)
     category: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    allowed_formats: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
+    width: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    height: Mapped[int | None] = mapped_column(Integer, nullable=True)
     revenue_share_percent: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("70.00"))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

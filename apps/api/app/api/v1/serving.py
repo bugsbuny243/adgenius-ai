@@ -35,7 +35,7 @@ async def serve_ad(
 
 @router.post("/track/impression", response_model=ImpressionTrackResponse)
 async def track_impression(data: ImpressionTrackRequest, db: AsyncSession = Depends(get_db)):
-    impression = await record_impression(db=db, request_id=data.request_id, session_id=data.session_id)
+    impression = await record_impression(db=db, ad_request_id=data.ad_request_id, session_id=data.session_id)
     return ImpressionTrackResponse(impression_id=str(impression.id), recorded=True)
 
 
