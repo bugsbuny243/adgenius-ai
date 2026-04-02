@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_db, get_current_user
 from app.models.user import User, UserRole
-from app.models.publisher import PublisherProfile, PublisherStatus, PublisherTier, SiteStatus
+from app.models.publisher import PublisherProfile, PublisherStatus, SiteStatus
 from app.models.adnet import Campaign, CampaignStatus, PublisherPayout, PayoutStatus, DeliveryLog
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -65,8 +65,6 @@ async def approve_publisher(publisher_id: str, db: AsyncSession = Depends(get_db
     if not publisher:
         raise HTTPException(status_code=404, detail="Publisher not found")
     publisher.status = PublisherStatus.APPROVED
-    if not publisher.tier:
-        publisher.tier = PublisherTier.BRONZE
     await db.flush()
     return {"approved": str(publisher.id)}
 
@@ -81,8 +79,8 @@ async def fraud_signals(db: AsyncSession = Depends(get_db), current_user: User =
 @router.get("/finance")
 async def finance(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     _require_admin(current_user)
-    total_payout = await db.scalar(select(func.coalesce(func.sum(PublisherPayout.amount), 0)).where(PublisherPayout.status == PayoutStatus.APPROVED))
-    pending_payout = await db.scalar(select(func.coalesce(func.sum(PublisherPayout.amount), 0)).where(PublisherPayout.status == PayoutStatus.PENDING))
+    total_payout = await db.scalar(select(func.coalesce(func.sum(PublisherPayout.publisher_share), 0)).where(PublisherPayout.status == PayoutStatus.APPROVED))
+    pending_payout = await db.scalar(select(func.coalesce(func.sum(PublisherPayout.publisher_share), 0)).where(PublisherPayout.status == PayoutStatus.PENDING))
     return {
         "approved_payouts": total_payout or Decimal("0"),
         "pending_payouts": pending_payout or Decimal("0"),

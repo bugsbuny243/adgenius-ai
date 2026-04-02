@@ -62,9 +62,9 @@ async def apply_ad_spend(db: AsyncSession, campaign: Campaign, slot: AdSlot, gro
     return publisher_share
 
 
-async def write_delivery_log(db: AsyncSession, event_type: str, campaign_id, ad_id, slot_id, gross_cost: Decimal, publisher_share: Decimal, request_id=None, description: Optional[str] = None) -> None:
+async def write_delivery_log(db: AsyncSession, event_type: str, campaign_id, ad_id, slot_id, gross_cost: Decimal, publisher_share: Decimal, ad_request_id=None, description: Optional[str] = None) -> None:
     db.add(DeliveryLog(
-        event_type=event_type, request_id=request_id,
+        event_type=event_type, ad_request_id=ad_request_id,
         campaign_id=campaign_id, ad_id=ad_id, slot_id=slot_id,
         gross_cost=gross_cost, publisher_share=publisher_share,
         description=description or f"{event_type} event",
