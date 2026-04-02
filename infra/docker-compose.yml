@@ -1,44 +1,110 @@
 version: '3.9'
-services:
-  api:
-    build:
-      context: ..
-      dockerfile: apps/api/Dockerfile
-    ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=${REDIS_URL}
-      - SECRET_KEY=${SECRET_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - CORS_ORIGINS=${CORS_ORIGINS}
-      - ENVIRONMENT=production
-    depends_on:
-      - redis
 
+services:
   web:
     build:
       context: ..
       dockerfile: apps/web/Dockerfile
-    ports:
-      - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://api:8000
+      NEXT_PUBLIC_API_URL: http://api-gateway:8080
+    ports:
+      - '3000:3000'
     depends_on:
-      - api
+      - api-gateway
+
+  api-gateway:
+    build:
+      context: ..
+      dockerfile: services/api-gateway/Dockerfile
+    env_file:
+      - ../services/api-gateway/.env.example
+    environment:
+      API_GATEWAY_PORT: 8080
+      NATS_URL: nats://nats:4222
+      REDIS_ADDR: redis:6379
+      POSTGRES_DSN: postgres://postgres:postgres@postgres:5432/adgenius?sslmode=disable
+      AI_SERVICE_URL: http://ai:8090
+    ports:
+      - '8080:8080'
+    depends_on:
+      - postgres
+      - redis
+      - nats
+      - ai
+
+  serving:
+    build:
+      context: ..
+      dockerfile: services/serving/Dockerfile
+    env_file:
+      - ../services/serving/.env.example
+    environment:
+      SERVING_PORT: 8081
+      NATS_URL: nats://nats:4222
+      REDIS_ADDR: redis:6379
+    ports:
+      - '8081:8081'
+    depends_on:
+      - redis
+      - nats
 
   worker:
     build:
       context: ..
-      dockerfile: apps/worker/Dockerfile
+      dockerfile: services/worker/Dockerfile
+    env_file:
+      - ../services/worker/.env.example
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=${REDIS_URL}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      NATS_URL: nats://nats:4222
+      CLICKHOUSE_DSN: clickhouse://default:@clickhouse:9000/default
+      POSTGRES_DSN: postgres://postgres:postgres@postgres:5432/adgenius?sslmode=disable
     depends_on:
-      - redis
+      - nats
+      - clickhouse
+      - postgres
+
+  ai:
+    build:
+      context: ..
+      dockerfile: services/ai/Dockerfile
+    env_file:
+      - ../services/ai/.env.example
+    environment:
+      AI_SERVICE_PORT: 8090
+    ports:
+      - '8090:8090'
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: adgenius
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - '5432:5432'
+    volumes:
+      - pg_data:/var/lib/postgresql/data
 
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - '6379:6379'
+
+  nats:
+    image: nats:2.10-alpine
+    command: ['-js']
+    ports:
+      - '4222:4222'
+      - '8222:8222'
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    ports:
+      - '8123:8123'
+      - '9000:9000'
+    volumes:
+      - ch_data:/var/lib/clickhouse
+
+volumes:
+  pg_data:
+  ch_data:

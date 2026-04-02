@@ -1,1 +1,0 @@
-export default function Page(){return <main className='p-6'><h2 className='text-2xl font-semibold'>Admin fraud signals</h2></main>}
