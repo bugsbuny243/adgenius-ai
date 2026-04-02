@@ -84,7 +84,7 @@ async def select_best_ad(
         return None
 
     runtime_conditions = [
-        LiveCampaign.approval_status == ApprovalStatus.APPROVED,
+        (LiveCampaign.is_approved.is_(True)) | (LiveCampaign.approval_status == ApprovalStatus.APPROVED),
         LiveCampaign.status == LiveCampaignStatus.ACTIVE,
     ]
     result = await db.execute(select(LiveCampaign).where(and_(*runtime_conditions)))

@@ -8,8 +8,8 @@ This module intentionally separates publish/runtime entities from advertiser aut
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Numeric, String
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import UUIDBase
@@ -29,6 +29,11 @@ class ApprovalStatus(str, enum.Enum):
     REJECTED = "REJECTED"
 
 
+class RuntimePricingModel(str, enum.Enum):
+    CPC = "CPC"
+    CPM = "CPM"
+
+
 class LiveCampaign(UUIDBase):
     """Publish/runtime campaign entity used by serving.
 
@@ -39,22 +44,31 @@ class LiveCampaign(UUIDBase):
     __tablename__ = "live_campaigns"
 
     campaign_id: Mapped[str] = mapped_column(ForeignKey("campaigns.id"), index=True)
+    workspace_id: Mapped[str | None] = mapped_column(ForeignKey("workspaces.id"), nullable=True, index=True)
     campaign_brief_id: Mapped[str | None] = mapped_column(ForeignKey("campaign_briefs.id"), nullable=True)
+    name: Mapped[str] = mapped_column(String(255), default="")
     ad_set_id: Mapped[str | None] = mapped_column(ForeignKey("generated_ad_sets.id"), nullable=True)
     ad_variant_id: Mapped[str | None] = mapped_column(ForeignKey("generated_ad_variants.id"), nullable=True)
     ad_id: Mapped[str | None] = mapped_column(ForeignKey("ads.id"), nullable=True)
 
-    pricing_model: Mapped[str] = mapped_column(String(20), default="CPC")
+    pricing_model: Mapped[RuntimePricingModel] = mapped_column(Enum(RuntimePricingModel), default=RuntimePricingModel.CPC)
     cpm_rate: Mapped[float] = mapped_column(Numeric(10, 4), default=0)
     cpc_rate: Mapped[float] = mapped_column(Numeric(10, 4), default=0)
+    total_budget: Mapped[float | None] = mapped_column(Numeric(14, 6), nullable=True)
+    spent_amount: Mapped[float] = mapped_column(Numeric(14, 6), default=0)
     daily_budget_cap: Mapped[float | None] = mapped_column(Numeric(12, 4), nullable=True)
-    total_budget_cap: Mapped[float | None] = mapped_column(Numeric(12, 4), nullable=True)
 
-    target_regions: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
-    target_formats: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
+    target_categories: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    target_regions: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    target_formats: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     runtime_targeting: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    frequency_cap_per_user: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    frequency_cap_per_session: Mapped[int | None] = mapped_column(Integer, nullable=True)
     priority: Mapped[int] = mapped_column(Integer, default=0)
+    is_approved: Mapped[bool] = mapped_column(Boolean, default=False)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     approval_status: Mapped[ApprovalStatus] = mapped_column(Enum(ApprovalStatus), default=ApprovalStatus.PENDING)
     status: Mapped[LiveCampaignStatus] = mapped_column(Enum(LiveCampaignStatus), default=LiveCampaignStatus.PENDING)
