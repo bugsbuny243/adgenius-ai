@@ -46,7 +46,10 @@ class Campaign(UUIDBase):
 
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     title: Mapped[str] = mapped_column(String(255))
-    status: Mapped[CampaignStatus] = mapped_column(Enum(CampaignStatus), default=CampaignStatus.DRAFT)
+    status: Mapped[CampaignStatus] = mapped_column(
+        Enum(CampaignStatus, name="campaign_status_enum", create_type=False),
+        default=CampaignStatus.DRAFT,
+    )
     pricing_model: Mapped[PricingModel] = mapped_column(Enum(PricingModel), default=PricingModel.CPC)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 

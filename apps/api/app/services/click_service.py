@@ -62,16 +62,21 @@ async def record_click(db: AsyncSession, token: str):
         db.add(
             AdClick(
                 live_campaign_id=ad_request.live_campaign_id,
+                campaign_id=ad_request.campaign_id,
+                slot_id=ad_request.slot_id,
                 ad_request_id=ad_request.id,
-                ad_impression_id=getattr(detailed_impression, "id", None),
+                impression_id=getattr(detailed_impression, "id", None),
                 ad_set_id=getattr(live_campaign, "ad_set_id", None),
                 ad_variant_id=getattr(live_campaign, "ad_variant_id", None),
                 ad_id=ad_request.ad_id,
                 click_token=token,
+                destination_url=landing_url,
+                cost=gross_cost,
+                publisher_earnings=publisher_share,
                 country=ad_request.country,
                 device=ad_request.device,
                 telemetry={"landing_url": landing_url},
-                occurred_at=datetime.utcnow(),
+                clicked_at=datetime.utcnow(),
             )
         )
 

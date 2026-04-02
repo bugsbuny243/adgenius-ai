@@ -35,7 +35,10 @@ class PublisherProfile(UUIDBase):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     revenue_share_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("70.00"))
-    status: Mapped[PublisherStatus] = mapped_column(Enum(PublisherStatus), default=PublisherStatus.PENDING)
+    status: Mapped[PublisherStatus] = mapped_column(
+        Enum(PublisherStatus, name="publisher_status_enum", create_type=False),
+        default=PublisherStatus.PENDING,
+    )
 
 
 class PublisherSite(UUIDBase):
@@ -79,7 +82,10 @@ class AdSlot(UUIDBase):
     placement_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("placements.id"), index=True)
     name: Mapped[str] = mapped_column(String(255), default="")
     slot_key: Mapped[str] = mapped_column(String(255), unique=True, index=True)
-    format: Mapped[SlotFormat] = mapped_column(Enum(SlotFormat), default=SlotFormat.BANNER)
+    format: Mapped[SlotFormat] = mapped_column(
+        Enum(SlotFormat, name="slot_format_enum", create_type=False),
+        default=SlotFormat.BANNER,
+    )
     category: Mapped[str | None] = mapped_column(String(100), nullable=True)
     allowed_formats: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     width: Mapped[int | None] = mapped_column(Integer, nullable=True)
