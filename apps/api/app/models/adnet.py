@@ -1,10 +1,12 @@
 import enum
 import uuid
-from decimal import Decimal
 from datetime import datetime
-from sqlalchemy import String, ForeignKey, Numeric, Integer, Enum, Boolean, DateTime, Text
-from sqlalchemy.dialects.postgresql import ARRAY
+from decimal import Decimal
+
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.models.base import UUIDBase
 
 
@@ -27,7 +29,19 @@ class PayoutStatus(str, enum.Enum):
     REJECTED = "REJECTED"
 
 
+class AdRequestStatus(str, enum.Enum):
+    FILLED = "filled"
+    NO_FILL = "no_fill"
+    REJECTED = "rejected"
+
+
 class Campaign(UUIDBase):
+    """Advertiser authoring/business layer campaign.
+
+    Canonical authoring fields (title/pricing/budget/targeting/landing URL/status) live here.
+    Runtime publish state is represented by ``live_campaigns`` and should not be mixed here.
+    """
+
     __tablename__ = "campaigns"
 
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
@@ -35,14 +49,18 @@ class Campaign(UUIDBase):
     status: Mapped[CampaignStatus] = mapped_column(Enum(CampaignStatus), default=CampaignStatus.DRAFT)
     pricing_model: Mapped[PricingModel] = mapped_column(Enum(PricingModel), default=PricingModel.CPC)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
     total_budget: Mapped[Decimal] = mapped_column(Numeric(14, 6), default=Decimal("0"))
     daily_budget: Mapped[Decimal | None] = mapped_column(Numeric(14, 6), nullable=True)
     spent_amount: Mapped[Decimal] = mapped_column(Numeric(14, 6), default=Decimal("0"))
     bid_amount: Mapped[Decimal] = mapped_column(Numeric(14, 6), default=Decimal("0.01"))
+
+    targeting: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     landing_url: Mapped[str] = mapped_column(String(1024), default="https://example.com")
     category: Mapped[str | None] = mapped_column(String(100), nullable=True)
     target_countries: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
     target_devices: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
+
     start_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     end_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     impressions_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -92,6 +110,8 @@ class PublisherEarning(UUIDBase):
 
 
 class PublisherPayout(UUIDBase):
+    """Period-based publisher settlement records."""
+
     __tablename__ = "publisher_payouts"
 
     publisher_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("publisher_profiles.id"), index=True)
@@ -107,12 +127,15 @@ class PublisherPayout(UUIDBase):
 
 
 class AdRequest(UUIDBase):
+    """Serving request envelope and selected entity links for downstream tracking."""
+
     __tablename__ = "ad_requests"
 
     slot_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ad_slots.id"), index=True)
     campaign_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("campaigns.id"), nullable=True)
+    live_campaign_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("live_campaigns.id"), nullable=True)
     ad_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("ads.id"), nullable=True)
-    request_status: Mapped[str] = mapped_column(String(20), default="filled")
+    request_status: Mapped[AdRequestStatus] = mapped_column(Enum(AdRequestStatus), default=AdRequestStatus.FILLED)
     session_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     page_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     country: Mapped[str | None] = mapped_column(String(8), nullable=True)
@@ -134,6 +157,8 @@ class DeliveryLog(UUIDBase):
 
 
 class Impression(UUIDBase):
+    """Campaign-level canonical aggregate impression tracking row."""
+
     __tablename__ = "impressions"
 
     ad_request_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ad_requests.id"), index=True)
@@ -146,6 +171,8 @@ class Impression(UUIDBase):
 
 
 class Click(UUIDBase):
+    """Campaign-level canonical aggregate click tracking row."""
+
     __tablename__ = "clicks"
 
     campaign_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("campaigns.id"), index=True)

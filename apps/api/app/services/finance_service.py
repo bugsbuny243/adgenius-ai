@@ -1,11 +1,23 @@
-"""Finance service: wallet debits, campaign spend tracking, publisher earnings."""
+"""Finance service: wallet debits, campaign spend tracking, budget and payout side-effects."""
+
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-import structlog
 
-from app.models.adnet import Campaign, CampaignStatus, AdvertiserWallet, AdvertiserTransaction, PublisherEarning, DeliveryLog
+import structlog
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.adnet import (
+    AdvertiserTransaction,
+    AdvertiserWallet,
+    Campaign,
+    CampaignStatus,
+    DeliveryLog,
+    PublisherEarning,
+)
+from app.models.delivery import BudgetLedger, PacingCounter
+from app.models.finance import SpendReservation
 from app.models.publisher import AdSlot, Placement
 
 logger = structlog.get_logger()
@@ -32,12 +44,16 @@ async def apply_ad_spend(db: AsyncSession, campaign: Campaign, slot: AdSlot, gro
             return Decimal("0")
         wallet.balance -= gross_cost
         wallet.total_spent += gross_cost
-        db.add(AdvertiserTransaction(
-            wallet_id=wallet.id, campaign_id=campaign.id,
-            tx_type=f"spend_{event_type}", amount=-gross_cost,
-            description=f"{event_type.upper()} spend on slot {slot.id}",
-            reference_id=reference_id[:255],
-        ))
+        db.add(
+            AdvertiserTransaction(
+                wallet_id=wallet.id,
+                campaign_id=campaign.id,
+                tx_type=f"spend_{event_type}",
+                amount=-gross_cost,
+                description=f"{event_type.upper()} spend on slot {slot.id}",
+                reference_id=reference_id[:255],
+            )
+        )
 
     campaign.spent_amount = campaign.spent_amount + gross_cost
     if event_type == "impression":
@@ -50,22 +66,67 @@ async def apply_ad_spend(db: AsyncSession, campaign: Campaign, slot: AdSlot, gro
         campaign.is_active = False
         logger.info("Campaign budget exhausted", campaign_id=str(campaign.id))
 
+    now = datetime.now(timezone.utc)
+    hour_bucket = now.strftime("%Y%m%d%H")
+    pacing_counter = await db.scalar(
+        select(PacingCounter).where(PacingCounter.campaign_id == campaign.id, PacingCounter.hour_bucket == hour_bucket)
+    )
+    if not pacing_counter:
+        pacing_counter = PacingCounter(campaign_id=campaign.id, hour_bucket=hour_bucket, count=0)
+        db.add(pacing_counter)
+    pacing_counter.count += 1
+
+    db.add(
+        BudgetLedger(
+            campaign_id=campaign.id,
+            amount=float(-gross_cost),
+            entry_type=f"{event_type}_spend",
+            reference_type="ad_request",
+            reference_id=reference_id[:255],
+        )
+    )
+
+    reservation = await db.scalar(select(SpendReservation).where(SpendReservation.ad_request_id == reference_id))
+    if reservation:
+        reservation.status = "consumed"
+
     result = await db.execute(select(Placement).where(Placement.id == slot.placement_id))
     placement = result.scalar_one_or_none()
     if placement and publisher_share > Decimal("0"):
-        db.add(PublisherEarning(
-            publisher_id=placement.publisher_id, slot_id=slot.id,
-            campaign_id=campaign.id, event_type=event_type,
-            amount=publisher_share, reference_id=reference_id[:255],
-        ))
+        db.add(
+            PublisherEarning(
+                publisher_id=placement.publisher_id,
+                slot_id=slot.id,
+                campaign_id=campaign.id,
+                event_type=event_type,
+                amount=publisher_share,
+                reference_id=reference_id[:255],
+            )
+        )
 
     return publisher_share
 
 
-async def write_delivery_log(db: AsyncSession, event_type: str, campaign_id, ad_id, slot_id, gross_cost: Decimal, publisher_share: Decimal, ad_request_id=None, description: Optional[str] = None) -> None:
-    db.add(DeliveryLog(
-        event_type=event_type, ad_request_id=ad_request_id,
-        campaign_id=campaign_id, ad_id=ad_id, slot_id=slot_id,
-        gross_cost=gross_cost, publisher_share=publisher_share,
-        description=description or f"{event_type} event",
-    ))
+async def write_delivery_log(
+    db: AsyncSession,
+    event_type: str,
+    campaign_id,
+    ad_id,
+    slot_id,
+    gross_cost: Decimal,
+    publisher_share: Decimal,
+    ad_request_id=None,
+    description: Optional[str] = None,
+) -> None:
+    db.add(
+        DeliveryLog(
+            event_type=event_type,
+            ad_request_id=ad_request_id,
+            campaign_id=campaign_id,
+            ad_id=ad_id,
+            slot_id=slot_id,
+            gross_cost=gross_cost,
+            publisher_share=publisher_share,
+            description=description or f"{event_type} event",
+        )
+    )

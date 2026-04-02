@@ -1,13 +1,17 @@
 from decimal import Decimal
 import uuid
+
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies import get_db, get_current_user
-from app.models.user import User, UserRole
+from app.dependencies import get_current_user, get_db
+from app.models.adnet import Campaign, CampaignStatus, PayoutStatus, PublisherPayout
+from app.models.ai_logs import AiOptimizationLog
+from app.models.finance import FraudSignal, ModerationReview, PolicyFlag
 from app.models.publisher import PublisherProfile, PublisherStatus, SiteStatus
-from app.models.adnet import Campaign, CampaignStatus, PublisherPayout, PayoutStatus, DeliveryLog
+from app.models.usage import ApiUsageCounter, UsageLog
+from app.models.user import User, UserRole
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -69,10 +73,45 @@ async def approve_publisher(publisher_id: str, db: AsyncSession = Depends(get_db
     return {"approved": str(publisher.id)}
 
 
-@router.get("/fraud/signals")
+@router.get("/governance/fraud-signals")
 async def fraud_signals(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     _require_admin(current_user)
-    result = await db.execute(select(DeliveryLog).where(DeliveryLog.event_type == "fraud").order_by(DeliveryLog.created_at.desc()))
+    result = await db.execute(select(FraudSignal).order_by(FraudSignal.created_at.desc()))
+    return list(result.scalars().all())
+
+
+@router.get("/governance/moderation-reviews")
+async def moderation_reviews(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _require_admin(current_user)
+    result = await db.execute(select(ModerationReview).order_by(ModerationReview.created_at.desc()))
+    return list(result.scalars().all())
+
+
+@router.get("/governance/policy-flags")
+async def policy_flags(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _require_admin(current_user)
+    result = await db.execute(select(PolicyFlag).order_by(PolicyFlag.created_at.desc()))
+    return list(result.scalars().all())
+
+
+@router.get("/governance/ai-optimization-logs")
+async def ai_optimization_logs(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _require_admin(current_user)
+    result = await db.execute(select(AiOptimizationLog).order_by(AiOptimizationLog.created_at.desc()))
+    return list(result.scalars().all())
+
+
+@router.get("/governance/usage-logs")
+async def usage_logs(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _require_admin(current_user)
+    result = await db.execute(select(UsageLog).order_by(UsageLog.created_at.desc()).limit(500))
+    return list(result.scalars().all())
+
+
+@router.get("/governance/api-usage-counters")
+async def api_usage_counters(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _require_admin(current_user)
+    result = await db.execute(select(ApiUsageCounter).order_by(ApiUsageCounter.key.asc()))
     return list(result.scalars().all())
 
 

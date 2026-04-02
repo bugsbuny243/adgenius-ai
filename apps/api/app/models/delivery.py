@@ -1,21 +1,63 @@
-from sqlalchemy import String, ForeignKey, Numeric, Integer
-from sqlalchemy.dialects.postgresql import ARRAY
+"""Runtime delivery domain models.
+
+This module intentionally separates publish/runtime entities from advertiser authoring entities:
+- ``campaigns`` and ``ads`` stay in advertiser business authoring domain.
+- ``live_campaigns`` and ``ad_*`` runtime tables power serving execution.
+"""
+
+import enum
+from datetime import datetime
+
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Numeric, String
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.models.base import UUIDBase
 
 
+class LiveCampaignStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    READY = "READY"
+    ACTIVE = "ACTIVE"
+    PAUSED = "PAUSED"
+    ENDED = "ENDED"
+
+
+class ApprovalStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
 class LiveCampaign(UUIDBase):
+    """Publish/runtime campaign entity used by serving.
+
+    This is not an advertiser authoring object. It is a runtime projection of campaign
+    business intent, brief intent and generated creative output.
+    """
+
     __tablename__ = "live_campaigns"
 
-    campaign_id: Mapped[str] = mapped_column(ForeignKey("campaigns.id"), unique=True)
+    campaign_id: Mapped[str] = mapped_column(ForeignKey("campaigns.id"), index=True)
+    campaign_brief_id: Mapped[str | None] = mapped_column(ForeignKey("campaign_briefs.id"), nullable=True)
+    ad_set_id: Mapped[str | None] = mapped_column(ForeignKey("generated_ad_sets.id"), nullable=True)
+    ad_variant_id: Mapped[str | None] = mapped_column(ForeignKey("generated_ad_variants.id"), nullable=True)
+    ad_id: Mapped[str | None] = mapped_column(ForeignKey("ads.id"), nullable=True)
+
     pricing_model: Mapped[str] = mapped_column(String(20), default="CPC")
     cpm_rate: Mapped[float] = mapped_column(Numeric(10, 4), default=0)
     cpc_rate: Mapped[float] = mapped_column(Numeric(10, 4), default=0)
+    daily_budget_cap: Mapped[float | None] = mapped_column(Numeric(12, 4), nullable=True)
+    total_budget_cap: Mapped[float | None] = mapped_column(Numeric(12, 4), nullable=True)
+
     target_regions: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
     target_formats: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
+    runtime_targeting: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    frequency_cap_per_user: Mapped[int | None] = mapped_column(Integer, nullable=True)
     priority: Mapped[int] = mapped_column(Integer, default=0)
-    daily_budget_cap: Mapped[float | None] = mapped_column(Numeric(12, 4), nullable=True)
-    approval_status: Mapped[str] = mapped_column(String(50), default="pending")
+
+    approval_status: Mapped[ApprovalStatus] = mapped_column(Enum(ApprovalStatus), default=ApprovalStatus.PENDING)
+    status: Mapped[LiveCampaignStatus] = mapped_column(Enum(LiveCampaignStatus), default=LiveCampaignStatus.PENDING)
 
 
 class DeliveryRule(UUIDBase):
@@ -27,17 +69,38 @@ class DeliveryRule(UUIDBase):
 
 
 class AdImpression(UUIDBase):
+    """Detailed runtime impression telemetry at live-campaign/ad-set level."""
+
     __tablename__ = "ad_impressions"
 
-    live_campaign_id: Mapped[str] = mapped_column(ForeignKey("live_campaigns.id"))
-    ad_id: Mapped[str] = mapped_column(ForeignKey("ads.id"))
+    live_campaign_id: Mapped[str] = mapped_column(ForeignKey("live_campaigns.id"), index=True)
+    ad_request_id: Mapped[str] = mapped_column(ForeignKey("ad_requests.id"), index=True)
+    ad_set_id: Mapped[str | None] = mapped_column(ForeignKey("generated_ad_sets.id"), nullable=True)
+    ad_variant_id: Mapped[str | None] = mapped_column(ForeignKey("generated_ad_variants.id"), nullable=True)
+    ad_id: Mapped[str | None] = mapped_column(ForeignKey("ads.id"), nullable=True)
+    click_token: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    country: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    device: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    telemetry: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
 
 class AdClick(UUIDBase):
+    """Detailed runtime click telemetry linked to ad impression when available."""
+
     __tablename__ = "ad_clicks"
 
-    live_campaign_id: Mapped[str] = mapped_column(ForeignKey("live_campaigns.id"))
-    ad_id: Mapped[str] = mapped_column(ForeignKey("ads.id"))
+    live_campaign_id: Mapped[str] = mapped_column(ForeignKey("live_campaigns.id"), index=True)
+    ad_request_id: Mapped[str] = mapped_column(ForeignKey("ad_requests.id"), index=True)
+    ad_impression_id: Mapped[str | None] = mapped_column(ForeignKey("ad_impressions.id"), nullable=True)
+    ad_set_id: Mapped[str | None] = mapped_column(ForeignKey("generated_ad_sets.id"), nullable=True)
+    ad_variant_id: Mapped[str | None] = mapped_column(ForeignKey("generated_ad_variants.id"), nullable=True)
+    ad_id: Mapped[str | None] = mapped_column(ForeignKey("ads.id"), nullable=True)
+    click_token: Mapped[str] = mapped_column(String(1024), index=True)
+    country: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    device: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    telemetry: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
 
 class ConversionEvent(UUIDBase):
@@ -48,15 +111,22 @@ class ConversionEvent(UUIDBase):
 
 
 class BudgetLedger(UUIDBase):
+    """Financial/budget control ledger for budget debits/credits per campaign."""
+
     __tablename__ = "budget_ledgers"
 
-    campaign_id: Mapped[str] = mapped_column(ForeignKey("campaigns.id"))
+    campaign_id: Mapped[str] = mapped_column(ForeignKey("campaigns.id"), index=True)
     amount: Mapped[float] = mapped_column(Numeric(12, 4), default=0)
+    entry_type: Mapped[str] = mapped_column(String(50), default="spend")
+    reference_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    reference_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
 
 class PacingCounter(UUIDBase):
+    """Per campaign serving counters used by pacing decisions."""
+
     __tablename__ = "pacing_counters"
 
-    campaign_id: Mapped[str] = mapped_column(ForeignKey("campaigns.id"))
-    hour_bucket: Mapped[str] = mapped_column(String(20))
+    campaign_id: Mapped[str] = mapped_column(ForeignKey("campaigns.id"), index=True)
+    hour_bucket: Mapped[str] = mapped_column(String(20), index=True)
     count: Mapped[int] = mapped_column(Integer, default=0)
