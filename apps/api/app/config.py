@@ -12,6 +12,12 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379"
     SECRET_KEY: str = "change-me-in-production-use-a-long-random-string"
     GEMINI_API_KEY: str = ""
+    GOOGLE_ADS_DEVELOPER_TOKEN: str = ""
+    GOOGLE_ADS_CUSTOMER_ID: str = ""
+    GOOGLE_ADS_LOGIN_CUSTOMER_ID: str = ""
+    GOOGLE_ADS_CLIENT_ID: str = ""
+    GOOGLE_ADS_CLIENT_SECRET: str = ""
+    GOOGLE_ADS_REFRESH_TOKEN: str = ""
     CORS_ORIGINS: List[str] = ["http://localhost:3000"]
     ENVIRONMENT: str = "development"
     RATE_LIMIT_GENERATION_PER_MINUTE: int = 5
