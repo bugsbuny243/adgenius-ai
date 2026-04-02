@@ -6,7 +6,8 @@ from app.models.base import UUIDBase
 
 
 class UserRole(str, enum.Enum):
-    ADMIN = "ADMIN"
+    SUPER_ADMIN = "SUPER_ADMIN"
+    OPS_MANAGER = "OPS_MANAGER"
     ADVERTISER = "ADVERTISER"
     PUBLISHER = "PUBLISHER"
 
@@ -17,7 +18,7 @@ class User(UUIDBase):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255))
     full_name: Mapped[str] = mapped_column(String(255), default="")
-    role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.ADVERTISER)
+    role: Mapped[UserRole] = mapped_column(Enum(UserRole, name="userrole"), default=UserRole.ADVERTISER)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
