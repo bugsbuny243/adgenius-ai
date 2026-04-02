@@ -1,21 +1,45 @@
-# FULL FILE
-from uuid import uuid4
-from fastapi import APIRouter
-from app.schemas.serving import ServeAdResponse, ImpressionTrackRequest
-from app.services.token_service import create_click_token
+"""Ad serving engine: slot request, impression tracking, click tracking."""
+from typing import Optional
+from fastapi import APIRouter, Depends, Response, status
+from fastapi.responses import RedirectResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+import structlog
 
-router = APIRouter(prefix="/serving", tags=["serving"])
+from app.dependencies import get_db
+from app.schemas.serving import ServeAdResponse, ImpressionTrackRequest, ImpressionTrackResponse
+from app.services.ad_selection import select_best_ad
+from app.services.impression_service import record_impression
+from app.services.click_service import record_click
 
-@router.get("/serve", response_model=ServeAdResponse)
-async def serve_ad(slot_id: str):
-    req_id = str(uuid4())
-    return ServeAdResponse(request_id=req_id, ad_id="demo-ad", campaign_id="demo-campaign", title="Grow with AdGenius", body="AI-powered ad delivery for your audience.", cta="Get Started")
+router = APIRouter(tags=["serving"])
+logger = structlog.get_logger()
 
-@router.post("/impression")
-async def track_impression(payload: ImpressionTrackRequest):
-    return {"ok": True, "request_id": payload.request_id}
 
-@router.post("/click")
-async def track_click(request_id: str, ad_id: str, slot_id: str):
-    token = create_click_token({"request_id": request_id, "ad_id": ad_id, "slot_id": slot_id})
-    return {"ok": True, "click_token": token}
+@router.get("/serve/ad", response_model=ServeAdResponse)
+async def serve_ad(
+    slot_key: str,
+    page_url: Optional[str] = None,
+    session_id: Optional[str] = None,
+    country: Optional[str] = None,
+    device: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    payload = await select_best_ad(
+        db=db, slot_key=slot_key, page_url=page_url,
+        session_id=session_id, country=country, device=device,
+    )
+    if payload is None:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return ServeAdResponse(**payload)
+
+
+@router.post("/track/impression", response_model=ImpressionTrackResponse)
+async def track_impression(data: ImpressionTrackRequest, db: AsyncSession = Depends(get_db)):
+    impression = await record_impression(db=db, request_id=data.request_id, session_id=data.session_id)
+    return ImpressionTrackResponse(impression_id=str(impression.id), recorded=True)
+
+
+@router.get("/track/click/{click_token}")
+async def track_click(click_token: str, db: AsyncSession = Depends(get_db)):
+    click, landing_url = await record_click(db=db, token=click_token)
+    return RedirectResponse(url=landing_url, status_code=302)
