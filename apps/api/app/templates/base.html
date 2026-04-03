@@ -3,19 +3,18 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{{ page_title or "AdGenius" }}</title>
+    <title>{{ page_title or "TradePi Global" }}</title>
     <link rel="stylesheet" href="/static/site.css" />
   </head>
   <body>
     <header>
       <div class="container nav">
-        <a href="/" class="brand">AdGenius</a>
+        <a href="/" class="brand">TradePi Global</a>
         <nav>
-          <a href="/pricing" class="{% if active_page == 'pricing' %}active{% endif %}">Pricing</a>
+          <a href="/" class="{% if active_page == 'home' %}active{% endif %}">Home</a>
+          <a href="/packages" class="{% if active_page == 'packages' %}active{% endif %}">Packages</a>
           <a href="/brief" class="{% if active_page == 'brief' %}active{% endif %}">Brief Intake</a>
-          <a href="/dashboard" class="{% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
-          <a href="/admin" class="{% if active_page == 'admin' %}active{% endif %}">Admin</a>
-          <a href="/api/v1/health" target="_blank" rel="noreferrer">API</a>
+          <a href="/contact" rel="noreferrer">Contact</a>
         </nav>
       </div>
     </header>

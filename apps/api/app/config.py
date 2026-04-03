@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_GENERATION_PER_MINUTE: int = 5
     ACCESS_TOKEN_EXPIRE_DAYS: int = 7
     ALGORITHM: str = "HS256"
+    WHATSAPP_URL: str = "https://wa.me/905000000000"
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

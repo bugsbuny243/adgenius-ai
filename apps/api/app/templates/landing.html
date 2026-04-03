@@ -1,29 +1,95 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="hero">
-  <h1>One Ad Stack. One Runtime.</h1>
-  <p>Launch campaigns, generate ads, and serve inventory from a single FastAPI deployment.</p>
+<section class="hero card">
+  <p class="eyebrow">AI-supported ad creative and campaign preparation</p>
+  <h1>Sales-ready creative packages for businesses that want faster ad results.</h1>
+  <p class="lead">We prepare ad copy, creative direction, visual prompts, and campaign structure tailored to your business so your team can launch quickly and confidently.</p>
   <div class="row">
-    <a class="button" href="/brief">Start brief intake</a>
-    <a class="button secondary" href="/dashboard">View dashboard</a>
+    <a class="button" href="/brief">Start Brief Intake</a>
+    <a class="button secondary" href="{{ whatsapp_url }}" target="_blank" rel="noreferrer">Contact on WhatsApp</a>
+    <a class="button tertiary" href="/packages">View Packages</a>
   </div>
 </section>
 
 <section>
-  <h2>Product flow</h2>
+  <h2>How it works</h2>
   <div class="grid three">
     <article>
-      <h3>Landing + Brief</h3>
-      <p>Capture campaign goals and constraints in one guided intake form.</p>
+      <h3>1) We collect your brief</h3>
+      <p>You share your offer, target audience, and goals with one focused intake form.</p>
     </article>
     <article>
-      <h3>Campaigns + Ads</h3>
-      <p>Manage campaign lifecycle and ad generation through /api/v1 advertiser routes.</p>
+      <h3>2) We prepare your ad package</h3>
+      <p>We craft clear ad angles, copy variations, and creative directions built for your business context.</p>
     </article>
     <article>
-      <h3>Delivery + Billing</h3>
-      <p>Serve ads, track impressions/clicks, then reconcile wallet balances and payouts.</p>
+      <h3>3) We deliver and optimize</h3>
+      <p>You receive practical launch assets and optimization guidance that your team can apply immediately.</p>
     </article>
+  </div>
+</section>
+
+<section>
+  <h2>Who it's for</h2>
+  <div class="grid two">
+    <article>
+      <ul>
+        <li>Real estate offices</li>
+        <li>Beauty and clinic businesses</li>
+        <li>Restaurants and cafes</li>
+      </ul>
+    </article>
+    <article>
+      <ul>
+        <li>Local service businesses</li>
+        <li>Small ecommerce brands</li>
+        <li>Teams that need faster creative turnaround</li>
+      </ul>
+    </article>
+  </div>
+</section>
+
+<section>
+  <h2>Package overview</h2>
+  <div class="grid three">
+    <article>
+      <h3>Launch Package</h3>
+      <p class="price">9,500 TL</p>
+      <p>Fast foundation for businesses preparing their first structured ad cycle.</p>
+    </article>
+    <article>
+      <h3>Growth Package</h3>
+      <p class="price">18,500 TL</p>
+      <p>More variations, stronger angle testing, and deeper planning for scaling campaigns.</p>
+    </article>
+    <article>
+      <h3>Performance Management</h3>
+      <p class="price">35,000 TL+ / monthly</p>
+      <p>Ongoing creative production and optimization support for sustained performance.</p>
+    </article>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Why businesses choose us</h2>
+  <div class="grid two">
+    <article>
+      <h3>Fast delivery, clear outputs</h3>
+      <p>You get concrete campaign assets and direction, not vague strategy documents.</p>
+    </article>
+    <article>
+      <h3>Built for execution</h3>
+      <p>Our work is designed to move directly into campaign setup, launch, and optimization.</p>
+    </article>
+  </div>
+</section>
+
+<section class="footer-cta card">
+  <h2>Ready to prepare your next campaign?</h2>
+  <p>Start your brief in minutes or message us directly to choose the right package.</p>
+  <div class="row">
+    <a class="button" href="/brief">Start Brief Intake</a>
+    <a class="button secondary" href="{{ whatsapp_url }}" target="_blank" rel="noreferrer">Contact on WhatsApp</a>
   </div>
 </section>
 {% endblock %}

@@ -1,33 +1,56 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Packages</h1>
+<section class="hero">
+  <p class="eyebrow">Packages</p>
+  <h1>Choose the level of support your business needs.</h1>
+  <p class="lead">Every package is focused on practical ad creative preparation, campaign structure, and faster execution.</p>
+</section>
+
 <div class="grid three">
   <article>
-    <h2>Starter</h2>
-    <p class="price">$499/mo</p>
+    <h2>Launch Package</h2>
+    <p class="price">9,500 TL</p>
     <ul>
-      <li>Up to 5 active campaigns</li>
-      <li>Automated ad generation</li>
-      <li>Basic reporting</li>
+      <li>Target and offer analysis</li>
+      <li>3 ad copy variations</li>
+      <li>3 creative directions / visual ideas</li>
+      <li>1 campaign launch structure</li>
+      <li>1 revision round</li>
+      <li>Fast delivery</li>
     </ul>
   </article>
   <article>
-    <h2>Growth</h2>
-    <p class="price">$1,499/mo</p>
+    <h2>Growth Package</h2>
+    <p class="price">18,500 TL</p>
     <ul>
-      <li>Up to 25 active campaigns</li>
-      <li>Publisher inventory matching</li>
-      <li>Wallet + payout support</li>
+      <li>Deeper business and offer analysis</li>
+      <li>10 ad copy variations</li>
+      <li>10 creative directions / prompt sets</li>
+      <li>Audience and message angle suggestions</li>
+      <li>Campaign structure</li>
+      <li>Optimization notes</li>
+      <li>2 revision rounds</li>
     </ul>
   </article>
   <article>
-    <h2>Enterprise</h2>
-    <p class="price">Custom</p>
+    <h2>Performance Management</h2>
+    <p class="price">35,000 TL+ / monthly</p>
     <ul>
-      <li>Unlimited campaigns</li>
-      <li>Dedicated fraud + pacing controls</li>
-      <li>Custom SLA and integrations</li>
+      <li>Continuous creative production</li>
+      <li>Weekly ad refreshes</li>
+      <li>Campaign optimization</li>
+      <li>Messaging and offer angle refinement</li>
+      <li>Regular performance review</li>
+      <li>Priority support</li>
     </ul>
   </article>
 </div>
+
+<section class="footer-cta card">
+  <h2>Need help picking the right package?</h2>
+  <div class="row">
+    <a class="button" href="/brief">Start Brief Intake</a>
+    <a class="button secondary" href="{{ whatsapp_url }}" target="_blank" rel="noreferrer">Contact on WhatsApp</a>
+  </div>
+</section>
 {% endblock %}
