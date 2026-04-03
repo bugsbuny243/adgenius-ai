@@ -6,7 +6,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_db, get_current_user
-from app.models.user import User
+from app.models.user import User, UserRole
+from app.services.brief_service import get_or_create_demo_user
 from app.models.publisher import (
     PublisherProfile,
     PublisherSite,
@@ -352,3 +353,46 @@ async def delete_slot(id: str, db: AsyncSession = Depends(get_db), current_user:
         raise HTTPException(status_code=404, detail="Slot not found")
     await db.delete(row[0])
     return {"deleted": True}
+
+
+class SlotCreateIn(SlotIn):
+    placement_id: str
+
+
+@router.get("/slots", response_model=list[SlotOut])
+async def list_slots_flat(db: AsyncSession = Depends(get_db)):
+    publisher_user = await get_or_create_demo_user(db, role=UserRole.PUBLISHER)
+    profile = await db.scalar(select(PublisherProfile).where(PublisherProfile.user_id == publisher_user.id))
+    if not profile:
+        return []
+    rows = await db.execute(
+        select(AdSlot)
+        .join(Placement, Placement.id == AdSlot.placement_id)
+        .where(Placement.publisher_id == profile.id)
+        .order_by(AdSlot.created_at.desc())
+    )
+    return [SlotOut.model_validate(row) for row in rows.scalars().all()]
+
+
+@router.post("/slots", response_model=SlotOut, status_code=status.HTTP_201_CREATED)
+async def create_slot_flat(payload: SlotCreateIn, db: AsyncSession = Depends(get_db)):
+    publisher_user = await get_or_create_demo_user(db, role=UserRole.PUBLISHER)
+    profile = await db.scalar(select(PublisherProfile).where(PublisherProfile.user_id == publisher_user.id))
+    if not profile:
+        raise HTTPException(status_code=404, detail="Publisher profile not found")
+    placement = await db.scalar(select(Placement).where(Placement.id == uuid.UUID(payload.placement_id), Placement.publisher_id == profile.id))
+    if not placement:
+        raise HTTPException(status_code=404, detail="Placement not found")
+    slot = AdSlot(
+        placement_id=placement.id,
+        name=payload.name,
+        slot_key=payload.slot_key or secrets.token_urlsafe(12),
+        format=SlotFormat(payload.format.upper()),
+        category=payload.category,
+        allowed_formats=payload.allowed_formats,
+        width=payload.width,
+        height=payload.height,
+    )
+    db.add(slot)
+    await db.flush()
+    return SlotOut.model_validate(slot)

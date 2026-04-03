@@ -1,26 +1,23 @@
 <!doctype html>
-<html lang="tr">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{{ page_title or "TradePi Global" }}</title>
+    <title>{{ page_title or "AdGenius" }}</title>
     <link rel="stylesheet" href="/static/site.css" />
   </head>
   <body>
     <header>
       <div class="container nav">
-        <a href="/" class="brand">TradePi Global</a>
+        <a href="/" class="brand">AdGenius</a>
         <nav>
-          <a href="/" class="{% if active_page == 'home' %}active{% endif %}">Ana Sayfa</a>
-          <a href="/packages" class="{% if active_page == 'packages' %}active{% endif %}">Paketler</a>
-          <a href="/brief" class="{% if active_page == 'brief' %}active{% endif %}">Brief</a>
-          <a href="{{ whatsapp_url }}" target="_blank" rel="noreferrer">WhatsApp</a>
+          <a href="/brief">Brief</a>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/dashboard/campaigns">Campaigns</a>
+          <a href="/dashboard/publisher">Publisher</a>
         </nav>
       </div>
     </header>
-
-    <main class="container">
-      {% block content %}{% endblock %}
-    </main>
+    <main class="container">{% block content %}{% endblock %}</main>
   </body>
 </html>

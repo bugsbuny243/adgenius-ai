@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Preview Studio</h1>
+<div class="grid two">
+<article><h3>Feed Ad Card</h3><h4>{{ copy.title if copy else brief.business_name }}</h4><p>{{ copy.content if copy else brief.offer_summary }}</p><button class="button">{{ copy.extra_data.cta if copy and copy.extra_data else 'Learn more' }}</button></article>
+<article><h3>Story/Reel</h3><p>{{ angle.title if angle else 'Primary angle' }}</p><p>{{ concept.content if concept else brief.goal }}</p></article>
+<article><h3>Banner/Native</h3><p>{{ concept.title if concept else brief.business_name }}</p><p>{{ angle.content if angle else brief.target_audience }}</p></article>
+<article><h3>Hosted Campaign Page Block</h3><h4>{{ brief.business_name }}</h4><p>{{ brief.offer_summary }}</p><p><b>Goal:</b> {{ brief.goal }}</p></article>
+</div>
+{% endblock %}

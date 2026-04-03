@@ -1,6 +1,6 @@
 """Ad serving engine: slot request, impression tracking, click tracking."""
 from typing import Optional
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
@@ -35,11 +35,17 @@ async def serve_ad(
 
 @router.post("/track/impression", response_model=ImpressionTrackResponse)
 async def track_impression(data: ImpressionTrackRequest, db: AsyncSession = Depends(get_db)):
-    impression = await record_impression(db=db, ad_request_id=data.ad_request_id, session_id=data.session_id)
+    try:
+        impression = await record_impression(db=db, ad_request_id=data.ad_request_id, session_id=data.session_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return ImpressionTrackResponse(impression_id=str(impression.id), recorded=True)
 
 
 @router.get("/track/click/{click_token}")
 async def track_click(click_token: str, db: AsyncSession = Depends(get_db)):
-    click, landing_url = await record_click(db=db, token=click_token)
+    try:
+        _, landing_url = await record_click(db=db, token=click_token)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return RedirectResponse(url=landing_url, status_code=302)

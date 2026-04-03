@@ -1,0 +1,2 @@
+{% extends "base.html" %}
+{% block content %}<h1>Placements</h1><ul>{% for p in placements %}<li>{{ p.name }} - site {{ p.site_id }}</li>{% endfor %}</ul>{% endblock %}

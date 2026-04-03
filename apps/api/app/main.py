@@ -11,7 +11,8 @@ from app.middleware.request_id import RequestIDMiddleware
 from app.middleware.logging import LoggingMiddleware, configure_structlog
 from app.api.v1.router import v1_router
 from app.pages import router as pages_router
-from app.models.lead import LeadBrief
+from app.database import Base
+import app.models  # noqa: F401
 
 configure_structlog()
 logger = structlog.get_logger()
@@ -25,7 +26,7 @@ async def lifespan(app: FastAPI):
 
     try:
         async with engine.begin() as conn:
-            await conn.run_sync(LeadBrief.__table__.create, checkfirst=True)
+            await conn.run_sync(Base.metadata.create_all)
         app.state.db_startup_ready = True
         logger.info("Database startup check completed")
     except Exception as exc:  # noqa: BLE001

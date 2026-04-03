@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>AI Creative Studio: {{ brief.business_name }}</h1>
+<div class="grid two">
+<section><h2>Angles</h2>{% for x in angles %}<article><h3>{{ x.title }}</h3><p>{{ x.content }}</p></article>{% endfor %}</section>
+<section><h2>Ad Copy Variants</h2>{% for x in copies %}<article><h3>{{ x.title }}</h3><p>{{ x.content }}</p><p><b>CTA:</b> {{ x.extra_data.cta if x.extra_data else '' }}</p></article>{% endfor %}</section>
+</div>
+<section><h2>Creative Concepts</h2>{% for x in concepts %}<article><h3>{{ x.title }}</h3><p>{{ x.content }}</p></article>{% endfor %}</section>
+{% endblock %}
