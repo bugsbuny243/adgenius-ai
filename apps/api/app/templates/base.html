@@ -13,10 +13,15 @@
         <nav>
           <a href="/packages">Packages</a>
           {% if is_authenticated %}
-          <a href="/brief">Brief</a>
           <a href="/dashboard">Dashboard</a>
+          {% if current_user and current_user.role.value in ["ADVERTISER", "ADMIN", "SUPER_ADMIN", "OPS_MANAGER"] %}
+          <a href="/brief">Brief</a>
           <a href="/campaigns">Campaigns</a>
+          {% endif %}
+          {% if current_user and current_user.role.value in ["PUBLISHER", "ADMIN", "SUPER_ADMIN", "OPS_MANAGER"] %}
           <a href="/publisher">Publisher</a>
+          {% endif %}
+          <span>{{ (current_user.full_name or current_user.email) if current_user else "" }}</span>
           <form method="post" action="/logout" style="display:inline;">
             <button type="submit">Logout</button>
           </form>
