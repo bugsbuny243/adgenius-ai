@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request, Depends, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
+from pathlib import Path
 
 from app.config import settings
 from app.dependencies import get_db
@@ -9,7 +10,8 @@ from app.models.lead import LeadBrief
 
 router = APIRouter(tags=["pages"])
 
-templates = Jinja2Templates(directory="app/templates")
+_templates_dir = Path(__file__).resolve().parent / "templates"
+templates = Jinja2Templates(directory=str(_templates_dir))
 
 
 @router.get("/", response_class=HTMLResponse)
