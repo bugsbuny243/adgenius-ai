@@ -1,26 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Advertiser Dashboard</h1>
+<h1>AdGenius Dashboard</h1>
 <div class="grid two">
-  <article>
-    <h2>Campaigns</h2>
-    <p>Track status, pacing, and budget consumption.</p>
-    <code>GET /api/v1/advertiser/campaigns</code>
-  </article>
-  <article>
-    <h2>Ads</h2>
-    <p>Review generated ads and approve launch-ready variants.</p>
-    <code>POST /api/v1/advertiser/campaigns/{id}/ads/generate</code>
-  </article>
-  <article>
-    <h2>Wallet</h2>
-    <p>Top up advertiser balance and monitor funds available.</p>
-    <code>GET /api/v1/advertiser/wallet</code>
-  </article>
-  <article>
-    <h2>Payouts</h2>
-    <p>Publisher payout requests and payout history visibility.</p>
-    <code>GET /api/v1/publisher/payouts</code>
-  </article>
+  <article><h3>Briefs</h3><p>{{ summary.brief_count }}</p></article>
+  <article><h3>Campaigns</h3><p>{{ summary.campaign_count }}</p></article>
+  <article><h3>Publisher Slots</h3><p>{{ summary.slot_count }}</p></article>
+  <article><h3>Serve Requests</h3><p>{{ summary.serve_events }}</p></article>
 </div>
+<h2>Recent Briefs</h2>
+<ul>{% for b in recent_briefs %}<li><a href="/dashboard/briefs/{{ b.id }}">{{ b.business_name }}</a> - {{ b.status.value }}</li>{% endfor %}</ul>
+<h2>Recent Campaigns</h2>
+<ul>{% for c in recent_campaigns %}<li><a href="/dashboard/campaigns/{{ c.id }}">{{ c.title }}</a> - {{ c.status.value }}</li>{% endfor %}</ul>
 {% endblock %}

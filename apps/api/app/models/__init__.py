@@ -11,3 +11,5 @@ from app.models.generation import GenerationJob, GeneratedAdSet, GeneratedAdVari
 from app.models.usage import UsageLog, ApiUsageCounter
 
 from app.models.lead import LeadBrief
+
+from app.models.briefing import AdBrief, BriefGenerationRun, BriefGeneratedOutput

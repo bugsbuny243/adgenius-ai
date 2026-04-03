@@ -1,50 +1,21 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="hero">
-  <p class="eyebrow">Brief Formu</p>
-  <h1>İşletmenizi ve hedefinizi birkaç dakikada paylaşın.</h1>
-  <p class="lead">Bu kısa formu doldurun, size en uygun reklam içerik ve kampanya planını net şekilde hazırlayalım.</p>
+  <p class="eyebrow">Brief</p>
+  <h1>Create a real campaign brief for AdGenius</h1>
 </section>
-
-{% if submitted %}
-<section class="card success">
-  <h2>Briefinizi aldık. En kısa sürede sizinle iletişime geçeceğiz.</h2>
-  <p>İsterseniz beklemeden WhatsApp üzerinden de bize yazabilirsiniz.</p>
-  <a class="button secondary" href="{{ whatsapp_url }}" target="_blank" rel="noreferrer">WhatsApp'tan yazın</a>
-</section>
-{% endif %}
-
+{% if submitted %}<section class="card success"><h2>Brief saved.</h2></section>{% endif %}
 <form class="card" method="post" action="/brief">
-  <p class="form-note">Lütfen yıldızlı alanları eksiksiz doldurun.</p>
-
-  <label>İşletme adı *
-    <input type="text" name="business_name" required placeholder="Örn: ABC Güzellik Merkezi" />
-  </label>
-  <label>Sektör *
-    <input type="text" name="sector" required placeholder="Örn: Emlak, güzellik, restoran, e-ticaret" />
-  </label>
-  <label>Ne satıyorsunuz? *
-    <textarea rows="3" name="what_do_you_sell" required placeholder="Ürün veya hizmetinizi kısa ve net anlatın"></textarea>
-  </label>
-  <label>Hedef kitleniz kim? *
-    <textarea rows="3" name="target_audience" required placeholder="Reklamı kimin görmesini istiyorsunuz?"></textarea>
-  </label>
-  <label>Reklamdan beklentiniz nedir? *
-    <textarea rows="3" name="advertising_goal" required placeholder="Örn: Daha fazla randevu, lead, satış"></textarea>
-  </label>
-  <label>Web sitesi / sosyal medya bağlantısı
-    <input type="url" name="website_or_social_link" placeholder="https://..." />
-  </label>
-  <label>Beğendiğiniz rakip örnekleri
-    <textarea rows="2" name="competitor_examples" placeholder="Varsa örnek hesap veya reklam linkleri"></textarea>
-  </label>
-  <label>İlgilendiğiniz paket *
-    <select name="interested_package" required>
-      <option value="Başlangıç Paketi">Başlangıç Paketi — 9.500 TL</option>
-      <option value="Büyüme Paketi">Büyüme Paketi — 18.500 TL</option>
-      <option value="Performans Yönetimi">Performans Yönetimi — 35.000 TL+ / aylık</option>
-    </select>
-  </label>
-  <button type="submit" class="button">Brief gönder</button>
+  <label>Business name *<input type="text" name="business_name" required /></label>
+  <label>Sector *<input type="text" name="sector" required /></label>
+  <label>Offer summary *<textarea rows="3" name="offer_summary" required></textarea></label>
+  <label>Target audience *<textarea rows="3" name="target_audience" required></textarea></label>
+  <label>Goal *<textarea rows="3" name="goal" required></textarea></label>
+  <label>Competitor examples<textarea rows="2" name="competitor_examples"></textarea></label>
+  <label>Tone / notes<textarea rows="2" name="tone_notes"></textarea></label>
+  <label>Selected package *<input type="text" name="selected_package" required /></label>
+  <button type="submit" class="button">Create brief</button>
 </form>
+<h2>Recent Briefs</h2>
+<ul>{% for b in briefs %}<li><a href="/dashboard/briefs/{{ b.id }}">{{ b.business_name }}</a> - {{ b.status.value }}</li>{% endfor %}</ul>
 {% endblock %}
