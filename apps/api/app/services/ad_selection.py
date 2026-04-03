@@ -8,13 +8,24 @@ import structlog
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.adnet import Ad, AdRequest, AdRequestStatus, Campaign, CampaignStatus
+from app.models import adnet as adnet_models
 from app.models.delivery import ApprovalStatus, LiveCampaign, LiveCampaignStatus
 from app.models.finance import SpendReservation
 from app.models.publisher import AdSlot, Placement, PublisherProfile, PublisherSite, PublisherStatus
 from app.services.token_service import create_click_token
 
 logger = structlog.get_logger()
+
+Ad = adnet_models.Ad
+AdRequest = adnet_models.AdRequest
+Campaign = adnet_models.Campaign
+CampaignStatus = adnet_models.CampaignStatus
+
+_DEFAULT_FILLED_STATUS = "FILLED"
+_DEFAULT_NO_FILL_STATUS = "NO_FILL"
+AdRequestStatus = getattr(adnet_models, "AdRequestStatus", None)
+_FILLED_STATUS = getattr(AdRequestStatus, "FILLED", _DEFAULT_FILLED_STATUS)
+_NO_FILL_STATUS = getattr(AdRequestStatus, "NO_FILL", _DEFAULT_NO_FILL_STATUS)
 
 _SCORE_WEIGHT_BID = 10
 _SCORE_WEIGHT_BUDGET = 20
@@ -36,7 +47,7 @@ async def _record_no_fill(db, slot_id, session_id, page_url, country, device):
     db.add(
         AdRequest(
             slot_id=slot_id,
-            request_status=AdRequestStatus.NO_FILL,
+            request_status=_NO_FILL_STATUS,
             session_id=session_id,
             page_url=page_url,
             country=country,
@@ -135,7 +146,7 @@ async def select_best_ad(
         campaign_id=selected_campaign.id,
         live_campaign_id=selected_live.id,
         ad_id=selected_ad.id,
-        request_status=AdRequestStatus.FILLED,
+        request_status=_FILLED_STATUS,
         session_id=session_id,
         page_url=page_url,
         country=country,
