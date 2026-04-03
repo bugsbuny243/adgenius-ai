@@ -10,7 +10,7 @@ class UsageLog(UUIDBase):
 
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
     action: Mapped[str] = mapped_column(String(255))
-    metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    metadata_json: Mapped[dict | None] = mapped_column("metadata", JSONB, nullable=True)
 
 
 class ApiUsageCounter(UUIDBase):
