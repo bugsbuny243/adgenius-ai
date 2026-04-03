@@ -4,6 +4,7 @@ from decimal import Decimal
 from datetime import datetime
 from sqlalchemy import String, ForeignKey, Numeric, Integer, Enum, Boolean, DateTime, Text
 from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import UUIDBase
 
@@ -21,6 +22,18 @@ class PricingModel(str, enum.Enum):
     CPM = "CPM"
 
 
+class AdRequestStatus(str, enum.Enum):
+    FILLED = "filled"
+    NO_FILL = "no_fill"
+    INVALID = "invalid"
+
+
+class PayoutStatus(str, enum.Enum):
+    PENDING = "pending"
+    PAID = "paid"
+    FAILED = "failed"
+
+
 class Campaign(UUIDBase):
     __tablename__ = "campaigns"
 
@@ -35,6 +48,7 @@ class Campaign(UUIDBase):
     bid_amount: Mapped[Decimal] = mapped_column(Numeric(14, 6), default=Decimal("0.01"))
     landing_url: Mapped[str] = mapped_column(String(1024), default="https://example.com")
     category: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    targeting: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     target_countries: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
     target_devices: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
     start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -97,7 +111,7 @@ class PublisherPayout(UUIDBase):
     period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    status: Mapped[str] = mapped_column(String(50), default="pending")
+    status: Mapped[PayoutStatus] = mapped_column(Enum(PayoutStatus, name="payoutstatus"), default=PayoutStatus.PENDING)
 
 
 class AdRequest(UUIDBase):
@@ -106,7 +120,8 @@ class AdRequest(UUIDBase):
     slot_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ad_slots.id"), index=True)
     campaign_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("campaigns.id"), nullable=True)
     ad_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("ads.id"), nullable=True)
-    request_status: Mapped[str] = mapped_column(String(20), default="filled")
+    live_campaign_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("live_campaigns.id"), nullable=True)
+    request_status: Mapped[AdRequestStatus] = mapped_column(Enum(AdRequestStatus, name="adrequeststatus"), default=AdRequestStatus.FILLED)
     session_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     page_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     country: Mapped[str | None] = mapped_column(String(8), nullable=True)
