@@ -75,7 +75,7 @@ async def generate_for_brief(db: AsyncSession, brief: AdBrief) -> BriefGeneratio
             await db.delete(row)
 
         analysis = payload.get("analysis") or {}
-        brief.metadata = {"analysis": analysis}
+        brief.brief_metadata = {"analysis": analysis}
 
         for angle in payload.get("angles", [])[:8]:
             db.add(
