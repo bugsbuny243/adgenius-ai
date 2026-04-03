@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_db, get_current_user, is_admin_role
 from app.models.user import User, UserRole
-from app.services.brief_service import get_or_create_demo_user
 from app.models.publisher import (
     PublisherProfile,
     PublisherSite,
@@ -137,6 +136,8 @@ def _require_publisher_or_admin(user: User) -> None:
 
 def _profile_scope_filter(user: User):
     return True if is_admin_role(user.role) else (PublisherProfile.user_id == user.id)
+
+
 async def _get_profile_or_404(db: AsyncSession, user: User) -> PublisherProfile:
     _require_publisher_or_admin(user)
     profile = await db.scalar(select(PublisherProfile).where(_profile_scope_filter(user)))
@@ -174,8 +175,12 @@ async def update_profile(payload: ProfileIn, db: AsyncSession = Depends(get_db),
 
 @router.get("/sites", response_model=list[SiteOut])
 async def list_sites(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    profile = await _get_profile_or_404(db, current_user)
-    result = await db.execute(select(PublisherSite).where(PublisherSite.publisher_id == profile.id).order_by(PublisherSite.created_at.desc()))
+    _require_publisher_or_admin(current_user)
+    query = select(PublisherSite).order_by(PublisherSite.created_at.desc())
+    if not is_admin_role(current_user.role):
+        profile = await _get_profile_or_404(db, current_user)
+        query = query.where(PublisherSite.publisher_id == profile.id)
+    result = await db.execute(query)
     return [SiteOut.model_validate(row) for row in result.scalars().all()]
 
 
@@ -190,8 +195,12 @@ async def create_site(payload: SiteIn, db: AsyncSession = Depends(get_db), curre
 
 @router.get("/sites/{id}", response_model=SiteOut)
 async def get_site(id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    profile = await _get_profile_or_404(db, current_user)
-    site = await db.scalar(select(PublisherSite).where(PublisherSite.id == uuid.UUID(id), PublisherSite.publisher_id == profile.id))
+    _require_publisher_or_admin(current_user)
+    query = select(PublisherSite).where(PublisherSite.id == uuid.UUID(id))
+    if not is_admin_role(current_user.role):
+        profile = await _get_profile_or_404(db, current_user)
+        query = query.where(PublisherSite.publisher_id == profile.id)
+    site = await db.scalar(query)
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
     return SiteOut.model_validate(site)
@@ -221,8 +230,12 @@ async def delete_site(id: str, db: AsyncSession = Depends(get_db), current_user:
 
 @router.get("/apps", response_model=list[AppOut])
 async def list_apps(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    profile = await _get_profile_or_404(db, current_user)
-    result = await db.execute(select(PublisherApp).where(PublisherApp.publisher_id == profile.id).order_by(PublisherApp.created_at.desc()))
+    _require_publisher_or_admin(current_user)
+    query = select(PublisherApp).order_by(PublisherApp.created_at.desc())
+    if not is_admin_role(current_user.role):
+        profile = await _get_profile_or_404(db, current_user)
+        query = query.where(PublisherApp.publisher_id == profile.id)
+    result = await db.execute(query)
     return [AppOut.model_validate(row) for row in result.scalars().all()]
 
 
@@ -259,8 +272,12 @@ async def delete_app(id: str, db: AsyncSession = Depends(get_db), current_user: 
 
 @router.get("/placements", response_model=list[PlacementOut])
 async def list_placements(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    profile = await _get_profile_or_404(db, current_user)
-    result = await db.execute(select(Placement).where(Placement.publisher_id == profile.id).order_by(Placement.created_at.desc()))
+    _require_publisher_or_admin(current_user)
+    query = select(Placement).order_by(Placement.created_at.desc())
+    if not is_admin_role(current_user.role):
+        profile = await _get_profile_or_404(db, current_user)
+        query = query.where(Placement.publisher_id == profile.id)
+    result = await db.execute(query)
     return [PlacementOut.model_validate(row) for row in result.scalars().all()]
 
 
@@ -282,8 +299,12 @@ async def create_placement(payload: PlacementIn, db: AsyncSession = Depends(get_
 
 @router.get("/placements/{id}", response_model=PlacementOut)
 async def get_placement(id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    profile = await _get_profile_or_404(db, current_user)
-    placement = await db.scalar(select(Placement).where(Placement.id == uuid.UUID(id), Placement.publisher_id == profile.id))
+    _require_publisher_or_admin(current_user)
+    query = select(Placement).where(Placement.id == uuid.UUID(id))
+    if not is_admin_role(current_user.role):
+        profile = await _get_profile_or_404(db, current_user)
+        query = query.where(Placement.publisher_id == profile.id)
+    placement = await db.scalar(query)
     if not placement:
         raise HTTPException(status_code=404, detail="Placement not found")
     return PlacementOut.model_validate(placement)
@@ -371,27 +392,24 @@ class SlotCreateIn(SlotIn):
 
 
 @router.get("/slots", response_model=list[SlotOut])
-async def list_slots_flat(db: AsyncSession = Depends(get_db)):
-    publisher_user = await get_or_create_demo_user(db, role=UserRole.PUBLISHER)
-    profile = await db.scalar(select(PublisherProfile).where(PublisherProfile.user_id == publisher_user.id))
-    if not profile:
-        return []
-    rows = await db.execute(
-        select(AdSlot)
-        .join(Placement, Placement.id == AdSlot.placement_id)
-        .where(Placement.publisher_id == profile.id)
-        .order_by(AdSlot.created_at.desc())
-    )
+async def list_slots_flat(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _require_publisher_or_admin(current_user)
+    query = select(AdSlot).join(Placement, Placement.id == AdSlot.placement_id).order_by(AdSlot.created_at.desc())
+    if not is_admin_role(current_user.role):
+        profile = await _get_profile_or_404(db, current_user)
+        query = query.where(Placement.publisher_id == profile.id)
+    rows = await db.execute(query)
     return [SlotOut.model_validate(row) for row in rows.scalars().all()]
 
 
 @router.post("/slots", response_model=SlotOut, status_code=status.HTTP_201_CREATED)
-async def create_slot_flat(payload: SlotCreateIn, db: AsyncSession = Depends(get_db)):
-    publisher_user = await get_or_create_demo_user(db, role=UserRole.PUBLISHER)
-    profile = await db.scalar(select(PublisherProfile).where(PublisherProfile.user_id == publisher_user.id))
-    if not profile:
-        raise HTTPException(status_code=404, detail="Publisher profile not found")
-    placement = await db.scalar(select(Placement).where(Placement.id == uuid.UUID(payload.placement_id), Placement.publisher_id == profile.id))
+async def create_slot_flat(payload: SlotCreateIn, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _require_publisher_or_admin(current_user)
+    query = select(Placement).where(Placement.id == uuid.UUID(payload.placement_id))
+    if not is_admin_role(current_user.role):
+        profile = await _get_profile_or_404(db, current_user)
+        query = query.where(Placement.publisher_id == profile.id)
+    placement = await db.scalar(query)
     if not placement:
         raise HTTPException(status_code=404, detail="Placement not found")
     slot = AdSlot(

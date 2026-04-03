@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.dependencies import get_db, get_optional_user, is_admin_role
+from app.dependencies import clear_auth_cookie, get_db, get_optional_user, is_admin_role, set_auth_cookie
 from app.models.adnet import AdRequest, Campaign, Click, Impression
 from app.models.briefing import AdBrief, BriefGeneratedOutput, BriefStatus, GeneratedItemType
 from app.models.publisher import AdSlot, Placement, PublisherProfile, PublisherSite
@@ -105,14 +105,7 @@ async def login_submit(
 
     token = create_access_token(user.id, workspace.id)
     response = RedirectResponse(url=next if next.startswith("/") else "/dashboard", status_code=status.HTTP_303_SEE_OTHER)
-    response.set_cookie(
-        key="access_token",
-        value=token,
-        httponly=True,
-        secure=settings.ENVIRONMENT == "production",
-        samesite="lax",
-        max_age=7 * 24 * 60 * 60,
-    )
+    set_auth_cookie(response, token)
     return response
 
 
@@ -163,21 +156,14 @@ async def signup_submit(
 
     token = create_access_token(user.id, workspace.id)
     response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
-    response.set_cookie(
-        key="access_token",
-        value=token,
-        httponly=True,
-        secure=settings.ENVIRONMENT == "production",
-        samesite="lax",
-        max_age=7 * 24 * 60 * 60,
-    )
+    set_auth_cookie(response, token)
     return response
 
 
 @router.post("/logout")
 async def logout_page() -> RedirectResponse:
     response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
-    response.delete_cookie("access_token")
+    clear_auth_cookie(response)
     return response
 
 

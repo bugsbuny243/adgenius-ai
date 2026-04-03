@@ -1,13 +1,39 @@
 import uuid
 from typing import AsyncGenerator
 
-from fastapi import Cookie, Depends, HTTPException, Request, status
+from fastapi import Cookie, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import AsyncSessionLocal
 from app.models.user import User, UserRole, Workspace
 from app.services.auth_service import decode_access_token
+from app.config import settings
+
+
+AUTH_COOKIE_KEY = "access_token"
+AUTH_COOKIE_MAX_AGE = settings.ACCESS_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
+
+
+def set_auth_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=AUTH_COOKIE_KEY,
+        value=token,
+        httponly=True,
+        secure=settings.ENVIRONMENT == "production",
+        samesite="lax",
+        max_age=AUTH_COOKIE_MAX_AGE,
+        path="/",
+    )
+
+
+def clear_auth_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=AUTH_COOKIE_KEY,
+        path="/",
+        secure=settings.ENVIRONMENT == "production",
+        samesite="lax",
+    )
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -57,14 +83,14 @@ async def _resolve_user_from_token(token: str | None, db: AsyncSession) -> User 
 
 
 async def get_optional_user(
-    access_token: str | None = Cookie(default=None),
+    access_token: str | None = Cookie(default=None, alias=AUTH_COOKIE_KEY),
     db: AsyncSession = Depends(get_db),
 ) -> User | None:
     return await _resolve_user_from_token(access_token, db)
 
 
 async def get_current_user(
-    access_token: str | None = Cookie(default=None),
+    access_token: str | None = Cookie(default=None, alias=AUTH_COOKIE_KEY),
     db: AsyncSession = Depends(get_db),
 ) -> User:
     user = await _resolve_user_from_token(access_token, db)
@@ -77,14 +103,14 @@ async def get_current_user_or_redirect(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    user = await _resolve_user_from_token(request.cookies.get("access_token"), db)
+    user = await _resolve_user_from_token(request.cookies.get(AUTH_COOKIE_KEY), db)
     if not user:
         raise HTTPException(status_code=status.HTTP_303_SEE_OTHER, headers={"Location": "/login"})
     return user
 
 
 async def get_current_workspace(
-    access_token: str | None = Cookie(default=None),
+    access_token: str | None = Cookie(default=None, alias=AUTH_COOKIE_KEY),
     db: AsyncSession = Depends(get_db),
 ) -> Workspace:
     credentials_exception = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
