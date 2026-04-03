@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h1>One Ad Stack. One Runtime.</h1>
+  <p>Launch campaigns, generate ads, and serve inventory from a single FastAPI deployment.</p>
+  <div class="row">
+    <a class="button" href="/brief">Start brief intake</a>
+    <a class="button secondary" href="/dashboard">View dashboard</a>
+  </div>
+</section>
+
+<section>
+  <h2>Product flow</h2>
+  <div class="grid three">
+    <article>
+      <h3>Landing + Brief</h3>
+      <p>Capture campaign goals and constraints in one guided intake form.</p>
+    </article>
+    <article>
+      <h3>Campaigns + Ads</h3>
+      <p>Manage campaign lifecycle and ad generation through /api/v1 advertiser routes.</p>
+    </article>
+    <article>
+      <h3>Delivery + Billing</h3>
+      <p>Serve ads, track impressions/clicks, then reconcile wallet balances and payouts.</p>
+    </article>
+  </div>
+</section>
+{% endblock %}

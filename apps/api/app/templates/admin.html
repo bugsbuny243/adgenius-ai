@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Admin Console</h1>
+<div class="grid two">
+  <article>
+    <h2>Publisher Inventory</h2>
+    <p>Manage approved publishers and placements.</p>
+    <code>POST /api/v1/publisher/inventory</code>
+  </article>
+  <article>
+    <h2>Serving</h2>
+    <p>Runtime serving endpoint for ad selection and delivery.</p>
+    <code>GET /api/v1/serve/ad</code>
+  </article>
+  <article>
+    <h2>Tracking</h2>
+    <p>Impression and click ingestion to feed reporting and billing.</p>
+    <code>POST /api/v1/track/impression</code>
+    <code>GET /api/v1/track/click/{click_token}</code>
+  </article>
+  <article>
+    <h2>Payout Approval</h2>
+    <p>Review and approve payout requests from publishers.</p>
+    <code>PATCH /api/v1/admin/payouts/{id}/approve</code>
+  </article>
+</div>
+{% endblock %}
