@@ -1,5 +1,3 @@
-"""Ad network domain models."""
-
 import enum
 import uuid
 from decimal import Decimal
