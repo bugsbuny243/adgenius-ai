@@ -6,7 +6,7 @@ from pydantic import AliasChoices, BaseModel, Field
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies import get_db, get_current_user
+from app.dependencies import get_db, get_current_user, is_admin_role
 from app.models.user import User, UserRole
 from app.models.publisher import PublisherProfile
 from app.models.adnet import (
@@ -109,8 +109,18 @@ class PayoutOut(BaseModel):
 
 
 def _ensure_admin(user: User):
-    if user.role != UserRole.ADMIN:
+    if not is_admin_role(user.role):
         raise HTTPException(status_code=403, detail="Admin only")
+
+
+def _ensure_advertiser_or_admin(user: User):
+    if user.role not in {UserRole.ADVERTISER} and not is_admin_role(user.role):
+        raise HTTPException(status_code=403, detail="Advertiser only")
+
+
+def _ensure_publisher_or_admin(user: User):
+    if user.role not in {UserRole.PUBLISHER} and not is_admin_role(user.role):
+        raise HTTPException(status_code=403, detail="Publisher only")
 
 
 def _campaign_to_out(campaign: Campaign) -> CampaignOut:
@@ -124,12 +134,14 @@ def _campaign_to_out(campaign: Campaign) -> CampaignOut:
 
 @router.get("/advertiser/campaigns", response_model=list[CampaignOut])
 async def list_campaigns(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_advertiser_or_admin(current_user)
     result = await db.execute(select(Campaign).where(Campaign.user_id == current_user.id).order_by(Campaign.created_at.desc()))
     return [_campaign_to_out(c) for c in result.scalars().all()]
 
 
 @router.post("/advertiser/campaigns", response_model=CampaignOut, status_code=status.HTTP_201_CREATED)
 async def create_campaign(payload: CampaignIn, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_advertiser_or_admin(current_user)
     campaign = Campaign(
         user_id=current_user.id,
         title=payload.title,
@@ -152,6 +164,7 @@ async def create_campaign(payload: CampaignIn, db: AsyncSession = Depends(get_db
 
 @router.get("/advertiser/campaigns/{id}", response_model=CampaignOut)
 async def get_campaign(id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_advertiser_or_admin(current_user)
     campaign = await db.scalar(select(Campaign).where(Campaign.id == uuid.UUID(id), Campaign.user_id == current_user.id))
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
@@ -160,10 +173,11 @@ async def get_campaign(id: str, db: AsyncSession = Depends(get_db), current_user
 
 @router.put("/advertiser/campaigns/{id}", response_model=CampaignOut)
 async def update_campaign(id: str, payload: CampaignIn, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_advertiser_or_admin(current_user)
     campaign = await db.scalar(select(Campaign).where(Campaign.id == uuid.UUID(id), Campaign.user_id == current_user.id))
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
-    if campaign.status == CampaignStatus.ACTIVE and current_user.role != UserRole.ADMIN:
+    if campaign.status == CampaignStatus.ACTIVE and not is_admin_role(current_user.role):
         raise HTTPException(status_code=403, detail="Active campaigns can only be set by admin")
     campaign.title = payload.title
     campaign.total_budget = payload.budget
@@ -182,6 +196,7 @@ async def update_campaign(id: str, payload: CampaignIn, db: AsyncSession = Depen
 
 @router.delete("/advertiser/campaigns/{id}")
 async def delete_campaign(id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_advertiser_or_admin(current_user)
     campaign = await db.scalar(select(Campaign).where(Campaign.id == uuid.UUID(id), Campaign.user_id == current_user.id))
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
@@ -191,6 +206,7 @@ async def delete_campaign(id: str, db: AsyncSession = Depends(get_db), current_u
 
 @router.get("/advertiser/campaigns/{id}/ads", response_model=list[AdOut])
 async def list_ads(id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_advertiser_or_admin(current_user)
     campaign = await db.scalar(select(Campaign).where(Campaign.id == uuid.UUID(id), Campaign.user_id == current_user.id))
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
@@ -200,6 +216,7 @@ async def list_ads(id: str, db: AsyncSession = Depends(get_db), current_user: Us
 
 @router.post("/advertiser/campaigns/{id}/ads", response_model=AdOut, status_code=status.HTTP_201_CREATED)
 async def create_ad(id: str, payload: AdIn, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_advertiser_or_admin(current_user)
     campaign = await db.scalar(select(Campaign).where(Campaign.id == uuid.UUID(id), Campaign.user_id == current_user.id))
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
@@ -211,6 +228,7 @@ async def create_ad(id: str, payload: AdIn, db: AsyncSession = Depends(get_db), 
 
 @router.put("/advertiser/ads/{id}", response_model=AdOut)
 async def update_ad(id: str, payload: AdIn, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_advertiser_or_admin(current_user)
     result = await db.execute(select(Ad, Campaign).join(Campaign, Campaign.id == Ad.campaign_id).where(Ad.id == uuid.UUID(id), Campaign.user_id == current_user.id))
     row = result.first()
     if not row:
@@ -226,6 +244,7 @@ async def update_ad(id: str, payload: AdIn, db: AsyncSession = Depends(get_db), 
 
 @router.delete("/advertiser/ads/{id}")
 async def delete_ad(id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_advertiser_or_admin(current_user)
     result = await db.execute(select(Ad, Campaign).join(Campaign, Campaign.id == Ad.campaign_id).where(Ad.id == uuid.UUID(id), Campaign.user_id == current_user.id))
     row = result.first()
     if not row:
@@ -236,6 +255,7 @@ async def delete_ad(id: str, db: AsyncSession = Depends(get_db), current_user: U
 
 @router.get("/advertiser/wallet", response_model=WalletOut)
 async def wallet(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_advertiser_or_admin(current_user)
     wallet_obj = await db.scalar(select(AdvertiserWallet).where(AdvertiserWallet.user_id == current_user.id))
     if not wallet_obj:
         wallet_obj = AdvertiserWallet(user_id=current_user.id)
@@ -246,6 +266,7 @@ async def wallet(db: AsyncSession = Depends(get_db), current_user: User = Depend
 
 @router.post("/advertiser/wallet/deposit", response_model=WalletOut)
 async def wallet_deposit(payload: DepositIn, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_advertiser_or_admin(current_user)
     if payload.amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
     wallet_obj = await db.scalar(select(AdvertiserWallet).where(AdvertiserWallet.user_id == current_user.id))
@@ -262,6 +283,8 @@ async def wallet_deposit(payload: DepositIn, db: AsyncSession = Depends(get_db),
 
 @router.get("/advertiser/finance/dashboard")
 async def finance_dashboard(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_advertiser_or_admin(current_user)
+    _ensure_advertiser_or_admin(current_user)
     wallet_obj = await db.scalar(select(AdvertiserWallet).where(AdvertiserWallet.user_id == current_user.id))
     spend = await db.scalar(select(func.coalesce(func.sum(Campaign.spent_amount), 0)).where(Campaign.user_id == current_user.id))
     active = await db.scalar(select(func.count(Campaign.id)).where(Campaign.user_id == current_user.id, Campaign.status == CampaignStatus.ACTIVE))
@@ -270,6 +293,7 @@ async def finance_dashboard(db: AsyncSession = Depends(get_db), current_user: Us
 
 @router.get("/publisher/earnings")
 async def publisher_earnings(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_publisher_or_admin(current_user)
     profile = await db.scalar(select(PublisherProfile).where(PublisherProfile.user_id == current_user.id))
     profile_id = profile.id if profile else uuid.uuid4()
     result = await db.execute(select(PublisherEarning).where(PublisherEarning.publisher_id == profile_id).order_by(PublisherEarning.created_at.desc()))
@@ -278,6 +302,7 @@ async def publisher_earnings(db: AsyncSession = Depends(get_db), current_user: U
 
 @router.get("/publisher/earnings/dashboard")
 async def publisher_earnings_dashboard(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_publisher_or_admin(current_user)
     profile = await db.scalar(select(PublisherProfile).where(PublisherProfile.user_id == current_user.id))
     if not profile:
         return {"total_earned": Decimal("0"), "available": Decimal("0"), "settled": Decimal("0")}
@@ -289,6 +314,7 @@ async def publisher_earnings_dashboard(db: AsyncSession = Depends(get_db), curre
 
 @router.post("/publisher/payout/request", response_model=PayoutOut, status_code=status.HTTP_201_CREATED)
 async def payout_request(payload: PayoutIn, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_publisher_or_admin(current_user)
     # Deprecated old amount-based request; now emits period-based pending settlement for the trailing 30 days.
     profile = await db.scalar(select(PublisherProfile).where(PublisherProfile.user_id == current_user.id))
     if not profile:
@@ -322,6 +348,8 @@ async def payout_request(payload: PayoutIn, db: AsyncSession = Depends(get_db), 
 
 @router.get("/publisher/payouts", response_model=list[PayoutOut])
 async def payout_list(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_publisher_or_admin(current_user)
+    _ensure_publisher_or_admin(current_user)
     profile = await db.scalar(select(PublisherProfile).where(PublisherProfile.user_id == current_user.id))
     profile_id = profile.id if profile else uuid.uuid4()
     result = await db.execute(select(PublisherPayout).where(PublisherPayout.publisher_id == profile_id).order_by(PublisherPayout.created_at.desc()))

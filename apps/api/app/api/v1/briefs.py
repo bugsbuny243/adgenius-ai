@@ -5,9 +5,10 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies import get_db
+from app.dependencies import get_db, get_current_user, is_admin_role
 from app.models.briefing import AdBrief, BriefGeneratedOutput, BriefStatus, GeneratedItemType
-from app.services.brief_service import create_campaign_from_brief, generate_for_brief, get_or_create_demo_user
+from app.models.user import User, UserRole
+from app.services.brief_service import create_campaign_from_brief, generate_for_brief
 
 router = APIRouter(tags=["briefs"])
 
@@ -33,10 +34,21 @@ class BriefOutputSelectionIn(BaseModel):
     selected: bool = True
 
 
+def _ensure_advertiser_or_admin(user: User) -> None:
+    if user.role not in {UserRole.ADVERTISER} and not is_admin_role(user.role):
+        raise HTTPException(status_code=403, detail="Advertiser or admin access required")
+
+
+def _brief_visibility_filter(user: User):
+    if is_admin_role(user.role):
+        return True
+    return AdBrief.advertiser_id == user.id
+
+
 @router.post("/briefs", response_model=BriefOut, status_code=status.HTTP_201_CREATED)
-async def create_brief(payload: BriefIn, db: AsyncSession = Depends(get_db)):
-    advertiser = await get_or_create_demo_user(db)
-    brief = AdBrief(advertiser_id=advertiser.id, **payload.model_dump())
+async def create_brief(payload: BriefIn, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_advertiser_or_admin(current_user)
+    brief = AdBrief(advertiser_id=current_user.id, **payload.model_dump())
     brief.status = BriefStatus(payload.status.lower())
     db.add(brief)
     await db.flush()
@@ -44,9 +56,12 @@ async def create_brief(payload: BriefIn, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/briefs", response_model=list[BriefOut])
-async def list_briefs(db: AsyncSession = Depends(get_db)):
-    advertiser = await get_or_create_demo_user(db)
-    rows = await db.execute(select(AdBrief).where(AdBrief.advertiser_id == advertiser.id).order_by(AdBrief.created_at.desc()))
+async def list_briefs(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_advertiser_or_admin(current_user)
+    query = select(AdBrief).order_by(AdBrief.created_at.desc())
+    if not is_admin_role(current_user.role):
+        query = query.where(AdBrief.advertiser_id == current_user.id)
+    rows = await db.execute(query)
     items = rows.scalars().all()
     return [
         BriefOut(
@@ -66,8 +81,12 @@ async def list_briefs(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/briefs/{id}", response_model=BriefOut)
-async def get_brief(id: str, db: AsyncSession = Depends(get_db)):
-    brief = await db.scalar(select(AdBrief).where(AdBrief.id == uuid.UUID(id)))
+async def get_brief(id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_advertiser_or_admin(current_user)
+    query = select(AdBrief).where(AdBrief.id == uuid.UUID(id))
+    if not is_admin_role(current_user.role):
+        query = query.where(AdBrief.advertiser_id == current_user.id)
+    brief = await db.scalar(query)
     if not brief:
         raise HTTPException(status_code=404, detail="Brief not found")
     return BriefOut(
@@ -85,8 +104,12 @@ async def get_brief(id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/briefs/{id}/generate")
-async def generate_brief_outputs(id: str, db: AsyncSession = Depends(get_db)):
-    brief = await db.scalar(select(AdBrief).where(AdBrief.id == uuid.UUID(id)))
+async def generate_brief_outputs(id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_advertiser_or_admin(current_user)
+    query = select(AdBrief).where(AdBrief.id == uuid.UUID(id))
+    if not is_admin_role(current_user.role):
+        query = query.where(AdBrief.advertiser_id == current_user.id)
+    brief = await db.scalar(query)
     if not brief:
         raise HTTPException(status_code=404, detail="Brief not found")
     try:
@@ -97,8 +120,12 @@ async def generate_brief_outputs(id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/briefs/{id}/outputs/select")
-async def select_output(id: str, payload: BriefOutputSelectionIn, db: AsyncSession = Depends(get_db)):
-    brief = await db.scalar(select(AdBrief).where(AdBrief.id == uuid.UUID(id)))
+async def select_output(id: str, payload: BriefOutputSelectionIn, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_advertiser_or_admin(current_user)
+    query = select(AdBrief).where(AdBrief.id == uuid.UUID(id))
+    if not is_admin_role(current_user.role):
+        query = query.where(AdBrief.advertiser_id == current_user.id)
+    brief = await db.scalar(query)
     if not brief:
         raise HTTPException(status_code=404, detail="Brief not found")
 
@@ -135,10 +162,13 @@ async def select_output(id: str, payload: BriefOutputSelectionIn, db: AsyncSessi
 
 
 @router.post("/briefs/{id}/create-campaign")
-async def create_campaign(id: str, db: AsyncSession = Depends(get_db)):
-    brief = await db.scalar(select(AdBrief).where(AdBrief.id == uuid.UUID(id)))
+async def create_campaign(id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_advertiser_or_admin(current_user)
+    query = select(AdBrief).where(AdBrief.id == uuid.UUID(id))
+    if not is_admin_role(current_user.role):
+        query = query.where(AdBrief.advertiser_id == current_user.id)
+    brief = await db.scalar(query)
     if not brief:
         raise HTTPException(status_code=404, detail="Brief not found")
-    advertiser = await get_or_create_demo_user(db)
-    result = await create_campaign_from_brief(db, brief, advertiser.id)
+    result = await create_campaign_from_brief(db, brief, brief.advertiser_id)
     return result

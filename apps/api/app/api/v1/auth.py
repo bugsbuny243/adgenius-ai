@@ -28,11 +28,8 @@ async def signup(data: SignupRequest, response: Response, db: AsyncSession = Dep
     if result.scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
 
-    allowed_roles = {UserRole.ADVERTISER.value, UserRole.PUBLISHER.value}
-    role_str = (data.role or "ADVERTISER").upper()
-    if role_str not in allowed_roles:
-        role_str = UserRole.ADVERTISER.value
-    role = UserRole(role_str)
+    requested_role = UserRole.from_input(data.role)
+    role = requested_role if requested_role in {UserRole.ADVERTISER, UserRole.PUBLISHER} else UserRole.ADVERTISER
 
     user = User(email=data.email, hashed_password=hash_password(data.password), full_name=data.full_name, role=role)
     db.add(user)
@@ -63,6 +60,7 @@ async def signup(data: SignupRequest, response: Response, db: AsyncSession = Dep
                         secure=settings.ENVIRONMENT == "production", samesite="lax", max_age=7 * 24 * 60 * 60)
 
     user_response = UserResponse.model_validate(user)
+    user_response.role = user.role.value.lower()
     user_response.workspace = WorkspaceResponse.model_validate(workspace)
     return user_response
 
@@ -92,6 +90,7 @@ async def login(data: LoginRequest, response: Response, db: AsyncSession = Depen
                         secure=settings.ENVIRONMENT == "production", samesite="lax", max_age=7 * 24 * 60 * 60)
 
     user_response = UserResponse.model_validate(user)
+    user_response.role = user.role.value.lower()
     user_response.workspace = WorkspaceResponse.model_validate(workspace)
     return user_response
 
@@ -119,6 +118,7 @@ async def me(access_token: str | None = Cookie(default=None), db: AsyncSession =
     result = await db.execute(select(Workspace).where(Workspace.id == workspace_id))
     workspace = result.scalar_one_or_none()
     user_response = UserResponse.model_validate(user)
+    user_response.role = user.role.value.lower()
     if workspace:
         user_response.workspace = WorkspaceResponse.model_validate(workspace)
     return user_response

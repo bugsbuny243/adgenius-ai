@@ -11,10 +11,19 @@
       <div class="container nav">
         <a href="/" class="brand">AdGenius</a>
         <nav>
+          <a href="/packages">Packages</a>
+          {% if is_authenticated %}
           <a href="/brief">Brief</a>
           <a href="/dashboard">Dashboard</a>
-          <a href="/dashboard/campaigns">Campaigns</a>
-          <a href="/dashboard/publisher">Publisher</a>
+          <a href="/campaigns">Campaigns</a>
+          <a href="/publisher">Publisher</a>
+          <form method="post" action="/logout" style="display:inline;">
+            <button type="submit">Logout</button>
+          </form>
+          {% else %}
+          <a href="/login">Login</a>
+          <a href="/signup">Sign up</a>
+          {% endif %}
         </nav>
       </div>
     </header>

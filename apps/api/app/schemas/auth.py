@@ -1,11 +1,11 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 class SignupRequest(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=8)
     full_name: str
-    role: str = "ADVERTISER"
+    role: str = "advertiser"
 
 
 class LoginRequest(BaseModel):

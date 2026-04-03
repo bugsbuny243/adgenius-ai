@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, AliasChoices
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies import get_db, get_current_user
+from app.dependencies import get_db, get_current_user, is_admin_role
 from app.models.user import User, UserRole
 from app.services.brief_service import get_or_create_demo_user
 from app.models.publisher import (
@@ -128,8 +128,18 @@ class SlotOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+
+
+def _require_publisher_or_admin(user: User) -> None:
+    if user.role not in {UserRole.PUBLISHER} and not is_admin_role(user.role):
+        raise HTTPException(status_code=403, detail="Publisher only")
+
+
+def _profile_scope_filter(user: User):
+    return True if is_admin_role(user.role) else (PublisherProfile.user_id == user.id)
 async def _get_profile_or_404(db: AsyncSession, user: User) -> PublisherProfile:
-    profile = await db.scalar(select(PublisherProfile).where(PublisherProfile.user_id == user.id))
+    _require_publisher_or_admin(user)
+    profile = await db.scalar(select(PublisherProfile).where(_profile_scope_filter(user)))
     if not profile:
         raise HTTPException(status_code=404, detail="Publisher profile not found")
     return profile
@@ -137,6 +147,7 @@ async def _get_profile_or_404(db: AsyncSession, user: User) -> PublisherProfile:
 
 @router.post("/profile", response_model=ProfileOut, status_code=status.HTTP_201_CREATED)
 async def create_profile(payload: ProfileIn, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _require_publisher_or_admin(current_user)
     exists = await db.scalar(select(PublisherProfile).where(PublisherProfile.user_id == current_user.id))
     if exists:
         raise HTTPException(status_code=409, detail="Publisher profile already exists")
