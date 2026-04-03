@@ -1,23 +1,48 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Campaign Brief Intake</h1>
-<form class="card">
-  <label>Brand name
-    <input type="text" placeholder="Acme Inc" />
+<section class="hero">
+  <p class="eyebrow">Brief Intake</p>
+  <h1>Tell us about your business and campaign goals.</h1>
+  <p class="lead">Complete this short form and we will prepare the right creative and campaign package for you.</p>
+</section>
+
+{% if submitted %}
+<section class="card success">
+  <h2>Thank you — your brief has been submitted.</h2>
+  <p>We will review your information and contact you shortly. If you prefer, you can also message us now on WhatsApp.</p>
+  <a class="button secondary" href="{{ whatsapp_url }}" target="_blank" rel="noreferrer">Contact on WhatsApp</a>
+</section>
+{% endif %}
+
+<form class="card" method="post" action="/brief">
+  <label>Business name
+    <input type="text" name="business_name" required placeholder="Your business name" />
   </label>
-  <label>Primary objective
-    <input type="text" placeholder="App installs" />
+  <label>Sector
+    <input type="text" name="sector" required placeholder="Real estate, beauty, restaurant, ecommerce..." />
+  </label>
+  <label>What do you sell?
+    <textarea rows="3" name="what_do_you_sell" required placeholder="Describe your product or service"></textarea>
   </label>
   <label>Target audience
-    <textarea rows="3" placeholder="Who should see these ads?"></textarea>
+    <textarea rows="3" name="target_audience" required placeholder="Who should see your ads?"></textarea>
   </label>
-  <label>Budget (USD)
-    <input type="number" placeholder="10000" />
+  <label>What do you want from advertising?
+    <textarea rows="3" name="advertising_goal" required placeholder="Leads, appointments, sales, awareness..."></textarea>
   </label>
-  <label>Creative constraints
-    <textarea rows="3" placeholder="Voice, tone, required phrases, etc."></textarea>
+  <label>Website / social link
+    <input type="url" name="website_or_social_link" placeholder="https://..." />
   </label>
-  <button type="submit" class="button">Submit brief</button>
+  <label>Competitor examples
+    <textarea rows="2" name="competitor_examples" placeholder="Any competitors you like or benchmark against"></textarea>
+  </label>
+  <label>Interested package
+    <select name="interested_package" required>
+      <option value="Launch Package">Launch Package — 9,500 TL</option>
+      <option value="Growth Package">Growth Package — 18,500 TL</option>
+      <option value="Performance Management">Performance Management — 35,000 TL+ / monthly</option>
+    </select>
+  </label>
+  <button type="submit" class="button">Submit Brief Intake</button>
 </form>
-<p class="hint">This page is server-rendered; submission wiring can post to /api/v1 advertiser campaign endpoints.</p>
 {% endblock %}

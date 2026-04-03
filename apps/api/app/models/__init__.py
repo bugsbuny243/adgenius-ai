@@ -9,3 +9,5 @@ from app.models.brand import Brand, Product, Audience
 from app.models.campaign import CampaignBrief
 from app.models.generation import GenerationJob, GeneratedAdSet, GeneratedAdVariant, ExportBundle
 from app.models.usage import UsageLog, ApiUsageCounter
+
+from app.models.lead import LeadBrief

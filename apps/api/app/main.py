@@ -6,10 +6,12 @@ import structlog
 import os
 
 from app.config import settings
+from app.database import engine
 from app.middleware.request_id import RequestIDMiddleware
 from app.middleware.logging import LoggingMiddleware, configure_structlog
 from app.api.v1.router import v1_router
 from app.pages import router as pages_router
+from app.models.lead import LeadBrief
 
 configure_structlog()
 logger = structlog.get_logger()
@@ -18,6 +20,8 @@ logger = structlog.get_logger()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("AdGenius API starting up", environment=settings.ENVIRONMENT)
+    async with engine.begin() as conn:
+        await conn.run_sync(LeadBrief.__table__.create, checkfirst=True)
     yield
     logger.info("AdGenius API shutting down")
 
