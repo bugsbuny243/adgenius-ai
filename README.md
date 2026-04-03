@@ -1,29 +1,40 @@
-# AdGenius Architecture Foundation
+# AdGenius Single Runtime Baseline
 
-This repository now contains a **new architecture baseline** for AdGenius as an independent ad network.
+AdGenius is now deployed as **one Python/FastAPI application** from `apps/api`.
 
-- No Google Ads / Meta Ads / TikTok Ads integrations.
-- AI generation/orchestration is designed for Gemini only.
-- Web → Go API gateway only (no direct browser Supabase client).
+## Canonical app
 
-## New stack folders
+- `apps/api` is the only runtime and deployment unit.
+- API endpoints remain under `/api/v1`.
+- Server-rendered product pages are served from the same FastAPI app via templates/static assets.
+- `apps/web` is no longer required for deployment.
 
-- `apps/web` (Next.js + TypeScript)
-- `services/api-gateway` (Go)
-- `services/serving` (Go)
-- `services/worker` (Go)
-- `services/ai` (Go)
-- `internal/shared` (shared Go packages)
-- `infra/docker` + `infra/docker-compose.yml`
-- `docs`
+## Included product flow
 
-## Quick start
+- landing
+- brief intake
+- campaigns
+- ads
+- publisher inventory
+- serve ad
+- impression
+- click
+- wallet
+- payouts
+
+## Local run
 
 ```bash
-make up
+cd apps/api
+pip install -e .
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-See:
+Then open:
 
-- `docs/architecture.md`
-- `docs/local-development.md`
+- `http://localhost:8000/` (landing page)
+- `http://localhost:8000/pricing`
+- `http://localhost:8000/brief`
+- `http://localhost:8000/dashboard`
+- `http://localhost:8000/admin`
+- `http://localhost:8000/api/v1/health`

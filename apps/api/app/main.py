@@ -9,6 +9,7 @@ from app.config import settings
 from app.middleware.request_id import RequestIDMiddleware
 from app.middleware.logging import LoggingMiddleware, configure_structlog
 from app.api.v1.router import v1_router
+from app.pages import router as pages_router
 
 configure_structlog()
 logger = structlog.get_logger()
@@ -40,8 +41,10 @@ def create_app() -> FastAPI:
     app.add_middleware(LoggingMiddleware)
     app.add_middleware(RequestIDMiddleware)
     app.include_router(v1_router)
+    app.include_router(pages_router)
 
-    _static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+    _app_dir = os.path.dirname(__file__)
+    _static_dir = os.path.join(_app_dir, "static")
     if os.path.isdir(_static_dir):
         app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 

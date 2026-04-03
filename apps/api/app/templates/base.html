@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ page_title or "AdGenius" }}</title>
+    <link rel="stylesheet" href="/static/site.css" />
+  </head>
+  <body>
+    <header>
+      <div class="container nav">
+        <a href="/" class="brand">AdGenius</a>
+        <nav>
+          <a href="/pricing" class="{% if active_page == 'pricing' %}active{% endif %}">Pricing</a>
+          <a href="/brief" class="{% if active_page == 'brief' %}active{% endif %}">Brief Intake</a>
+          <a href="/dashboard" class="{% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
+          <a href="/admin" class="{% if active_page == 'admin' %}active{% endif %}">Admin</a>
+          <a href="/api/v1/health" target="_blank" rel="noreferrer">API</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container">
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

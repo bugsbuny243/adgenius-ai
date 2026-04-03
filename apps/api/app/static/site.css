@@ -1,0 +1,62 @@
+:root {
+  color-scheme: light dark;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+body {
+  margin: 0;
+  background: #0b1020;
+  color: #e7ecff;
+}
+.container {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+header {
+  border-bottom: 1px solid #243050;
+  background: #111a31;
+}
+.nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.brand { font-size: 1.15rem; font-weight: 700; color: #fff; text-decoration: none; }
+nav a { color: #c8d4ff; margin-left: 1rem; text-decoration: none; }
+nav a.active { color: #fff; font-weight: 700; }
+.hero { padding: 2.5rem 0 1rem; }
+.grid { display: grid; gap: 1rem; }
+.grid.two { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.grid.three { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+article, .card {
+  background: #141f3a;
+  border: 1px solid #2b3d6b;
+  border-radius: 12px;
+  padding: 1rem;
+}
+label { display: block; margin-bottom: 0.75rem; }
+input, textarea {
+  display: block;
+  margin-top: 0.35rem;
+  width: 100%;
+  padding: 0.6rem;
+  border-radius: 8px;
+  border: 1px solid #324a80;
+  background: #0c1730;
+  color: #fff;
+}
+.button {
+  display: inline-block;
+  background: #4f7dff;
+  color: #fff;
+  padding: 0.55rem 0.9rem;
+  border-radius: 8px;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+}
+.button.secondary { background: transparent; border: 1px solid #4f7dff; }
+.row { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.price { font-weight: 700; font-size: 1.2rem; }
+code { display: block; margin-top: 0.4rem; color: #9dc1ff; }
+.hint { color: #b5c6f9; }

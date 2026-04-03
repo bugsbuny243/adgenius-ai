@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Campaign Brief Intake</h1>
+<form class="card">
+  <label>Brand name
+    <input type="text" placeholder="Acme Inc" />
+  </label>
+  <label>Primary objective
+    <input type="text" placeholder="App installs" />
+  </label>
+  <label>Target audience
+    <textarea rows="3" placeholder="Who should see these ads?"></textarea>
+  </label>
+  <label>Budget (USD)
+    <input type="number" placeholder="10000" />
+  </label>
+  <label>Creative constraints
+    <textarea rows="3" placeholder="Voice, tone, required phrases, etc."></textarea>
+  </label>
+  <button type="submit" class="button">Submit brief</button>
+</form>
+<p class="hint">This page is server-rendered; submission wiring can post to /api/v1 advertiser campaign endpoints.</p>
+{% endblock %}
