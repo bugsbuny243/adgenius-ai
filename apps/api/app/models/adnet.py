@@ -21,6 +21,17 @@ class PricingModel(str, enum.Enum):
     CPM = "CPM"
 
 
+class AdRequestStatus(str, enum.Enum):
+    FILLED = "FILLED"
+    NO_FILL = "NO_FILL"
+
+
+class PayoutStatus(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
 class Campaign(UUIDBase):
     __tablename__ = "campaigns"
 
@@ -99,7 +110,7 @@ class PublisherPayout(UUIDBase):
     period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # status VARCHAR — DB'de enum değil, sıradan string
-    status: Mapped[str] = mapped_column(String(50), default="pending")
+    status: Mapped[str] = mapped_column(String(50), default=PayoutStatus.PENDING)
 
 
 class AdRequest(UUIDBase):
@@ -107,8 +118,9 @@ class AdRequest(UUIDBase):
 
     slot_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ad_slots.id"), index=True)
     campaign_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("campaigns.id"), nullable=True)
+    live_campaign_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("live_campaigns.id"), nullable=True, index=True)
     ad_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("ads.id"), nullable=True)
-    request_status: Mapped[str] = mapped_column(String(20), default="filled")
+    request_status: Mapped[str] = mapped_column(String(20), default=AdRequestStatus.FILLED)
     session_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     page_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     country: Mapped[str | None] = mapped_column(String(8), nullable=True)
