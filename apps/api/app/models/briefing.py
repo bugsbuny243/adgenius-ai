@@ -41,7 +41,7 @@ class AdBrief(UUIDBase):
     selected_angle_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("brief_generated_outputs.id"), nullable=True)
     selected_copy_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("brief_generated_outputs.id"), nullable=True)
     selected_concept_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("brief_generated_outputs.id"), nullable=True)
-    metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    brief_metadata: Mapped[dict | None] = mapped_column("metadata", JSONB, nullable=True)
 
 
 class BriefGenerationRun(UUIDBase):
