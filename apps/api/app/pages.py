@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Request, Depends, Form
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
-from pathlib import Path
 
 from app.config import settings
 from app.dependencies import get_db
@@ -14,15 +15,22 @@ _templates_dir = Path(__file__).resolve().parent / "templates"
 templates = Jinja2Templates(directory=str(_templates_dir))
 
 
+def get_whatsapp_url() -> str:
+    whatsapp_url = settings.WHATSAPP_URL.strip()
+    if whatsapp_url:
+        return whatsapp_url
+    return "/brief"
+
+
 @router.get("/", response_class=HTMLResponse)
 async def landing_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request,
         "landing.html",
         {
-            "page_title": "TradePi Global | AI-Supported Ad Creative",
+            "page_title": "TradePi Global | Yerel İşletmeler için Reklam İçerikleri",
             "active_page": "home",
-            "whatsapp_url": settings.WHATSAPP_URL,
+            "whatsapp_url": get_whatsapp_url(),
         },
     )
 
@@ -33,9 +41,9 @@ async def packages_page(request: Request) -> HTMLResponse:
         request,
         "pricing.html",
         {
-            "page_title": "TradePi Global Packages",
+            "page_title": "TradePi Global Paketleri",
             "active_page": "packages",
-            "whatsapp_url": settings.WHATSAPP_URL,
+            "whatsapp_url": get_whatsapp_url(),
         },
     )
 
@@ -51,10 +59,10 @@ async def brief_form_page(request: Request, submitted: int = 0) -> HTMLResponse:
         request,
         "brief.html",
         {
-            "page_title": "Brief Intake",
+            "page_title": "Brief Formu",
             "active_page": "brief",
             "submitted": bool(submitted),
-            "whatsapp_url": settings.WHATSAPP_URL,
+            "whatsapp_url": get_whatsapp_url(),
         },
     )
 
@@ -88,7 +96,7 @@ async def submit_brief(
 
 @router.get("/contact")
 async def contact_redirect() -> RedirectResponse:
-    return RedirectResponse(url=settings.WHATSAPP_URL, status_code=307)
+    return RedirectResponse(url=get_whatsapp_url(), status_code=307)
 
 
 @router.get("/dashboard", response_class=HTMLResponse)

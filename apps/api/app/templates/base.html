@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="tr">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -11,10 +11,10 @@
       <div class="container nav">
         <a href="/" class="brand">TradePi Global</a>
         <nav>
-          <a href="/" class="{% if active_page == 'home' %}active{% endif %}">Home</a>
-          <a href="/packages" class="{% if active_page == 'packages' %}active{% endif %}">Packages</a>
-          <a href="/brief" class="{% if active_page == 'brief' %}active{% endif %}">Brief Intake</a>
-          <a href="/contact" rel="noreferrer">Contact</a>
+          <a href="/" class="{% if active_page == 'home' %}active{% endif %}">Ana Sayfa</a>
+          <a href="/packages" class="{% if active_page == 'packages' %}active{% endif %}">Paketler</a>
+          <a href="/brief" class="{% if active_page == 'brief' %}active{% endif %}">Brief</a>
+          <a href="{{ whatsapp_url }}" target="_blank" rel="noreferrer">WhatsApp</a>
         </nav>
       </div>
     </header>
