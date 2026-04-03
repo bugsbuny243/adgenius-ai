@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 import structlog
 
-from app.dependencies import get_db, get_current_user
+from app.dependencies import get_db, get_current_user, is_admin_role
 from app.models.user import User, UserRole
 from app.models.publisher import PublisherProfile, PublisherStatus, PublisherSite, Placement, AdSlot
 from app.models.adnet import Campaign, CampaignStatus, PublisherPayout, PublisherEarning, AdvertiserWallet, DeliveryLog
@@ -19,7 +19,7 @@ logger = structlog.get_logger()
 
 
 def _require_admin(user: User):
-    if user.role not in (UserRole.SUPER_ADMIN, UserRole.OPS_MANAGER):
+    if not is_admin_role(user.role):
         raise HTTPException(status_code=403, detail="Admin only")
 
 

@@ -1,15 +1,13 @@
 import uuid
 from typing import AsyncGenerator
-from fastapi import Depends, HTTPException, Cookie, status
-from sqlalchemy.ext.asyncio import AsyncSession
+
+from fastapi import Cookie, Depends, HTTPException, Request, status
 from sqlalchemy import select
-import structlog
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import AsyncSessionLocal
-from app.models.user import User, Workspace
+from app.models.user import User, UserRole, Workspace
 from app.services.auth_service import decode_access_token
-
-logger = structlog.get_logger()
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -22,31 +20,66 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             raise
 
 
-async def get_current_user(
-    access_token: str | None = Cookie(default=None),
-    db: AsyncSession = Depends(get_db),
-) -> User:
-    credentials_exception = HTTPException(
+def _auth_exception() -> HTTPException:
+    return HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Not authenticated",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    if not access_token:
-        raise credentials_exception
-    payload = decode_access_token(access_token)
+
+
+def is_admin_role(role: UserRole) -> bool:
+    return role in {UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.OPS_MANAGER}
+
+
+async def _resolve_user_from_token(token: str | None, db: AsyncSession) -> User | None:
+    if not token:
+        return None
+
+    payload = decode_access_token(token)
     if not payload:
-        raise credentials_exception
+        return None
+
     user_id_str = payload.get("sub")
     if not user_id_str:
-        raise credentials_exception
+        return None
+
     try:
         user_id = uuid.UUID(user_id_str)
     except ValueError:
-        raise credentials_exception
+        return None
+
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user or not user.is_active:
-        raise credentials_exception
+        return None
+    return user
+
+
+async def get_optional_user(
+    access_token: str | None = Cookie(default=None),
+    db: AsyncSession = Depends(get_db),
+) -> User | None:
+    return await _resolve_user_from_token(access_token, db)
+
+
+async def get_current_user(
+    access_token: str | None = Cookie(default=None),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    user = await _resolve_user_from_token(access_token, db)
+    if not user:
+        raise _auth_exception()
+    return user
+
+
+async def get_current_user_or_redirect(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    user = await _resolve_user_from_token(request.cookies.get("access_token"), db)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_303_SEE_OTHER, headers={"Location": "/login"})
     return user
 
 
@@ -72,3 +105,14 @@ async def get_current_workspace(
     if not workspace:
         raise credentials_exception
     return workspace
+
+
+def require_roles(*roles: UserRole):
+    allowed = set(roles)
+
+    def _checker(current_user: User = Depends(get_current_user)) -> User:
+        if current_user.role in allowed or (UserRole.ADMIN in allowed and is_admin_role(current_user.role)):
+            return current_user
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+    return _checker
