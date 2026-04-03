@@ -83,7 +83,6 @@ class PublisherEarning(UUIDBase):
     event_type: Mapped[str] = mapped_column(String(32), default="impression")
     amount: Mapped[Decimal] = mapped_column(Numeric(14, 6), default=Decimal("0"))
     reference_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    # NOT: paid_out kolonu DB'de yok, kullanılmıyor
 
 
 class PublisherPayout(UUIDBase):
@@ -98,7 +97,6 @@ class PublisherPayout(UUIDBase):
     period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    # status VARCHAR — DB'de enum değil, sıradan string
     status: Mapped[str] = mapped_column(String(50), default="pending")
 
 
