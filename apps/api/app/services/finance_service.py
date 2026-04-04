@@ -32,6 +32,9 @@ async def apply_ad_spend(
     reference_id: str,
     live_campaign_id: uuid.UUID | None = None,
 ) -> tuple[bool, Decimal]:
+    # Finance path touches both campaign models:
+    # - `campaign` is the advertiser-facing campaign entity (`campaigns` table).
+    # - `live_campaign_id` is the serving/spend-tracked entity (`live_campaigns` table).
     if gross_cost <= Decimal("0") or not live_campaign_id:
         return False, Decimal("0")
 
