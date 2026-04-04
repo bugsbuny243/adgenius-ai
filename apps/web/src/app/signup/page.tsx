@@ -1,1 +1,3 @@
-export default function SignUpPage() { return <div><h1 className="text-3xl font-bold">Kayıt Ol</h1></div> }
+export default function SignupPage() {
+  return <div className="panel"><h1 className="text-2xl font-semibold">Kayıt Ol</h1></div>
+}

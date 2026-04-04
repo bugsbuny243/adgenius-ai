@@ -1,35 +1,62 @@
 import { GoogleGenAI } from '@google/genai'
 
-export type ExtractionResult = {
-  customerName: string | null
-  workTitle: string | null
+export type GeminiExtraction = {
   summary: string
-  keyDates: Array<{ label: string; date: string; confidence: number }>
-  taskList: Array<{ title: string; dueDate: string | null; assignee: string | null; priority: 'low' | 'medium' | 'high' }>
-  riskFlags: string[]
-  missingInformation: string[]
-  nextActions: string[]
+  tasks: Array<{ title: string; dueDate?: string; priority: 'low' | 'medium' | 'high' }>
+  risks: string[]
+  missingFields: string[]
+  customer?: { name: string; email?: string }
+  workItem?: { title: string; summary?: string }
+  note?: string
 }
 
-const systemPrompt = `You are OperaAI, an operations extraction engine.
-Return ONLY valid JSON with these keys:
-customerName, workTitle, summary, keyDates, taskList, riskFlags, missingInformation, nextActions.
-Dates must be ISO 8601 strings.`
+const OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    summary: { type: 'string' },
+    tasks: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          dueDate: { type: 'string' },
+          priority: { type: 'string', enum: ['low', 'medium', 'high'] },
+        },
+        required: ['title', 'priority'],
+      },
+    },
+    risks: { type: 'array', items: { type: 'string' } },
+    missingFields: { type: 'array', items: { type: 'string' } },
+    customer: {
+      type: 'object',
+      properties: { name: { type: 'string' }, email: { type: 'string' } },
+    },
+    workItem: {
+      type: 'object',
+      properties: { title: { type: 'string' }, summary: { type: 'string' } },
+    },
+    note: { type: 'string' },
+  },
+  required: ['summary', 'tasks', 'risks', 'missingFields'],
+}
 
-export async function runGeminiExtraction(input: string): Promise<{ parsed: ExtractionResult; raw: unknown }> {
+export async function extractOperationalData(input: string) {
   const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
   const response = await client.models.generateContent({
     model: 'gemini-2.5-pro',
-    contents: `${systemPrompt}\n\nINPUT:\n${input}`,
+    contents: [
+      {
+        role: 'user',
+        parts: [{ text: `Extract operational records from this mixed input:\n${input}` }],
+      },
+    ],
     config: {
       responseMimeType: 'application/json',
+      responseJsonSchema: OUTPUT_SCHEMA,
     },
   })
 
-  const rawText = response.text
-  const parsed = JSON.parse(rawText) as ExtractionResult
-  return {
-    parsed,
-    raw: parsed,
-  }
+  const text = response.text?.trim() ?? '{}'
+  return JSON.parse(text) as GeminiExtraction
 }

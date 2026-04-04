@@ -1,3 +1,8 @@
 export default function DemoPage() {
-  return <div><h1 className="text-3xl font-bold">Demo</h1><p className="mt-2">Upload -> Gemini extraction -> review -> confirm akışını deneyin.</p></div>
+  return (
+    <div className="panel space-y-3">
+      <h1 className="text-3xl font-semibold">Canlı Demo</h1>
+      <p className="text-slate-300">Demo akışı: Bilgi yükle → Agent çalıştır → Review & approve → DB kayıtları.</p>
+    </div>
+  )
 }
