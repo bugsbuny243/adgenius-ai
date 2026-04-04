@@ -1,9 +1,8 @@
 import json
-import os
 import uuid
 from typing import Any
 
-import google.generativeai as genai
+from google import genai
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -57,11 +56,10 @@ async def generate_for_brief(db: AsyncSession, brief: AdBrief) -> BriefGeneratio
     prompt = _prompt_for_brief(brief)
     run.prompt = prompt
 
-    genai.configure(api_key=settings.GEMINI_API_KEY)
-    model = genai.GenerativeModel("gemini-2.5-pro")
+    client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
     try:
-        resp = model.generate_content(prompt)
+        resp = client.models.generate_content(model="gemini-2.5-pro", contents=prompt)
         text = (resp.text or "{}").strip()
         if text.startswith("```"):
             text = text.strip("`")
