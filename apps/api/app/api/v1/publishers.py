@@ -284,6 +284,14 @@ async def list_placements(db: AsyncSession = Depends(get_db), current_user: User
 @router.post("/placements", response_model=PlacementOut, status_code=status.HTTP_201_CREATED)
 async def create_placement(payload: PlacementIn, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     profile = await _get_profile_or_404(db, current_user)
+    if payload.site_id:
+        site = await db.scalar(select(PublisherSite).where(PublisherSite.id == uuid.UUID(payload.site_id), PublisherSite.publisher_id == profile.id))
+        if not site:
+            raise HTTPException(status_code=404, detail="Site not found")
+    if payload.app_id:
+        app = await db.scalar(select(PublisherApp).where(PublisherApp.id == uuid.UUID(payload.app_id), PublisherApp.publisher_id == profile.id))
+        if not app:
+            raise HTTPException(status_code=404, detail="App not found")
     placement = Placement(
         publisher_id=profile.id,
         site_id=uuid.UUID(payload.site_id) if payload.site_id else None,
@@ -316,6 +324,14 @@ async def update_placement(id: str, payload: PlacementIn, db: AsyncSession = Dep
     placement = await db.scalar(select(Placement).where(Placement.id == uuid.UUID(id), Placement.publisher_id == profile.id))
     if not placement:
         raise HTTPException(status_code=404, detail="Placement not found")
+    if payload.site_id:
+        site = await db.scalar(select(PublisherSite).where(PublisherSite.id == uuid.UUID(payload.site_id), PublisherSite.publisher_id == profile.id))
+        if not site:
+            raise HTTPException(status_code=404, detail="Site not found")
+    if payload.app_id:
+        app = await db.scalar(select(PublisherApp).where(PublisherApp.id == uuid.UUID(payload.app_id), PublisherApp.publisher_id == profile.id))
+        if not app:
+            raise HTTPException(status_code=404, detail="App not found")
     placement.name = payload.name
     placement.site_id = uuid.UUID(payload.site_id) if payload.site_id else None
     placement.app_id = uuid.UUID(payload.app_id) if payload.app_id else None

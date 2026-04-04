@@ -7,14 +7,23 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies import get_current_user, get_db
+from app.dependencies import get_current_user, get_db, is_admin_role
 from app.models.adnet import Campaign, PricingModel
 from app.models.campaign import CampaignBrief
 from app.models.delivery import ApprovalStatus, LiveCampaign, LiveCampaignStatus, RuntimePricingModel
 from app.models.generation import GeneratedAdSet, GeneratedAdVariant, GenerationJob, GenerationJobStatus
-from app.models.user import User
+from app.models.user import User, UserRole
 
 router = APIRouter(prefix="/runtime", tags=["runtime"])
+
+
+def _ensure_advertiser_or_admin(user: User) -> None:
+    if user.role != UserRole.ADVERTISER and not is_admin_role(user.role):
+        raise HTTPException(status_code=403, detail="Advertiser access required")
+
+
+def _campaign_scope_filter(user: User):
+    return True if is_admin_role(user.role) else (Campaign.user_id == user.id)
 
 
 class LiveCampaignIn(BaseModel):
@@ -55,8 +64,9 @@ class GenerationJobIn(BaseModel):
 
 
 @router.post("/live-campaigns", status_code=status.HTTP_201_CREATED)
-async def create_live_campaign(payload: LiveCampaignIn, db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
-    campaign = await db.scalar(select(Campaign).where(Campaign.id == payload.campaign_id))
+async def create_live_campaign(payload: LiveCampaignIn, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_advertiser_or_admin(current_user)
+    campaign = await db.scalar(select(Campaign).where(Campaign.id == payload.campaign_id, _campaign_scope_filter(current_user)))
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
 
@@ -94,14 +104,19 @@ async def create_live_campaign(payload: LiveCampaignIn, db: AsyncSession = Depen
 
 
 @router.get("/live-campaigns")
-async def list_live_campaigns(db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
-    result = await db.execute(select(LiveCampaign).order_by(LiveCampaign.created_at.desc()))
+async def list_live_campaigns(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_advertiser_or_admin(current_user)
+    query = select(LiveCampaign).join(Campaign, Campaign.id == LiveCampaign.campaign_id).order_by(LiveCampaign.created_at.desc())
+    if not is_admin_role(current_user.role):
+        query = query.where(Campaign.user_id == current_user.id)
+    result = await db.execute(query)
     return list(result.scalars().all())
 
 
 @router.post("/generation/jobs", status_code=status.HTTP_201_CREATED)
-async def create_generation_job(payload: GenerationJobIn, db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
-    campaign = await db.scalar(select(Campaign).where(Campaign.id == payload.campaign_id))
+async def create_generation_job(payload: GenerationJobIn, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_advertiser_or_admin(current_user)
+    campaign = await db.scalar(select(Campaign).where(Campaign.id == payload.campaign_id, _campaign_scope_filter(current_user)))
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
     if payload.campaign_brief_id:
@@ -124,10 +139,15 @@ async def create_generation_job(payload: GenerationJobIn, db: AsyncSession = Dep
 
 
 @router.post("/generation/jobs/{job_id}/publish", status_code=status.HTTP_201_CREATED)
-async def publish_generation_output(job_id: str, db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+async def publish_generation_output(job_id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_advertiser_or_admin(current_user)
     job = await db.scalar(select(GenerationJob).where(GenerationJob.id == job_id))
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+
+    campaign = await db.scalar(select(Campaign).where(Campaign.id == job.campaign_id, _campaign_scope_filter(current_user)))
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
 
     ad_set = await db.scalar(select(GeneratedAdSet).where(GeneratedAdSet.job_id == job.id).order_by(GeneratedAdSet.created_at.desc()))
     if not ad_set:
@@ -138,7 +158,6 @@ async def publish_generation_output(job_id: str, db: AsyncSession = Depends(get_
         .order_by(GeneratedAdVariant.created_at.desc())
     )
 
-    campaign = await db.scalar(select(Campaign).where(Campaign.id == job.campaign_id))
     live = LiveCampaign(
         campaign_id=job.campaign_id,
         campaign_brief_id=job.campaign_brief_id,
