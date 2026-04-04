@@ -64,3 +64,19 @@ Script: `sql/20260402_full_schema_completion.sql`
 ```bash
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/migrations/sql/20260402_full_schema_completion.sql
 ```
+
+## 2026-04-04: finance invoice alignment
+
+Script: `sql/20260404_finance_invoice_alignment.sql`
+
+### Purpose
+Scoped alignment for `advertiser_invoices` only:
+- repoints `campaign_id` FK to `live_campaigns(id)`
+- enforces uniqueness on `invoice_number`
+- sets DB default for `status` to `PENDING`
+- canonicalizes legacy lowercase statuses (`pending`, `paid`, `void`) to uppercase
+
+### Execution
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/migrations/sql/20260404_finance_invoice_alignment.sql
+```
