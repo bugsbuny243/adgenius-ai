@@ -89,7 +89,7 @@ class DepositIn(BaseModel):
 
 
 class PayoutIn(BaseModel):
-    amount: Decimal
+    amount: Decimal | None = None
 
 
 class PayoutOut(BaseModel):
@@ -330,19 +330,34 @@ async def publisher_earnings_dashboard(db: AsyncSession = Depends(get_db), curre
 @router.post("/publisher/payout/request", response_model=PayoutOut, status_code=status.HTTP_201_CREATED)
 async def payout_request(payload: PayoutIn, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     _ensure_publisher_or_admin(current_user)
-    # Deprecated old amount-based request; now emits period-based pending settlement for the trailing 30 days.
     profile = await db.scalar(select(PublisherProfile).where(PublisherProfile.user_id == current_user.id))
     if not profile:
         raise HTTPException(status_code=404, detail="Publisher profile not found")
-    if payload.amount <= 0:
-        raise HTTPException(status_code=400, detail="Amount must be positive")
 
     period_end = datetime.now(timezone.utc)
     period_start = period_end - timedelta(days=30)
-    gross = await db.scalar(select(func.coalesce(func.sum(PublisherEarning.amount), 0)).where(PublisherEarning.publisher_id == profile.id))
-    if payload.amount > Decimal(str(gross or 0)):
+    gross = await db.scalar(
+        select(func.coalesce(func.sum(PublisherEarning.amount), 0)).where(
+            PublisherEarning.publisher_id == profile.id,
+            PublisherEarning.created_at >= period_start,
+            PublisherEarning.created_at <= period_end,
+        )
+    )
+    already_requested = await db.scalar(
+        select(func.coalesce(func.sum(PublisherPayout.publisher_share), 0)).where(
+            PublisherPayout.publisher_id == profile.id,
+            PublisherPayout.period_start >= period_start,
+            PublisherPayout.period_end <= period_end,
+            PublisherPayout.status.in_([PayoutStatus.PENDING, PayoutStatus.APPROVED]),
+        )
+    )
+    available_amount = Decimal(str(gross or 0)) - Decimal(str(already_requested or 0))
+    requested_amount = Decimal(str(payload.amount)) if payload.amount is not None else available_amount
+    if requested_amount <= 0:
+        raise HTTPException(status_code=400, detail="No earnings available for payout period")
+    if requested_amount > available_amount:
         raise HTTPException(status_code=400, detail="Insufficient available earnings")
-    publisher_share = Decimal(str(payload.amount))
+    publisher_share = requested_amount
     platform_share = Decimal("0")
 
     payout = PublisherPayout(

@@ -36,14 +36,17 @@ async def record_impression(db: AsyncSession, ad_request_id: str, session_id: st
 
     publisher_share = Decimal("0")
     if campaign and slot:
-        publisher_share = await apply_ad_spend(
+        spend_captured, publisher_share = await apply_ad_spend(
             db=db,
             campaign=campaign,
             slot=slot,
             gross_cost=gross_cost,
             event_type="impression",
             reference_id=str(ad_request.id),
+            live_campaign_id=ad_request.live_campaign_id,
         )
+        if not spend_captured:
+            raise ValueError("Insufficient funds for impression spend")
 
     impression = Impression(
         ad_request_id=ad_request.id,

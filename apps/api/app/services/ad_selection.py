@@ -2,6 +2,7 @@
 
 import random
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Optional
 
 import structlog
@@ -156,13 +157,12 @@ async def select_best_ad(
     await db.flush()
     await db.refresh(ad_request)
 
-    estimated_reservation = float(selected_live.cpm_rate or selected_live.cpc_rate or selected_campaign.bid_amount or 0)
+    estimated_reservation = Decimal(str(selected_live.cpm_rate or selected_live.cpc_rate or selected_campaign.bid_amount or 0))
     db.add(
         SpendReservation(
-            campaign_id=selected_campaign.id,
-            ad_request_id=ad_request.id,
-            amount=estimated_reservation,
-            status="reserved",
+            campaign_id=selected_live.id,
+            reserved_amount=estimated_reservation,
+            actual_spend=Decimal("0"),
         )
     )
 
