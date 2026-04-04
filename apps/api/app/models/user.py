@@ -6,7 +6,6 @@ from app.models.base import UUIDBase
 
 
 class UserRole(str, enum.Enum):
-    ADMIN = "ADMIN"
     SUPER_ADMIN = "SUPER_ADMIN"
     OPS_MANAGER = "OPS_MANAGER"
     ADVERTISER = "ADVERTISER"
@@ -16,7 +15,6 @@ class UserRole(str, enum.Enum):
     def from_input(cls, value: str | None) -> "UserRole":
         raw = (value or "ADVERTISER").strip().upper()
         aliases = {
-            "ADMIN": cls.ADMIN,
             "SUPER_ADMIN": cls.SUPER_ADMIN,
             "OPS_MANAGER": cls.OPS_MANAGER,
             "ADVERTISER": cls.ADVERTISER,

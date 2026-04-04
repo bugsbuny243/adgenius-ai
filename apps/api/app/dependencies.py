@@ -55,7 +55,7 @@ def _auth_exception() -> HTTPException:
 
 
 def is_admin_role(role: UserRole) -> bool:
-    return role in {UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.OPS_MANAGER}
+    return role in {UserRole.SUPER_ADMIN, UserRole.OPS_MANAGER}
 
 
 async def _resolve_user_from_token(token: str | None, db: AsyncSession) -> User | None:
@@ -137,7 +137,7 @@ def require_roles(*roles: UserRole):
     allowed = set(roles)
 
     def _checker(current_user: User = Depends(get_current_user)) -> User:
-        if current_user.role in allowed or (UserRole.ADMIN in allowed and is_admin_role(current_user.role)):
+        if current_user.role in allowed:
             return current_user
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
