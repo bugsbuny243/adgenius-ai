@@ -8,7 +8,8 @@ class Settings(BaseSettings):
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
 
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/adgenius"
+    SUPABASE_URL: str = "http://localhost:54321"
+    SUPABASE_ANON_KEY: str = ""
     REDIS_URL: str = "redis://localhost:6379"
     SECRET_KEY: str = "change-me-in-production-use-a-long-random-string"
     GEMINI_API_KEY: str = ""
@@ -18,7 +19,6 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_DAYS: int = 7
     ALGORITHM: str = "HS256"
     WHATSAPP_URL: str = "https://wa.me/905000000000"
-    REQUIRE_DB_ON_STARTUP: bool = False
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
