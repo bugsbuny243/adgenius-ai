@@ -1,0 +1,175 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AssetType {
+  PDF
+  DOCUMENT
+  IMAGE
+  AUDIO
+  TEXT
+}
+
+enum AiRunStatus {
+  PROCESSING
+  REVIEW
+  CONFIRMED
+  FAILED
+}
+
+model User {
+  id           String      @id @default(cuid())
+  email        String      @unique
+  name         String?
+  customers    Customer[]
+  workItems    WorkItem[]
+  tasks        Task[]
+  notes        Note[]
+  aiRuns       AiRun[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+model Customer {
+  id           String      @id @default(cuid())
+  name         String
+  ownerId      String
+  owner        User        @relation(fields: [ownerId], references: [id])
+  workItems    WorkItem[]
+  notes        Note[]
+  timelines    Timeline[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([ownerId])
+}
+
+model WorkItem {
+  id           String      @id @default(cuid())
+  title        String
+  summary      String
+  status       String      @default("open")
+  ownerId      String
+  owner        User        @relation(fields: [ownerId], references: [id])
+  customerId   String?
+  customer     Customer?   @relation(fields: [customerId], references: [id])
+  tasks        Task[]
+  notes        Note[]
+  timelines    Timeline[]
+  assets       Asset[]
+  aiRuns       AiRun[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([ownerId])
+  @@index([customerId])
+}
+
+model Asset {
+  id           String      @id @default(cuid())
+  type         AssetType
+  fileName     String
+  mimeType     String
+  storageKey   String
+  sourceUrl    String?
+  textContent  String?
+  ownerId      String
+  owner        User        @relation(fields: [ownerId], references: [id])
+  workItemId   String?
+  workItem     WorkItem?   @relation(fields: [workItemId], references: [id])
+  aiRuns       AiRun[]
+  createdAt    DateTime    @default(now())
+
+  @@index([ownerId])
+  @@index([workItemId])
+}
+
+model AiRun {
+  id              String        @id @default(cuid())
+  ownerId         String
+  owner           User          @relation(fields: [ownerId], references: [id])
+  status          AiRunStatus   @default(PROCESSING)
+  model           String
+  promptVersion   String
+  workItemId      String?
+  workItem        WorkItem?     @relation(fields: [workItemId], references: [id])
+  sourceText      String?
+  assets          Asset[]
+  extraction      AiExtraction?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([ownerId])
+  @@index([workItemId])
+}
+
+model AiExtraction {
+  id                 String     @id @default(cuid())
+  aiRunId            String     @unique
+  aiRun              AiRun      @relation(fields: [aiRunId], references: [id])
+  customerName       String?
+  workTitle          String?
+  summary            String
+  keyDates           Json
+  taskList           Json
+  riskFlags          Json
+  missingInformation Json
+  nextActions        Json
+  rawOutput          Json
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+}
+
+model Task {
+  id           String      @id @default(cuid())
+  title        String
+  status       String      @default("todo")
+  dueDate      DateTime?
+  ownerId      String
+  owner        User        @relation(fields: [ownerId], references: [id])
+  workItemId   String?
+  workItem     WorkItem?   @relation(fields: [workItemId], references: [id])
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([ownerId])
+  @@index([workItemId])
+}
+
+model Note {
+  id           String      @id @default(cuid())
+  body         String
+  ownerId      String
+  owner        User        @relation(fields: [ownerId], references: [id])
+  customerId   String?
+  customer     Customer?   @relation(fields: [customerId], references: [id])
+  workItemId   String?
+  workItem     WorkItem?   @relation(fields: [workItemId], references: [id])
+  createdAt    DateTime    @default(now())
+
+  @@index([ownerId])
+  @@index([customerId])
+  @@index([workItemId])
+}
+
+model Timeline {
+  id            String      @id @default(cuid())
+  title         String
+  eventDate     DateTime
+  kind          String
+  ownerId       String
+  owner         User        @relation(fields: [ownerId], references: [id])
+  customerId    String?
+  customer      Customer?   @relation(fields: [customerId], references: [id])
+  workItemId    String?
+  workItem      WorkItem?   @relation(fields: [workItemId], references: [id])
+  createdAt     DateTime    @default(now())
+
+  @@index([ownerId])
+  @@index([eventDate])
+}
