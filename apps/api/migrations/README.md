@@ -80,3 +80,15 @@ Scoped alignment for `advertiser_invoices` only:
 ```bash
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/migrations/sql/20260404_finance_invoice_alignment.sql
 ```
+
+### Staging smoke-check notes
+- **Preflight duplicate check (required):** the partial unique index creation will fail if duplicate non-null `invoice_number` values already exist.
+  ```sql
+  SELECT invoice_number, COUNT(*)
+  FROM public.advertiser_invoices
+  WHERE invoice_number IS NOT NULL
+  GROUP BY invoice_number
+  HAVING COUNT(*) > 1;
+  ```
+- **Legacy status handling:** only `pending`, `paid`, and `void` (case-insensitive) are canonicalized to uppercase. Other unexpected legacy values are intentionally left unchanged for manual review.
+- **Atomicity recommendation:** run in a single transaction during staging apply (for example with `psql -1`) to avoid partial-apply state if a later step fails.
