@@ -1,18 +1,16 @@
 from contextlib import asynccontextmanager
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import structlog
-import os
 
-from app.config import settings
-from app.database import engine
-from app.middleware.request_id import RequestIDMiddleware
-from app.middleware.logging import LoggingMiddleware, configure_structlog
 from app.api.v1.router import v1_router
+from app.config import settings
+from app.middleware.logging import LoggingMiddleware, configure_structlog
+from app.middleware.request_id import RequestIDMiddleware
 from app.pages import router as pages_router
-from app.database import Base
-import app.models  # noqa: F401
 
 configure_structlog()
 logger = structlog.get_logger()
@@ -21,25 +19,6 @@ logger = structlog.get_logger()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("AdGenius API starting up", environment=settings.ENVIRONMENT)
-    app.state.db_startup_ready = False
-    app.state.db_startup_error = None
-
-    try:
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        app.state.db_startup_ready = True
-        logger.info("Database startup check completed")
-    except Exception as exc:  # noqa: BLE001
-        app.state.db_startup_error = str(exc)
-        logger.exception(
-            "Database startup check failed; continuing in degraded mode",
-            require_db_on_startup=settings.REQUIRE_DB_ON_STARTUP,
-        )
-        if settings.REQUIRE_DB_ON_STARTUP:
-            raise RuntimeError(
-                "Database startup check failed and REQUIRE_DB_ON_STARTUP=true. "
-                "Set REQUIRE_DB_ON_STARTUP=false to allow degraded startup."
-            ) from exc
     yield
     logger.info("AdGenius API shutting down")
 
