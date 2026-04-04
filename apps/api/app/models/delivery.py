@@ -160,14 +160,11 @@ class BudgetLedger(UUIDBase):
 
     __tablename__ = "budget_ledgers"
 
-    campaign_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("campaigns.id"), index=True)
-    live_campaign_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("live_campaigns.id"), nullable=True, index=True)
-    workspace_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("workspaces.id"), nullable=True, index=True)
-    amount: Mapped[Decimal] = mapped_column(Numeric(12, 4), default=Decimal("0"))
+    campaign_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("live_campaigns.id"), index=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 6), default=Decimal("0"))
     entry_type: Mapped[str] = mapped_column(String(50), default="spend")
-    reference_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     reference_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    meta: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
 
 class PacingCounter(UUIDBase):

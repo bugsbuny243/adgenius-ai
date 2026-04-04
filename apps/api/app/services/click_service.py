@@ -33,14 +33,17 @@ async def record_click(db: AsyncSession, token: str):
 
     publisher_share = Decimal("0")
     if campaign and slot:
-        publisher_share = await apply_ad_spend(
+        spend_captured, publisher_share = await apply_ad_spend(
             db=db,
             campaign=campaign,
             slot=slot,
             gross_cost=gross_cost,
             event_type="click",
             reference_id=token,
+            live_campaign_id=ad_request.live_campaign_id,
         )
+        if not spend_captured:
+            raise ValueError("Insufficient funds for click spend")
 
     click = Click(
         campaign_id=ad_request.campaign_id,
