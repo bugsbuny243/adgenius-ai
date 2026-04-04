@@ -7,169 +7,266 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum AssetType {
-  PDF
-  DOCUMENT
-  IMAGE
-  AUDIO
-  TEXT
-}
-
-enum AiRunStatus {
+enum RunStatus {
+  PENDING
   PROCESSING
-  REVIEW
-  CONFIRMED
+  WAITING_APPROVAL
+  APPROVED
+  COMPLETED
   FAILED
 }
 
+enum StepStatus {
+  SUCCESS
+  WARNING
+  FAILED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
 model User {
-  id           String      @id @default(cuid())
-  email        String      @unique
-  name         String?
-  customers    Customer[]
-  workItems    WorkItem[]
-  tasks        Task[]
-  notes        Note[]
-  aiRuns       AiRun[]
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id              String         @id @default(cuid())
+  email           String         @unique
+  name            String?
+  passwordHash    String?
+  organizationId  String?
+  organization    Organization?  @relation(fields: [organizationId], references: [id])
+  runs            Run[]
+  approvals       Approval[]     @relation("ApprovalActor")
+  tasks           Task[]         @relation("TaskAssignee")
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model Organization {
+  id               String            @id @default(cuid())
+  name             String
+  slug             String            @unique
+  users            User[]
+  agentTemplates   AgentTemplate[]
+  agents           Agent[]
+  customers        Customer[]
+  workItems        WorkItem[]
+  knowledgeSources KnowledgeSource[]
+  runs             Run[]
+  tasks            Task[]
+  notes            Note[]
+  timelines        Timeline[]
+  approvals        Approval[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+}
+
+model AgentTemplate {
+  id              String         @id @default(cuid())
+  organizationId  String
+  organization    Organization   @relation(fields: [organizationId], references: [id])
+  name            String
+  description     String?
+  systemPrompt    String
+  schemaHint      Json?
+  agents          Agent[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([organizationId])
+}
+
+model Agent {
+  id               String            @id @default(cuid())
+  organizationId   String
+  organization     Organization      @relation(fields: [organizationId], references: [id])
+  templateId       String?
+  template         AgentTemplate?    @relation(fields: [templateId], references: [id])
+  name             String
+  description      String?
+  instructions     String
+  isActive         Boolean           @default(true)
+  runs             Run[]
+  knowledgeSources KnowledgeSource[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([organizationId])
 }
 
 model Customer {
-  id           String      @id @default(cuid())
-  name         String
-  ownerId      String
-  owner        User        @relation(fields: [ownerId], references: [id])
-  workItems    WorkItem[]
-  notes        Note[]
-  timelines    Timeline[]
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id               String          @id @default(cuid())
+  organizationId   String
+  organization     Organization    @relation(fields: [organizationId], references: [id])
+  name             String
+  email            String?
+  phone            String?
+  workItems        WorkItem[]
+  notes            Note[]
+  timelines        Timeline[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
-  @@index([ownerId])
+  @@index([organizationId])
 }
 
 model WorkItem {
-  id           String      @id @default(cuid())
-  title        String
-  summary      String
-  status       String      @default("open")
-  ownerId      String
-  owner        User        @relation(fields: [ownerId], references: [id])
-  customerId   String?
-  customer     Customer?   @relation(fields: [customerId], references: [id])
-  tasks        Task[]
-  notes        Note[]
-  timelines    Timeline[]
-  assets       Asset[]
-  aiRuns       AiRun[]
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id               String          @id @default(cuid())
+  organizationId   String
+  organization     Organization    @relation(fields: [organizationId], references: [id])
+  customerId       String?
+  customer         Customer?       @relation(fields: [customerId], references: [id])
+  title            String
+  status           String          @default("open")
+  summary          String?
+  sourceRunId      String?
+  sourceRun        Run?            @relation("RunWorkItem", fields: [sourceRunId], references: [id])
+  tasks            Task[]
+  notes            Note[]
+  timelines        Timeline[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
-  @@index([ownerId])
+  @@index([organizationId])
   @@index([customerId])
 }
 
-model Asset {
+model KnowledgeSource {
+  id               String          @id @default(cuid())
+  organizationId   String
+  organization     Organization    @relation(fields: [organizationId], references: [id])
+  agentId          String?
+  agent            Agent?          @relation(fields: [agentId], references: [id])
+  title            String
+  mimeType         String
+  storageKey       String
+  sourceUrl        String?
+  extractedText    String?
+  createdById      String?
+  runs             Run[]
+  createdAt        DateTime        @default(now())
+
+  @@index([organizationId])
+  @@index([agentId])
+}
+
+model Run {
+  id                String            @id @default(cuid())
+  organizationId    String
+  organization      Organization      @relation(fields: [organizationId], references: [id])
+  agentId           String
+  agent             Agent             @relation(fields: [agentId], references: [id])
+  startedById       String?
+  startedBy         User?             @relation(fields: [startedById], references: [id])
+  status            RunStatus         @default(PENDING)
+  inputText         String?
+  extraction        Json?
+  summary           String?
+  risks             Json?
+  missingFields     Json?
+  proposedTasks     Json?
+  output            Json?
+  knowledgeSourceId String?
+  knowledgeSource   KnowledgeSource?  @relation(fields: [knowledgeSourceId], references: [id])
+  steps             RunStep[]
+  approvals         Approval[]
+  workItems         WorkItem[]        @relation("RunWorkItem")
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([organizationId])
+  @@index([agentId])
+}
+
+model RunStep {
   id           String      @id @default(cuid())
-  type         AssetType
-  fileName     String
-  mimeType     String
-  storageKey   String
-  sourceUrl    String?
-  textContent  String?
-  ownerId      String
-  owner        User        @relation(fields: [ownerId], references: [id])
-  workItemId   String?
-  workItem     WorkItem?   @relation(fields: [workItemId], references: [id])
-  aiRuns       AiRun[]
+  runId        String
+  run          Run         @relation(fields: [runId], references: [id])
+  stepType     String
+  status       StepStatus  @default(SUCCESS)
+  title        String
+  detail       String?
+  payload      Json?
   createdAt    DateTime    @default(now())
 
-  @@index([ownerId])
-  @@index([workItemId])
+  @@index([runId])
 }
 
-model AiRun {
-  id              String        @id @default(cuid())
-  ownerId         String
-  owner           User          @relation(fields: [ownerId], references: [id])
-  status          AiRunStatus   @default(PROCESSING)
-  model           String
-  promptVersion   String
-  workItemId      String?
-  workItem        WorkItem?     @relation(fields: [workItemId], references: [id])
-  sourceText      String?
-  assets          Asset[]
-  extraction      AiExtraction?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+model Approval {
+  id               String          @id @default(cuid())
+  organizationId   String
+  organization     Organization    @relation(fields: [organizationId], references: [id])
+  runId            String
+  run              Run             @relation(fields: [runId], references: [id])
+  status           ApprovalStatus  @default(PENDING)
+  title            String
+  summary          String
+  payload          Json
+  approvedById     String?
+  approvedBy       User?           @relation("ApprovalActor", fields: [approvedById], references: [id])
+  approvedAt       DateTime?
+  createdAt        DateTime        @default(now())
 
-  @@index([ownerId])
-  @@index([workItemId])
-}
-
-model AiExtraction {
-  id                 String     @id @default(cuid())
-  aiRunId            String     @unique
-  aiRun              AiRun      @relation(fields: [aiRunId], references: [id])
-  customerName       String?
-  workTitle          String?
-  summary            String
-  keyDates           Json
-  taskList           Json
-  riskFlags          Json
-  missingInformation Json
-  nextActions        Json
-  rawOutput          Json
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @updatedAt
+  @@index([organizationId])
+  @@index([runId])
 }
 
 model Task {
-  id           String      @id @default(cuid())
-  title        String
-  status       String      @default("todo")
-  dueDate      DateTime?
-  ownerId      String
-  owner        User        @relation(fields: [ownerId], references: [id])
-  workItemId   String?
-  workItem     WorkItem?   @relation(fields: [workItemId], references: [id])
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id               String         @id @default(cuid())
+  organizationId   String
+  organization     Organization   @relation(fields: [organizationId], references: [id])
+  title            String
+  description      String?
+  status           TaskStatus     @default(TODO)
+  dueDate          DateTime?
+  assigneeId       String?
+  assignee         User?          @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  workItemId       String?
+  workItem         WorkItem?      @relation(fields: [workItemId], references: [id])
+  sourceRunId      String?
+  sourceRun        Run?           @relation(fields: [sourceRunId], references: [id])
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
-  @@index([ownerId])
+  @@index([organizationId])
   @@index([workItemId])
 }
 
 model Note {
-  id           String      @id @default(cuid())
-  body         String
-  ownerId      String
-  owner        User        @relation(fields: [ownerId], references: [id])
-  customerId   String?
-  customer     Customer?   @relation(fields: [customerId], references: [id])
-  workItemId   String?
-  workItem     WorkItem?   @relation(fields: [workItemId], references: [id])
-  createdAt    DateTime    @default(now())
+  id               String         @id @default(cuid())
+  organizationId   String
+  organization     Organization   @relation(fields: [organizationId], references: [id])
+  body             String
+  customerId       String?
+  customer         Customer?      @relation(fields: [customerId], references: [id])
+  workItemId       String?
+  workItem         WorkItem?      @relation(fields: [workItemId], references: [id])
+  sourceRunId      String?
+  createdAt        DateTime       @default(now())
 
-  @@index([ownerId])
-  @@index([customerId])
-  @@index([workItemId])
+  @@index([organizationId])
 }
 
 model Timeline {
-  id            String      @id @default(cuid())
-  title         String
-  eventDate     DateTime
-  kind          String
-  ownerId       String
-  owner         User        @relation(fields: [ownerId], references: [id])
-  customerId    String?
-  customer      Customer?   @relation(fields: [customerId], references: [id])
-  workItemId    String?
-  workItem      WorkItem?   @relation(fields: [workItemId], references: [id])
-  createdAt     DateTime    @default(now())
+  id               String         @id @default(cuid())
+  organizationId   String
+  organization     Organization   @relation(fields: [organizationId], references: [id])
+  title            String
+  detail           String?
+  happenedAt       DateTime       @default(now())
+  customerId       String?
+  customer         Customer?      @relation(fields: [customerId], references: [id])
+  workItemId       String?
+  workItem         WorkItem?      @relation(fields: [workItemId], references: [id])
+  sourceRunId      String?
+  createdAt        DateTime       @default(now())
 
-  @@index([ownerId])
-  @@index([eventDate])
+  @@index([organizationId])
+  @@index([happenedAt])
 }
