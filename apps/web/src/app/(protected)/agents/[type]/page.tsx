@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
+import { ApiRequestError, postJsonWithSession } from '@/lib/api-client';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 
 type AgentTypeRow = {
@@ -72,39 +73,20 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
     setRunning(true);
 
     try {
-      const supabase = createBrowserSupabase();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session?.access_token) {
-        setError('Oturum bulunamadı. Lütfen tekrar giriş yapın.');
-        return;
-      }
-
-      const response = await fetch('/api/agents/run', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
+      const data = await postJsonWithSession<AgentRunResponse, { type: string; userInput: string }>('/api/agents/run', {
           type: params.type,
           userInput: input,
-        }),
       });
-
-      const data = (await response.json()) as AgentRunResponse;
-
-      if (!response.ok || data.error) {
-        setError(data.error ?? 'Bir hata oluştu.');
-        return;
-      }
 
       setResult(data.result ?? 'Model boş yanıt döndürdü.');
       setRunId(data.runId ?? null);
       setSaveTitle('');
     } catch (runError) {
+      if (runError instanceof ApiRequestError) {
+        setError(runError.message);
+        return;
+      }
+
       setError(runError instanceof Error ? runError.message : 'Çalıştırma sırasında hata oluştu.');
     } finally {
       setRunning(false);
@@ -121,37 +103,22 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
     setSaveStatus('');
 
     try {
-      const supabase = createBrowserSupabase();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session?.access_token) {
-        setSaveStatus('Oturum bulunamadı. Tekrar giriş yapın.');
-        return;
-      }
-
-      const response = await fetch('/api/outputs/save', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
+      await postJsonWithSession<{ saved: { id: string } }, { runId: string; title: string; content: string }>(
+        '/api/outputs/save',
+        {
           runId,
           title: saveTitle,
           content: result,
-        }),
-      });
-
-      const data = (await response.json()) as { error?: string };
-      if (!response.ok || data.error) {
-        setSaveStatus(data.error ?? 'Bir hata oluştu.');
-        return;
-      }
+        },
+      );
 
       setSaveStatus('Çıktı kaydedildi.');
     } catch (saveError) {
+      if (saveError instanceof ApiRequestError) {
+        setSaveStatus(saveError.message);
+        return;
+      }
+
       setSaveStatus(saveError instanceof Error ? saveError.message : 'Kaydetme sırasında hata oluştu.');
     } finally {
       setSaving(false);
