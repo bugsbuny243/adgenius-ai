@@ -2,11 +2,10 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { signOut } from '@/lib/auth';
 import { createBrowserSupabase, isSupabaseConfigured } from '@/lib/supabase/client';
-import { loadCurrentUser } from '@/lib/workspace';
 import { cn } from '@/lib/utils';
 
 const appNavItems = [
@@ -21,33 +20,32 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [checkingAuth, setCheckingAuth] = useState(true);
-  const [authError, setAuthError] = useState('');
+
+  const loginRedirectPath = useMemo(() => {
+    const nextPath = pathname && pathname !== '/' ? pathname : '/dashboard';
+    return `/login?next=${encodeURIComponent(nextPath)}`;
+  }, [pathname]);
 
   useEffect(() => {
     let mounted = true;
 
-    async function verifyAuth() {
+    async function verifySession() {
       try {
         if (!isSupabaseConfigured()) {
-          throw new Error('Supabase yapılandırması eksik.');
-        }
-
-        const supabase = createBrowserSupabase();
-        const user = await loadCurrentUser(supabase);
-
-        if (!user) {
           router.replace('/login');
           return;
         }
 
-        if (mounted) {
-          setAuthError('');
+        const supabase = createBrowserSupabase();
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
+
+        if (error || !session?.access_token) {
+          router.replace(loginRedirectPath);
+          return;
         }
-      } catch (error) {
-        if (mounted) {
-          setAuthError(error instanceof Error ? error.message : 'Oturum doğrulanamadı.');
-        }
-        router.replace('/login');
       } finally {
         if (mounted) {
           setCheckingAuth(false);
@@ -55,7 +53,7 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
       }
     }
 
-    void verifyAuth();
+    void verifySession();
 
     if (!isSupabaseConfigured()) {
       return () => {
@@ -68,7 +66,7 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session?.access_token) {
-        router.replace('/login');
+        router.replace(loginRedirectPath);
       }
     });
 
@@ -76,7 +74,7 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [router]);
+  }, [loginRedirectPath, router]);
 
   async function onLogout() {
     await signOut();
@@ -86,10 +84,6 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
 
   if (checkingAuth) {
     return <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-zinc-300">Oturum kontrol ediliyor...</div>;
-  }
-
-  if (authError) {
-    return <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-4 text-center text-sm text-rose-300">{authError}</div>;
   }
 
   return (
