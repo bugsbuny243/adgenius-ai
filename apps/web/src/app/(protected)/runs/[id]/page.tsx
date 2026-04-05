@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
+import { ApiRequestError, postJsonWithSession } from '@/lib/api-client';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { bootstrapWorkspaceForUser, loadCurrentUser } from '@/lib/workspace';
 
@@ -71,36 +72,21 @@ export default function RunDetailPage({ params }: { params: { id: string } }) {
       return;
     }
 
-    const supabase = createBrowserSupabase();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session?.access_token) {
-      setStatus('Oturum bilgisi bulunamadı.');
-      return;
-    }
-
-    const response = await fetch('/api/outputs/save', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
+    try {
+      await postJsonWithSession<{ saved: { id: string } }, { runId: string; content: string }>('/api/outputs/save', {
         runId: run.id,
         content: run.result_text,
-      }),
-    });
+      });
+      setSaved(true);
+      setStatus('Çıktı kaydedildi.');
+    } catch (error) {
+      if (error instanceof ApiRequestError) {
+        setStatus(error.message);
+        return;
+      }
 
-    const data = (await response.json()) as { error?: string };
-    if (!response.ok || data.error) {
-      setStatus(data.error ?? 'Kaydetme sırasında hata oluştu.');
-      return;
+      setStatus(error instanceof Error ? error.message : 'Kaydetme sırasında hata oluştu.');
     }
-
-    setSaved(true);
-    setStatus('Çıktı kaydedildi.');
   }
 
   if (!run) {
