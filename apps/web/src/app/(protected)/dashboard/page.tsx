@@ -70,7 +70,7 @@ export default function DashboardPage() {
     <section className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <p className="text-zinc-300">Tradepiglobal AI kullanım özetiniz ve son aktiviteleriniz.</p>
+        <p className="text-zinc-300">AdGenius AI kullanım özetiniz ve son aktiviteleriniz.</p>
       </div>
 
       {error ? <p className="text-sm text-rose-300">{error}</p> : null}

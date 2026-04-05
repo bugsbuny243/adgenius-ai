@@ -8,8 +8,8 @@ const adsenseEnabled =
   process.env.NEXT_PUBLIC_ENABLE_ADSENSE === 'true' && !!adsenseClient;
 
 export const metadata: Metadata = {
-  title: 'Tradepiglobal AI',
-  description: 'Tradepiglobal AI agent çalışma alanı ve üretim platformu.',
+  title: 'AdGenius AI',
+  description: 'AdGenius AI agent çalışma alanı ve üretim platformu.',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

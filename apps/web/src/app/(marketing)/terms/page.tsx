@@ -8,7 +8,7 @@ export default function TermsPage() {
       <main className="mx-auto w-full max-w-4xl space-y-6 px-4 py-12">
         <h1 className="text-3xl font-semibold">Kullanım Şartları</h1>
         <p className="text-zinc-300">
-          Tradepiglobal AI hizmetini kullanan herkes, platformu yürürlükteki mevzuata uygun şekilde kullanmaktan sorumludur.
+          AdGenius AI hizmetini kullanan herkes, platformu yürürlükteki mevzuata uygun şekilde kullanmaktan sorumludur.
         </p>
         <p className="text-zinc-300">
           Hizmet sürekliliği için azami çaba gösterilse de bakım, güncelleme veya teknik nedenlerle geçici erişim
