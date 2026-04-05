@@ -10,7 +10,7 @@ const guestNavItems = [
   { href: '/pricing', label: 'Fiyatlar' },
   { href: '/about', label: 'Hakkımızda' },
   { href: '/contact', label: 'İletişim' },
-  { href: '/login', label: 'Giriş' },
+  { href: '/signin', label: 'Giriş' },
   { href: '/signup', label: 'Kayıt' },
 ];
 

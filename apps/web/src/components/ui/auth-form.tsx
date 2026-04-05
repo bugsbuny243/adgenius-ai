@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
-import { createBrowserSupabase, isSupabaseConfigured } from '@/lib/supabase/client';
+import { createBrowserSupabase } from '@/lib/supabase/client';
 
 type AuthMode = 'login' | 'signup';
 
@@ -80,13 +80,19 @@ export function AuthForm({ mode }: AuthFormProps) {
   useEffect(() => {
     isMountedRef.current = true;
 
-    if (!isSupabaseConfigured()) {
-      return () => {
-        isMountedRef.current = false;
-      };
-    }
-
     const supabase = createBrowserSupabase();
+
+    void (async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (session?.access_token) {
+        router.replace(redirectTarget);
+        router.refresh();
+      }
+    })();
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -117,11 +123,6 @@ export function AuthForm({ mode }: AuthFormProps) {
     setLoading(true);
 
     try {
-      if (!isSupabaseConfigured()) {
-        setError('Kimlik doğrulama servisi şu anda kullanılamıyor. Lütfen daha sonra tekrar dene.');
-        return;
-      }
-
       const supabase = createBrowserSupabase();
       const sanitizedEmail = email.trim().toLowerCase();
 

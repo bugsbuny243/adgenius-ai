@@ -2,19 +2,19 @@ import Link from 'next/link';
 
 import { AuthForm } from '@/components/ui/auth-form';
 
-export default function SignupPage() {
+export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-4 py-10 text-zinc-100">
       <div className="w-full max-w-md space-y-5">
         <div className="space-y-2 text-center">
-          <h1 className="text-2xl font-semibold">Kayıt Ol</h1>
-          <p className="text-sm text-zinc-400">AdGenius AI ile agent iş akışını başlatın.</p>
+          <h1 className="text-2xl font-semibold">Giriş Yap</h1>
+          <p className="text-sm text-zinc-400">AdGenius AI hesabınızla devam edin.</p>
         </div>
-        <AuthForm mode="signup" />
+        <AuthForm mode="login" />
         <p className="text-center text-sm text-zinc-400">
-          Zaten hesabın var mı?{' '}
-          <Link href="/signin" className="text-indigo-300 hover:text-indigo-200">
-            Giriş yap
+          Hesabın yok mu?{' '}
+          <Link href="/signup" className="text-indigo-300 hover:text-indigo-200">
+            Kayıt ol
           </Link>
         </p>
       </div>
