@@ -8,7 +8,7 @@ export default function SignupPage() {
       <div className="w-full max-w-md space-y-5">
         <div className="space-y-2 text-center">
           <h1 className="text-2xl font-semibold">Kayıt Ol</h1>
-          <p className="text-sm text-zinc-400">Koschei ile agent iş akışını başlatın.</p>
+          <p className="text-sm text-zinc-400">Tradepiglobal AI ile agent iş akışını başlatın.</p>
         </div>
         <AuthForm mode="signup" />
         <p className="text-center text-sm text-zinc-400">

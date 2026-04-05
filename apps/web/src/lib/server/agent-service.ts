@@ -1,11 +1,11 @@
-'use server';
+import 'server-only';
 
 import { runAI } from '@/lib/ai';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { assertCanRun, getMonthKey, incrementMonthlyUsage } from '@/lib/usage';
 import { resolveWorkspaceContext, WorkspaceError } from '@/lib/workspace';
 
-type ActionResult<T> =
+type ServiceResult<T> =
   | {
       ok: true;
       data: T;
@@ -40,13 +40,13 @@ function deriveTitle(content: string) {
   return firstLine.length > 80 ? `${firstLine.slice(0, 80)}...` : firstLine;
 }
 
-export async function runAgentAction(input: {
+export async function runAgent(input: {
   accessToken?: string;
   type?: string;
   userInput?: string;
   model?: string;
 }): Promise<
-  ActionResult<{
+  ServiceResult<{
     run: { id: string; created_at: string; status: string };
     result: string;
     usage: { runsCount: number; monthKey: string };
@@ -95,7 +95,7 @@ export async function runAgentAction(input: {
       });
       resultText = aiResult.text;
       modelName = aiResult.model;
-    } catch (aiError) {
+    } catch {
       await supabase.from('agent_runs').insert({
         workspace_id: workspace.id,
         user_id: user.id,
@@ -148,12 +148,12 @@ export async function runAgentAction(input: {
   }
 }
 
-export async function saveAgentOutputAction(input: {
+export async function saveAgentOutput(input: {
   accessToken?: string;
   runId?: string;
   title?: string;
   content?: string;
-}): Promise<ActionResult<{ id: string; title: string; created_at: string }>> {
+}): Promise<ServiceResult<{ id: string; title: string; created_at: string }>> {
   try {
     if (!input.accessToken) {
       return { ok: false, error: 'Oturum bulunamadı. Lütfen tekrar giriş yapın.' };

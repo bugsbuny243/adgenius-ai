@@ -8,7 +8,7 @@ export default function ContactPage() {
       <main className="mx-auto w-full max-w-4xl space-y-6 px-4 py-12">
         <h1 className="text-3xl font-semibold">İletişim</h1>
         <p className="text-zinc-300">
-          Koschei ürün ekibi; iş ortaklığı, kurumsal kullanım ve teknik geri bildirim konularında destek sağlar.
+          Tradepiglobal AI ürün ekibi; iş ortaklığı, kurumsal kullanım ve teknik geri bildirim konularında destek sağlar.
         </p>
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
           <p className="text-sm text-zinc-400">E-posta</p>

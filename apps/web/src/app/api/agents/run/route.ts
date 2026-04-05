@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { runAgentAction } from '@/actions/agent-actions';
+import { runAgent } from '@/lib/server/agent-service';
 
 function getAccessToken(request: Request) {
   const authorization = request.headers.get('authorization');
@@ -14,13 +14,23 @@ function getAccessToken(request: Request) {
 export async function POST(request: Request) {
   const accessToken = getAccessToken(request);
 
-  const body = (await request.json()) as {
+  let body: {
     type?: string;
     userInput?: string;
     model?: string;
   };
 
-  const result = await runAgentAction({
+  try {
+    body = (await request.json()) as {
+      type?: string;
+      userInput?: string;
+      model?: string;
+    };
+  } catch {
+    return NextResponse.json({ error: 'Geçersiz istek gövdesi.' }, { status: 400 });
+  }
+
+  const result = await runAgent({
     accessToken: accessToken ?? undefined,
     type: body.type,
     userInput: body.userInput,

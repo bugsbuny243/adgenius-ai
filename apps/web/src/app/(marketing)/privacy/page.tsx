@@ -8,7 +8,7 @@ export default function PrivacyPage() {
       <main className="mx-auto w-full max-w-4xl space-y-6 px-4 py-12">
         <h1 className="text-3xl font-semibold">Gizlilik Politikası</h1>
         <p className="text-zinc-300">
-          Koschei, kullanıcı hesap verilerini hizmete erişim, güvenlik doğrulaması ve hesap yönetimi amaçlarıyla
+          Tradepiglobal AI, kullanıcı hesap verilerini hizmete erişim, güvenlik doğrulaması ve hesap yönetimi amaçlarıyla
           işler.
         </p>
         <p className="text-zinc-300">
