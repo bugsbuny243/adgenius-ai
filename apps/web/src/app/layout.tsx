@@ -1,23 +1,19 @@
 import './globals.css'
+import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
-import Script from 'next/script'
 import { TopNav } from '@/src/components/nav'
+
+export const metadata: Metadata = {
+  title: 'AgentForge',
+  description: 'Create and run business agents powered by Gemini.',
+}
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="tr">
-      <head>
-        <Script
-          id="adsense-base-script"
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6001394144742471"
-          crossOrigin="anonymous"
-          strategy="afterInteractive"
-        />
-      </head>
+    <html lang="en">
       <body>
         <TopNav />
-        <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+        <main className="container">{children}</main>
       </body>
     </html>
   )
