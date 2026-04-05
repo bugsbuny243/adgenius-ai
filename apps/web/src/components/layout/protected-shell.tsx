@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
 import { signOut } from '@/lib/auth';
-import { createBrowserSupabase, isSupabaseConfigured } from '@/lib/supabase/client';
+import { createBrowserSupabase } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 
 const appNavItems = [
@@ -24,7 +24,7 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
 
   const loginRedirectPath = useMemo(() => {
     const nextPath = pathname && pathname !== '/' ? pathname : '/dashboard';
-    return `/login?next=${encodeURIComponent(nextPath)}`;
+    return `/signin?next=${encodeURIComponent(nextPath)}`;
   }, [pathname]);
 
   useEffect(() => {
@@ -32,12 +32,6 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
 
     async function verifySession() {
       try {
-        if (!isSupabaseConfigured()) {
-          setIsAuthenticated(false);
-          router.replace('/login');
-          return;
-        }
-
         const supabase = createBrowserSupabase();
         const {
           data: { session },
@@ -64,12 +58,6 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
 
     void verifySession();
 
-    if (!isSupabaseConfigured()) {
-      return () => {
-        mounted = false;
-      };
-    }
-
     const supabase = createBrowserSupabase();
     const {
       data: { subscription },
@@ -92,7 +80,7 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
   async function onLogout() {
     await signOut();
     setIsAuthenticated(false);
-    router.replace('/login');
+    router.replace('/signin');
     router.refresh();
   }
 
