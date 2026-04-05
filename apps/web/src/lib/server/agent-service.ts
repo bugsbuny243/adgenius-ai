@@ -96,6 +96,12 @@ export async function runAgent(input: {
         user_input: input.userInput,
         model_name: modelName,
         status: 'pending',
+        result_text: null,
+        error_message: null,
+        metadata: {
+          started_at: new Date().toISOString(),
+          month_key: usage.monthKey,
+        },
       })
       .select('id, created_at, status')
       .single();
@@ -106,6 +112,17 @@ export async function runAgent(input: {
         error: `Çalıştırma başlatılamadı: ${pendingRunError?.message ?? 'Bilinmeyen hata'}`,
       };
     }
+
+    await supabase
+      .from('agent_runs')
+      .update({
+        status: 'running',
+        metadata: {
+          started_at: new Date().toISOString(),
+          month_key: usage.monthKey,
+        },
+      })
+      .eq('id', pendingRun.id);
 
     try {
       const aiResult = await runAI({
@@ -126,6 +143,7 @@ export async function runAgent(input: {
           metadata: {
             completed_at: new Date().toISOString(),
             month_key: usage.monthKey,
+            usage: aiResult.usageMetadata,
           },
         })
         .eq('id', pendingRun.id)
@@ -153,7 +171,7 @@ export async function runAgent(input: {
         },
       };
     } catch (aiError) {
-      const aiErrorMessage = cleanErrorMessage(aiError, 'AI yanıtı alınamadı. Lütfen tekrar deneyin.');
+      const aiErrorMessage = cleanErrorMessage(aiError, 'Yapay zeka yanıtı alınamadı. Lütfen tekrar deneyin.');
 
       await supabase
         .from('agent_runs')
@@ -163,11 +181,12 @@ export async function runAgent(input: {
           error_message: aiErrorMessage,
           metadata: {
             failed_at: new Date().toISOString(),
+            month_key: usage.monthKey,
           },
         })
         .eq('id', pendingRun.id);
 
-      return { ok: false, error: 'AI yanıtı alınamadı. Lütfen tekrar deneyin.' };
+      return { ok: false, error: 'Yapay zeka yanıtı alınamadı. Lütfen tekrar deneyin.' };
     }
   } catch (error) {
     return { ok: false, error: cleanErrorMessage(error) };
@@ -223,11 +242,25 @@ export async function saveAgentOutput(input: {
       return { ok: false, error: `Kayıt kontrolü başarısız: ${existingSavedError.message}` };
     }
 
-    if (existingSaved) {
-      return { ok: true, data: existingSaved };
-    }
-
     const finalTitle = input.title?.trim() || deriveTitle(content);
+
+    if (existingSaved) {
+      const { data: updatedSaved, error: updateError } = await supabase
+        .from('saved_outputs')
+        .update({
+          title: finalTitle,
+          content,
+        })
+        .eq('id', existingSaved.id)
+        .select('id, title, created_at')
+        .single();
+
+      if (updateError || !updatedSaved) {
+        return { ok: false, error: `Kayıt güncellenemedi: ${updateError?.message ?? 'Bilinmeyen hata'}` };
+      }
+
+      return { ok: true, data: updatedSaved };
+    }
 
     const { data: saved, error: saveError } = await supabase
       .from('saved_outputs')
@@ -242,22 +275,6 @@ export async function saveAgentOutput(input: {
       .single();
 
     if (saveError) {
-      if (saveError.code === '23505') {
-        const { data: duplicateSaved } = await supabase
-          .from('saved_outputs')
-          .select('id, title, created_at')
-          .eq('workspace_id', workspace.id)
-          .eq('user_id', user.id)
-          .eq('agent_run_id', runId)
-          .maybeSingle();
-
-        if (duplicateSaved) {
-          return { ok: true, data: duplicateSaved };
-        }
-
-        return { ok: false, error: 'Bu çıktı zaten kaydedilmiş.' };
-      }
-
       return { ok: false, error: `Çıktı kaydedilemedi: ${saveError.message}` };
     }
 

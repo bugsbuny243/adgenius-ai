@@ -11,6 +11,8 @@ type RunRow = {
   status: string;
   user_input: string;
   result_text: string | null;
+  error_message: string | null;
+  metadata: Record<string, unknown> | null;
   created_at: string;
   agent_types: {
     name: string;
@@ -38,7 +40,7 @@ export default function RunsPage() {
 
         const { data, error: loadError } = await supabase
           .from('agent_runs')
-          .select('id, status, user_input, result_text, created_at, agent_types(name, slug)')
+.select('id, status, user_input, result_text, error_message, metadata, created_at, agent_types(name, slug)')
           .eq('workspace_id', workspace.id)
           .order('created_at', { ascending: false })
           .limit(30);
@@ -76,6 +78,12 @@ export default function RunsPage() {
             <p className="mt-1 text-sm text-zinc-300">
               <strong>Sonuç:</strong> {truncate(run.result_text)}
             </p>
+            {run.error_message ? (
+              <p className="mt-1 text-sm text-rose-300">
+                <strong>Hata:</strong> {run.error_message}
+              </p>
+            ) : null}
+            {run.metadata ? <p className="mt-1 text-xs text-zinc-500">Metadata mevcut</p> : null}
             <Link href={`/runs/${run.id}`} className="mt-3 inline-block text-sm text-indigo-300 hover:text-indigo-200">
               Detayı Aç
             </Link>

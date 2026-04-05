@@ -11,6 +11,8 @@ type RunDetail = {
   user_input: string;
   result_text: string | null;
   status: string;
+  error_message: string | null;
+  metadata: Record<string, unknown> | null;
   created_at: string;
   agent_types: {
     name: string;
@@ -36,7 +38,7 @@ export default function RunDetailPage({ params }: { params: { id: string } }) {
 
       const { data: runData, error: runError } = await supabase
         .from('agent_runs')
-        .select('id, user_input, result_text, status, created_at, agent_types(name, slug)')
+.select('id, user_input, result_text, status, error_message, metadata, created_at, agent_types(name, slug)')
         .eq('id', params.id)
         .eq('workspace_id', workspace.id)
         .maybeSingle();
@@ -111,6 +113,9 @@ export default function RunDetailPage({ params }: { params: { id: string } }) {
       <div className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-4">
         <h2 className="mb-2 text-sm uppercase tracking-wide text-zinc-400">Sonuç</h2>
         <p className="whitespace-pre-wrap text-sm text-zinc-100">{run.result_text ?? 'Sonuç boş.'}</p>
+        <p className="mt-2 text-xs uppercase tracking-wide text-zinc-400">Durum: {run.status}</p>
+        {run.error_message ? <p className="mt-2 text-sm text-rose-300">{run.error_message}</p> : null}
+        {run.metadata ? <pre className="mt-3 overflow-auto rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-400">{JSON.stringify(run.metadata, null, 2)}</pre> : null}
       </div>
 
       {!saved ? (

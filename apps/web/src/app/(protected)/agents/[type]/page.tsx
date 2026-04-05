@@ -80,7 +80,7 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
         userInput: input,
       });
 
-      setResult(data.result ?? 'AI engine boş yanıt döndürdü.');
+      setResult(data.result ?? 'Koschei boş yanıt döndürdü.');
       setRunId(data.runId ?? null);
       setSaveTitle('');
     } catch (runError) {

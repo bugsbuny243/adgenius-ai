@@ -8,7 +8,7 @@ export default function PricingPage() {
       <main className="mx-auto w-full max-w-5xl px-4 py-12">
         <h1 className="text-3xl font-semibold">Fiyatlar</h1>
         <p className="mt-3 max-w-3xl text-zinc-300">
-          AdGenius AI planları ekip boyutuna ve kullanım hacmine göre kademeli olarak sunulur. Güncel paket
+          Koschei planları ekip boyutuna ve kullanım hacmine göre kademeli olarak sunulur. Güncel paket
           ayrıntıları ve kurumsal teklifler için kısa süre içinde bu sayfada detaylı bir tablo yayınlanacaktır.
         </p>
       </main>

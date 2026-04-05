@@ -198,7 +198,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           onChange={(event) => setEmail(event.target.value)}
           required
           className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none ring-indigo-400 placeholder:text-zinc-500 focus:ring"
-          placeholder="ornek@adgenius.ai"
+          placeholder="ornek@koschei.ai"
         />
       </div>
       <div className="space-y-1">
