@@ -1,6 +1,6 @@
 'use server';
 
-import { runAgent } from '@/lib/gemini';
+import { runAI } from '@/lib/ai';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { assertCanRun, getMonthKey, incrementMonthlyUsage } from '@/lib/usage';
 import { resolveWorkspaceContext, WorkspaceError } from '@/lib/workspace';
@@ -84,18 +84,18 @@ export async function runAgentAction(input: {
 
     const usage = await assertCanRun(supabase, workspace.id);
 
-    let geminiText = '';
-    let modelName = input.model ?? 'gemini-2.5-flash';
+    let resultText = '';
+    let modelName = input.model ?? 'ai-standard';
 
     try {
-      const geminiResult = await runAgent({
+      const aiResult = await runAI({
         systemPrompt: agentType.system_prompt,
         userInput: input.userInput,
         model: input.model,
       });
-      geminiText = geminiResult.text;
-      modelName = geminiResult.model;
-    } catch (geminiError) {
+      resultText = aiResult.text;
+      modelName = aiResult.model;
+    } catch (aiError) {
       await supabase.from('agent_runs').insert({
         workspace_id: workspace.id,
         user_id: user.id,
@@ -103,10 +103,10 @@ export async function runAgentAction(input: {
         user_input: input.userInput,
         model_name: modelName,
         result_text: null,
-        status: 'failed'
+        status: 'failed',
       });
 
-      return { ok: false, error: 'Gemini yanıtı alınamadı. Lütfen tekrar deneyin.' };
+      return { ok: false, error: 'AI yanıtı alınamadı. Lütfen tekrar deneyin.' };
     }
 
     const { data: createdRun, error: runInsertError } = await supabase
@@ -117,14 +117,17 @@ export async function runAgentAction(input: {
         agent_type_id: agentType.id,
         user_input: input.userInput,
         model_name: modelName,
-        result_text: geminiText,
+        result_text: resultText,
         status: 'completed',
       })
       .select('id, created_at, status')
       .single();
 
     if (runInsertError || !createdRun) {
-      return { ok: false, error: `Çalıştırma kaydedilemedi: ${runInsertError?.message ?? 'Bilinmeyen hata'}` };
+      return {
+        ok: false,
+        error: `Çalıştırma kaydedilemedi: ${runInsertError?.message ?? 'Bilinmeyen hata'}`,
+      };
     }
 
     const nextRunsCount = await incrementMonthlyUsage(supabase, workspace.id, usage.monthKey);
@@ -133,7 +136,7 @@ export async function runAgentAction(input: {
       ok: true,
       data: {
         run: createdRun,
-        result: geminiText,
+        result: resultText,
         usage: {
           runsCount: nextRunsCount,
           monthKey: getMonthKey(),

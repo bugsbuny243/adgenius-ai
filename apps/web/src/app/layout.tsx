@@ -1,22 +1,22 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
+import { AdSenseScript } from '@/components/ads/adsense-script';
+
 import '@/styles/globals.css';
 
 export const metadata: Metadata = {
   title: 'Koschei',
-  description: 'AI Agent Platform',
+  description: 'Koschei AI agent çalışma alanı ve üretim platformu.',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="tr">
-      <body>{children}</body>
+      <body>
+        <AdSenseScript />
+        {children}
+      </body>
     </html>
   );
 }
-<script
-  async
-  src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXX"
-  crossOrigin="anonymous"
-/>

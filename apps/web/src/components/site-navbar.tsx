@@ -8,6 +8,8 @@ import { createBrowserSupabase } from '@/lib/supabase/client';
 const guestNavItems = [
   { href: '/agents', label: 'Agentlar' },
   { href: '/pricing', label: 'Fiyatlar' },
+  { href: '/about', label: 'Hakkımızda' },
+  { href: '/contact', label: 'İletişim' },
   { href: '/login', label: 'Giriş' },
   { href: '/signup', label: 'Kayıt' },
 ];
@@ -16,6 +18,7 @@ const authNavItems = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/agents', label: 'Agentlar' },
   { href: '/pricing', label: 'Fiyatlar' },
+  { href: '/about', label: 'Hakkımızda' },
 ];
 
 export function SiteNavbar() {
@@ -41,7 +44,7 @@ export function SiteNavbar() {
         <Link href="/" className="text-lg font-semibold tracking-tight text-white">
           Koschei
         </Link>
-        <nav className="flex items-center gap-2 sm:gap-6">
+        <nav className="flex items-center gap-2 sm:gap-5">
           {navItems.map((item) => (
             <Link
               key={item.href}
