@@ -159,7 +159,10 @@ export async function saveAgentOutput(input: {
       return { ok: false, error: 'Oturum bulunamadı. Lütfen tekrar giriş yapın.' };
     }
 
-    if (!input.runId || !input.content?.trim()) {
+    const runId = input.runId?.trim();
+    const content = input.content?.trim();
+
+    if (!runId || !content) {
       return { ok: false, error: 'Kaydedilecek sonuç bulunamadı.' };
     }
 
@@ -169,8 +172,9 @@ export async function saveAgentOutput(input: {
     const { data: runRow, error: runError } = await supabase
       .from('agent_runs')
       .select('id')
-      .eq('id', input.runId)
+      .eq('id', runId)
       .eq('workspace_id', workspace.id)
+      .eq('user_id', user.id)
       .maybeSingle();
 
     if (runError) {
@@ -181,22 +185,50 @@ export async function saveAgentOutput(input: {
       return { ok: false, error: 'Bu çalıştırmaya erişim izniniz yok.' };
     }
 
-    const finalTitle = input.title?.trim() || deriveTitle(input.content);
+    const { data: existingSaved, error: existingSavedError } = await supabase
+      .from('saved_outputs')
+      .select('id, title, created_at')
+      .eq('workspace_id', workspace.id)
+      .eq('user_id', user.id)
+      .eq('agent_run_id', runId)
+      .maybeSingle();
+
+    if (existingSavedError) {
+      return { ok: false, error: `Kayıt kontrolü başarısız: ${existingSavedError.message}` };
+    }
+
+    if (existingSaved) {
+      return { ok: true, data: existingSaved };
+    }
+
+    const finalTitle = input.title?.trim() || deriveTitle(content);
 
     const { data: saved, error: saveError } = await supabase
       .from('saved_outputs')
       .insert({
         workspace_id: workspace.id,
         user_id: user.id,
-        agent_run_id: input.runId,
+        agent_run_id: runId,
         title: finalTitle,
-        content: input.content,
+        content,
       })
       .select('id, title, created_at')
       .single();
 
     if (saveError) {
       if (saveError.code === '23505') {
+        const { data: duplicateSaved } = await supabase
+          .from('saved_outputs')
+          .select('id, title, created_at')
+          .eq('workspace_id', workspace.id)
+          .eq('user_id', user.id)
+          .eq('agent_run_id', runId)
+          .maybeSingle();
+
+        if (duplicateSaved) {
+          return { ok: true, data: duplicateSaved };
+        }
+
         return { ok: false, error: 'Bu çıktı zaten kaydedilmiş.' };
       }
 

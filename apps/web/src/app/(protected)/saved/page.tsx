@@ -21,17 +21,19 @@ type SavedOutputRow = {
 export default function SavedPage() {
   const [rows, setRows] = useState<SavedOutputRow[]>([]);
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function loadSaved() {
       try {
         const supabase = createBrowserSupabase();
-        const { workspace } = await resolveWorkspaceContext(supabase);
+        const { workspace, user } = await resolveWorkspaceContext(supabase);
 
         const { data, error: loadError } = await supabase
           .from('saved_outputs')
           .select('id, title, content, created_at, agent_runs(agent_types(name, slug))')
           .eq('workspace_id', workspace.id)
+          .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(50);
 
@@ -43,6 +45,8 @@ export default function SavedPage() {
         setRows((data ?? []) as unknown as SavedOutputRow[]);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Bir hata oluştu.');
+      } finally {
+        setIsLoading(false);
       }
     }
 
@@ -55,6 +59,10 @@ export default function SavedPage() {
       {error ? <p className="text-sm text-rose-300">{error}</p> : null}
 
       <div className="space-y-3">
+        {isLoading ? (
+          <p className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4 text-sm text-zinc-300">Kayıtlı çıktılar yükleniyor...</p>
+        ) : null}
+
         {rows.map((item) => (
           <article key={item.id} className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -62,11 +70,13 @@ export default function SavedPage() {
               <p className="text-xs text-zinc-400">{new Date(item.created_at).toLocaleString('tr-TR')}</p>
             </div>
             <p className="mt-1 text-xs text-zinc-400">{item.agent_runs?.agent_types?.name ?? item.agent_runs?.agent_types?.slug ?? 'Agent'}</p>
-            <p className="mt-3 whitespace-pre-wrap text-sm text-zinc-300">{item.content.slice(0, 260)}...</p>
+            <p className="mt-3 whitespace-pre-wrap text-sm text-zinc-300">
+              {item.content.length > 260 ? `${item.content.slice(0, 260)}...` : item.content}
+            </p>
           </article>
         ))}
 
-        {rows.length === 0 && !error ? (
+        {rows.length === 0 && !error && !isLoading ? (
           <p className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4 text-sm text-zinc-300">Henüz kaydedilmiş çıktı bulunmuyor.</p>
         ) : null}
       </div>
