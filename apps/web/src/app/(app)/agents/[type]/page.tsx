@@ -21,6 +21,10 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
   }
 
   async function onRun() {
+    if (!agent) {
+      return;
+    }
+
     setError('');
     setRunning(true);
 
