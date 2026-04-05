@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 
 import { signOut } from '@/lib/auth';
 import { createBrowserSupabase } from '@/lib/supabase/client';
-import { bootstrapWorkspaceForUser, loadCurrentUser } from '@/lib/workspace';
+import { loadCurrentUser } from '@/lib/workspace';
 import { cn } from '@/lib/utils';
 
 const appNavItems = [
@@ -30,12 +30,6 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
       if (!user) {
         router.replace('/login');
         return;
-      }
-
-      try {
-        await bootstrapWorkspaceForUser(supabase, user);
-      } catch {
-        // Workspace bootstrap başarısız olsa bile shell render edilmeli.
       }
 
       setCheckingAuth(false);
