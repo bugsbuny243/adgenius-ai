@@ -1,35 +1,29 @@
-# AgentForge Monorepo (Canonical: `apps/web`)
+# Koschei Monorepo (Canonical: `apps/web`)
 
-This repository has completed its **canonical runtime cutover**:
+Bu repo için **tek kanonik ürün**: **Koschei — AI Agent Platform**.
 
-- ✅ **Canonical product runtime:** `apps/web`
-- ✅ **Canonical stack:** **Node.js + Next.js 16.2.9 + TypeScript (App Router)**
-- ⚠️ **Legacy runtime:** `apps/api` (Python/FastAPI) is retained only for archive/reference and is **non-canonical**.
+- ✅ **Deploy hedefi:** `apps/web`
+- ✅ **Stack:** Next.js 16.2.9 + TypeScript + App Router
+- ✅ **Backend/Data platform:** Supabase (auth, DB, RLS, storage)
+- ✅ **AI engine:** Gemini (`@google/genai`)
+- ⚠️ `apps/api` ve `apps/worker` legacy/reference olarak tutulur; kanonik runtime değildir.
 
-## Monorepo structure
+## Monorepo
 
-- `apps/web` — main product application (canonical)
-- `apps/api` — legacy FastAPI app (archive/reference only)
-- `apps/worker` — legacy/supporting worker code
-- `infra/` — local/dev infrastructure helpers
+- `apps/web` — ana ürün
+- `apps/api` — legacy FastAPI (non-canonical)
+- `apps/worker` — legacy worker (non-canonical)
+- `infra/` — altyapı yardımcıları
 
-## Product direction
+## Koschei V1 kapsamı
 
-**AgentForge** is a system for creating and running business agents powered by **Gemini**.
+- Agent türlerini listeleme ve seçme
+- Agent prompt girip Gemini ile run çalıştırma
+- Sonucu Supabase'e kaydetme
+- Run geçmişi ve saved outputs görüntüleme
+- Plan/kullanım limiti farkındalığı
 
-Initial product shell routes in the canonical app:
-
-- `/`
-- `/login`
-- `/signup`
-- `/dashboard`
-- `/agents`
-- `/runs`
-- `/approvals`
-
-## Local development (default)
-
-From repo root:
+## Geliştirme
 
 ```bash
 cd apps/web
@@ -37,9 +31,7 @@ npm install
 npm run dev
 ```
 
-Then open `http://localhost:3000`.
-
-## Build & run (production baseline)
+## Build
 
 ```bash
 cd apps/web
@@ -48,34 +40,22 @@ npm run build
 npm run start
 ```
 
-## Environment
+## Ortam değişkenleri
 
-Copy web env template:
+`apps/web/.env.example` dosyasını kullanın:
 
-```bash
-cp apps/web/.env.example apps/web/.env.local
-```
-
-Minimum recommended variables for cutover:
-
-- `NEXT_PUBLIC_APP_NAME`
-- `NEXT_PUBLIC_APP_URL`
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `GEMINI_API_KEY`
-- `DATABASE_URL` (if Prisma/database features are enabled)
 
-## Deployment (default: `apps/web`)
+## Supabase schema
 
-Use `apps/web` as the service root in your platform settings.
+Temel migration dosyası:
 
-For Railway:
+- `apps/web/supabase/migrations/20260405_koschei_core.sql`
 
-1. Create/update the main service to point to **`apps/web`** as the root directory.
-2. Build command: `npm run build`
-3. Start command: `npm run start`
-4. Set required environment variables from `apps/web/.env.example`.
+Bu dosya; tabloları, RLS politikalarını ve V1 agent katalog seed'ini içerir.
 
-> Do not point the primary product service at `apps/api`.
+## Deploy notu
 
-## Legacy app note (`apps/api`)
-
-`apps/api` remains in the repository for migration safety and historical reference. It is **not** the canonical runtime and should not be used as the default deployment target for the product site.
+Platform ayarlarında kök dizin olarak **yalnızca `apps/web`** seçin.
