@@ -1,5 +1,0 @@
-{% extends "base.html" %}
-{% block content %}
-<h1>Campaigns</h1>
-<ul>{% for c in campaigns %}<li><a href="/dashboard/campaigns/{{ c.id }}">{{ c.title }}</a> - {{ c.status.value }}</li>{% endfor %}</ul>
-{% endblock %}

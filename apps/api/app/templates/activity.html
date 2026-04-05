@@ -1,7 +1,0 @@
-{% extends "base.html" %}
-{% block content %}
-<h1>Activity</h1>
-<h3>Serve</h3><ul>{% for r in ad_requests %}<li>{{ r.request_status }} {{ r.slot_id }} {{ r.created_at }}</li>{% endfor %}</ul>
-<h3>Impressions</h3><ul>{% for r in impressions %}<li>{{ r.campaign_id }} {{ r.cost }}</li>{% endfor %}</ul>
-<h3>Clicks</h3><ul>{% for r in clicks %}<li>{{ r.campaign_id }} {{ r.cost }}</li>{% endfor %}</ul>
-{% endblock %}

@@ -1,9 +1,0 @@
-{% extends "base.html" %}
-{% block content %}
-<h1>{{ brief.business_name }}</h1>
-<p>{{ brief.offer_summary }}</p>
-<p>Status: {{ brief.status.value }}</p>
-<p><a class="button" href="/dashboard/briefs/{{ brief.id }}/studio">Open Studio</a> <a class="button secondary" href="/dashboard/briefs/{{ brief.id }}/preview">Open Preview</a></p>
-<form method="post" action="/api/v1/briefs/{{ brief.id }}/generate"><button class="button">Generate with Gemini</button></form>
-<ul>{% for o in outputs %}<li>{{ o.output_type.value }} - {{ o.title }} {% if o.is_selected %}(selected){% endif %}</li>{% endfor %}</ul>
-{% endblock %}

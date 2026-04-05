@@ -1,9 +1,0 @@
-{% extends "base.html" %}
-{% block content %}
-<h1>Briefs</h1>
-<ul>
-  {% for b in briefs %}
-  <li><a href="/dashboard/briefs/{{ b.id }}">{{ b.business_name }}</a> - {{ b.goal }} - {{ b.status.value }}</li>
-  {% endfor %}
-</ul>
-{% endblock %}

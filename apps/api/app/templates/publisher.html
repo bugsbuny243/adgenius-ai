@@ -1,6 +1,0 @@
-{% extends "base.html" %}
-{% block content %}
-<h1>Publisher</h1>
-{% if profile %}<p>{{ profile.company_name }} - {{ profile.status.value }}</p>{% else %}<p>No profile yet. Create via API POST /api/v1/publishers/profile</p>{% endif %}
-<ul><li><a href="/dashboard/publisher/sites">Sites</a></li><li><a href="/dashboard/publisher/placements">Placements</a></li><li><a href="/dashboard/publisher/slots">Slots</a></li></ul>
-{% endblock %}
