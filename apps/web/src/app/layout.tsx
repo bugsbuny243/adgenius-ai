@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
-import '@/styles/globals.css';
+import '@/app/globals.css';
 
 const adsenseClient = process.env.NEXT_PUBLIC_ADSENSE_CLIENT;
 const adsenseEnabled =
