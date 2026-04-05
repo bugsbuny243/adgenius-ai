@@ -12,7 +12,7 @@ export default function AIAgentNedirPage() {
           bileşenidir.
         </p>
         <p className="text-zinc-300">
-          Tradepiglobal AI içinde agentlar; içerik oluşturma, e-posta taslakları hazırlama, araştırma notları üretme gibi
+          AdGenius AI içinde agentlar; içerik oluşturma, e-posta taslakları hazırlama, araştırma notları üretme gibi
           görevleri hızlandırmak için kullanılır.
         </p>
       </main>

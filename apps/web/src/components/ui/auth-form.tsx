@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { createBrowserSupabase, isSupabaseConfigured } from '@/lib/supabase/client';
 
@@ -18,12 +18,18 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const isMountedRef = useRef(true);
+  const submitRequestRef = useRef(0);
 
   const isLogin = mode === 'login';
 
   useEffect(() => {
+    isMountedRef.current = true;
+
     if (!isSupabaseConfigured()) {
-      return;
+      return () => {
+        isMountedRef.current = false;
+      };
     }
 
     const supabase = createBrowserSupabase();
@@ -37,29 +43,42 @@ export function AuthForm({ mode }: AuthFormProps) {
     });
 
     return () => {
+      isMountedRef.current = false;
       subscription.unsubscribe();
     };
   }, [router]);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (loading) {
+      return;
+    }
+
+    const submitRequestId = submitRequestRef.current + 1;
+    submitRequestRef.current = submitRequestId;
+    const shouldUpdateState = () => isMountedRef.current && submitRequestRef.current === submitRequestId;
+
     setError(null);
     setSuccessMessage(null);
     setLoading(true);
 
     try {
       if (!isSupabaseConfigured()) {
-        setError('Kimlik doğrulama servisi şu anda yapılandırılmamış. Lütfen daha sonra tekrar dene.');
+        if (shouldUpdateState()) {
+          setError('Kimlik doğrulama servisi şu anda yapılandırılmamış. Lütfen daha sonra tekrar dene.');
+        }
         return;
       }
 
       const supabase = createBrowserSupabase();
       const { data, error: authError } = isLogin
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password });
+        ? await supabase.auth.signInWithPassword({ email: email.trim(), password })
+        : await supabase.auth.signUp({ email: email.trim(), password });
 
       if (authError) {
-        setError(authError.message);
+        if (shouldUpdateState()) {
+          setError(authError.message);
+        }
         return;
       }
 
@@ -81,18 +100,32 @@ export function AuthForm({ mode }: AuthFormProps) {
       }
 
       if (isLogin) {
-        setError('Giriş işlemi tamamlanamadı. Lütfen bilgilerini kontrol edip tekrar dene.');
+        if (shouldUpdateState()) {
+          setError('Giriş işlemi tamamlanamadı. Lütfen bilgilerini kontrol edip tekrar dene.');
+        }
         return;
       }
 
-      setSuccessMessage('Kayıt başarılı. E-postanı doğruladıktan sonra giriş yapabilirsin.');
-      setEmail('');
-      setPassword('');
+      if (shouldUpdateState()) {
+        setSuccessMessage('Kayıt başarılı. E-postanı doğruladıktan sonra giriş yapabilirsin.');
+        setEmail('');
+        setPassword('');
+      }
     } catch (err) {
       console.error('Auth submit failed:', err);
-      setError(err instanceof Error ? err.message : 'Beklenmeyen bir hata oluştu.');
+      if (shouldUpdateState()) {
+        setError(
+          err instanceof TypeError
+            ? 'Ağ hatası oluştu. İnternet bağlantını kontrol edip tekrar dene.'
+            : err instanceof Error
+              ? err.message
+              : 'Beklenmeyen bir hata oluştu.'
+        );
+      }
     } finally {
-      setLoading(false);
+      if (shouldUpdateState()) {
+        setLoading(false);
+      }
     }
   }
 
@@ -110,7 +143,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           onChange={(event) => setEmail(event.target.value)}
           required
           className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none ring-indigo-400 placeholder:text-zinc-500 focus:ring"
-          placeholder="ornek@tradepiglobal.co"
+          placeholder="ornek@adgenius.ai"
         />
       </div>
       <div className="space-y-1">
