@@ -56,7 +56,7 @@ export default function DashboardPage() {
           monthlyRuns: usage?.runs_count ?? 0,
           savedCount: savedCount ?? 0,
           activeAgents: activeAgents ?? 0,
-          latestRuns: (latestRuns ?? []) as DashboardStats['latestRuns'],
+          latestRuns: (latestRuns ?? []) as unknown as DashboardStats['latestRuns'],
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Bir hata oluştu');
