@@ -1,4 +1,4 @@
-export type AgentType =
+export type AgentSlug =
   | 'icerik'
   | 'eposta'
   | 'arastirma'
@@ -8,90 +8,99 @@ export type AgentType =
   | 'emlak'
   | 'yazilim';
 
-export type AgentDefinition = {
-  type: AgentType;
+export type AgentCatalogItem = {
+  slug: AgentSlug;
   name: string;
   icon: string;
   description: string;
   systemPrompt: string;
   placeholder: string;
+  isActive: boolean;
 };
 
-export const agents: AgentDefinition[] = [
+export const agents: AgentCatalogItem[] = [
   {
-    type: 'icerik',
+    slug: 'icerik',
     name: 'İçerik Agentı',
     icon: '📝',
     description: 'Blog yazıları, landing metinleri ve kampanya içerikleri üretir.',
     systemPrompt:
       'Sen uzman bir Türkçe içerik stratejisti ve copywriter agentsın. Net, faydalı ve dönüşüm odaklı yaz.',
     placeholder: 'Örn: B2B SaaS ürünüm için 3 farklı landing hero metni üret.',
+    isActive: true,
   },
   {
-    type: 'eposta',
+    slug: 'eposta',
     name: 'E-posta Agentı',
     icon: '✉️',
     description: 'Satış, onboarding ve takip e-postaları hazırlar.',
     systemPrompt:
       'Sen yüksek açılma ve yanıt oranı odaklı bir e-posta uzmanısın. Kısa, ikna edici ve kişiselleştirilmiş yaz.',
     placeholder: 'Örn: Demo sonrası 2 adımlı takip e-postası hazırla.',
+    isActive: true,
   },
   {
-    type: 'arastirma',
+    slug: 'arastirma',
     name: 'Araştırma Agentı',
     icon: '🔎',
     description: 'Pazar, rakip ve trend araştırmalarını özetler.',
     systemPrompt:
       'Sen analitik düşünceye sahip bir araştırma agentsın. Veriyi net başlıklarla, aksiyon önerileriyle sun.',
     placeholder: 'Örn: Türkiye e-ticaret pazarında niş fırsatları özetle.',
+    isActive: true,
   },
   {
-    type: 'eticaret',
+    slug: 'eticaret',
     name: 'E-ticaret Agentı',
     icon: '🛒',
     description: 'Ürün açıklamaları, kampanya fikirleri ve satış metinleri üretir.',
     systemPrompt:
       'Sen dönüşüm optimizasyonuna odaklı bir e-ticaret uzmanısın. Satış odaklı ama güven veren bir ton kullan.',
     placeholder: 'Örn: Doğal içerikli şampuan için ürün sayfası açıklaması yaz.',
+    isActive: true,
   },
   {
-    type: 'sosyal',
+    slug: 'sosyal',
     name: 'Sosyal Medya Agentı',
     icon: '📱',
     description: 'Platform bazlı içerik takvimi ve post metinleri oluşturur.',
     systemPrompt:
       'Sen viral potansiyeli yüksek ama marka uyumlu sosyal medya içerikleri üreten bir agentsın.',
     placeholder: 'Örn: LinkedIn için 1 haftalık thought-leadership planı oluştur.',
+    isActive: true,
   },
   {
-    type: 'rapor',
+    slug: 'rapor',
     name: 'Raporlama Agentı',
     icon: '📊',
     description: 'Performans verilerini anlaşılır yönetici özetlerine dönüştürür.',
     systemPrompt:
       'Sen veri odaklı bir raporlama agentsın. Karmaşık verileri sadeleştir, içgörü ve öneri sun.',
     placeholder: 'Örn: Son 30 gün reklam performansını yönetici özeti formatında yaz.',
+    isActive: true,
   },
   {
-    type: 'emlak',
+    slug: 'emlak',
     name: 'Emlak Agentı',
     icon: '🏠',
     description: 'İlan metinleri, müşteri yanıtları ve bölge analizleri hazırlar.',
     systemPrompt:
       'Sen emlak pazarlama uzmanı bir agentsın. Güven veren, net ve ikna edici iletişim kur.',
     placeholder: 'Örn: Kadıköy 2+1 daire için premium ilan metni oluştur.',
+    isActive: true,
   },
   {
-    type: 'yazilim',
+    slug: 'yazilim',
     name: 'Yazılım Agentı',
     icon: '💻',
     description: 'Teknik dokümantasyon, kullanıcı hikayeleri ve kod planları üretir.',
     systemPrompt:
       'Sen kıdemli bir yazılım product engineer agentsın. Yapılandırılmış, uygulanabilir ve temiz çıktılar üret.',
     placeholder: 'Örn: Bir görev takip uygulaması için MVP teknik planını çıkar.',
+    isActive: true,
   },
 ];
 
-export function getAgentByType(type: string): AgentDefinition | undefined {
-  return agents.find((agent) => agent.type === type);
+export function getAgentBySlug(type: string): AgentCatalogItem | undefined {
+  return agents.find((agent) => agent.slug === type);
 }

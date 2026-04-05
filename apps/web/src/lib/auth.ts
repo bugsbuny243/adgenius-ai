@@ -1,31 +1,31 @@
 import type { User } from '@supabase/supabase-js';
 
-import { requireSupabaseClient, supabaseClient } from '@/lib/supabase/client';
+import { createBrowserSupabase, isSupabaseConfigured } from '@/lib/supabase/client';
 
 export async function signUpWithEmail(email: string, password: string) {
-  return requireSupabaseClient().auth.signUp({ email, password });
+  return createBrowserSupabase().auth.signUp({ email, password });
 }
 
 export async function signInWithEmail(email: string, password: string) {
-  return requireSupabaseClient().auth.signInWithPassword({ email, password });
+  return createBrowserSupabase().auth.signInWithPassword({ email, password });
 }
 
 export async function signOut() {
-  if (!supabaseClient) {
+  if (!isSupabaseConfigured()) {
     return { error: null };
   }
 
-  return supabaseClient.auth.signOut();
+  return createBrowserSupabase().auth.signOut();
 }
 
 export async function getCurrentUser(): Promise<User | null> {
-  if (!supabaseClient) {
+  if (!isSupabaseConfigured()) {
     return null;
   }
 
   const {
     data: { user },
-  } = await supabaseClient.auth.getUser();
+  } = await createBrowserSupabase().auth.getUser();
 
   return user;
 }

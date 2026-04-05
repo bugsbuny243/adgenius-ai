@@ -1,8 +1,8 @@
 import 'server-only';
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-export function createServerSupabase() {
+function getSupabaseEnv() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -10,10 +10,24 @@ export function createServerSupabase() {
     throw new Error('Supabase environment variables are missing.');
   }
 
+  return { supabaseUrl, supabaseAnonKey };
+}
+
+export function createServerSupabase(accessToken?: string): SupabaseClient {
+  const { supabaseUrl, supabaseAnonKey } = getSupabaseEnv();
+
   return createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
+      detectSessionInUrl: false,
     },
+    global: accessToken
+      ? {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      : undefined,
   });
 }

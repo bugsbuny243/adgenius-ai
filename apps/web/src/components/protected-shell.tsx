@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-import { getCurrentUser, signOut } from '@/lib/auth';
+import { signOut } from '@/lib/auth';
+import { createBrowserSupabase } from '@/lib/supabase/client';
+import { bootstrapWorkspaceForUser, loadCurrentUser } from '@/lib/workspace';
 import { cn } from '@/lib/utils';
 
 const appNavItems = [
@@ -22,11 +24,18 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     async function verifyAuth() {
-      const user = await getCurrentUser();
+      const supabase = createBrowserSupabase();
+      const user = await loadCurrentUser(supabase);
 
       if (!user) {
         router.replace('/login');
         return;
+      }
+
+      try {
+        await bootstrapWorkspaceForUser(supabase, user);
+      } catch {
+        // Workspace bootstrap başarısız olsa bile shell render edilmeli.
       }
 
       setCheckingAuth(false);
