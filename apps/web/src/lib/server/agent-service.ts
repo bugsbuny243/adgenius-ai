@@ -2,7 +2,7 @@ import 'server-only';
 
 import { runAI } from '@/lib/ai';
 import { createServerSupabase } from '@/lib/supabase/server';
-import { assertCanRun, getMonthKey, incrementMonthlyUsage } from '@/lib/usage';
+import { assertCanRun, getMonthKey, incrementUsageCounter, UsageLimitError } from '@/lib/usage';
 import { resolveWorkspaceContext, WorkspaceError } from '@/lib/workspace';
 
 type ServiceResult<T> =
@@ -13,6 +13,13 @@ type ServiceResult<T> =
   | {
       ok: false;
       error: string;
+      code?: 'USAGE_LIMIT_EXCEEDED';
+      usage?: {
+        planName: string;
+        runLimit: number;
+        runsCount: number;
+        period: 'day' | 'month';
+      };
     };
 
 function cleanErrorMessage(error: unknown, fallback = 'Bir hata oluştu.'): string {
@@ -130,7 +137,7 @@ export async function runAgent(input: {
       };
     }
 
-    const nextRunsCount = await incrementMonthlyUsage(supabase, workspace.id, usage.monthKey);
+    const nextRunsCount = await incrementUsageCounter(supabase, workspace.id, usage.periodKey);
 
     return {
       ok: true,
@@ -144,6 +151,20 @@ export async function runAgent(input: {
       },
     };
   } catch (error) {
+    if (error instanceof UsageLimitError) {
+      return {
+        ok: false,
+        error: error.message,
+        code: 'USAGE_LIMIT_EXCEEDED',
+        usage: {
+          planName: error.usage.planName,
+          runLimit: error.usage.runLimit,
+          runsCount: error.usage.runsCount,
+          period: error.usage.period,
+        },
+      };
+    }
+
     return { ok: false, error: cleanErrorMessage(error) };
   }
 }

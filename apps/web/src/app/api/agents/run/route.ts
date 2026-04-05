@@ -38,6 +38,17 @@ export async function POST(request: Request) {
   });
 
   if (!result.ok) {
+    if (result.code === 'USAGE_LIMIT_EXCEEDED') {
+      return NextResponse.json(
+        {
+          error: result.error,
+          code: result.code,
+          usage: result.usage,
+        },
+        { status: 429 }
+      );
+    }
+
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
 

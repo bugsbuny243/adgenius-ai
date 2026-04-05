@@ -4,19 +4,69 @@ export function getMonthKey(date = new Date()): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
+export function getDayKey(date = new Date()): string {
+  return date.toISOString().slice(0, 10);
+}
+
+export type UsageLimitPeriod = 'day' | 'month';
+
+export const FREE_DAILY_RUN_LIMIT = 5;
+
+export class UsageLimitError extends Error {
+  constructor(
+    message: string,
+    public readonly usage: UsageStatus
+  ) {
+    super(message);
+    this.name = 'UsageLimitError';
+  }
+}
+
 export type UsageStatus = {
   planName: string;
+  period: UsageLimitPeriod;
   runLimit: number;
   runsCount: number;
   remaining: number;
   isExceeded: boolean;
-  monthKey: string;
+  periodKey: string;
+  limitMessage: string;
 };
+
+function getPeriodKey(period: UsageLimitPeriod, date = new Date()) {
+  return period === 'day' ? getDayKey(date) : getMonthKey(date);
+}
+
+function formatLimitMessage(usage: Pick<UsageStatus, 'runLimit' | 'period' | 'planName'>) {
+  const periodLabel = usage.period === 'day' ? 'günlük' : 'aylık';
+  return `${usage.planName} planı için ${usage.runLimit} ${periodLabel} çalıştırma limitine ulaştınız. Planınızı yükselterek devam edebilirsiniz.`;
+}
+
+function resolveLimitPolicy(subscription: {
+  plan_name: string;
+  run_limit: number;
+} | null): { planName: string; runLimit: number; period: UsageLimitPeriod } {
+  if (!subscription) {
+    return {
+      planName: 'free',
+      runLimit: FREE_DAILY_RUN_LIMIT,
+      period: 'day',
+    };
+  }
+
+  const planName = subscription.plan_name || 'starter';
+  const isFreePlan = planName.toLowerCase() === 'free';
+
+  return {
+    planName,
+    runLimit: Math.max(0, subscription.run_limit),
+    period: isFreePlan ? 'day' : 'month',
+  };
+}
 
 export async function getUsageStatus(
   supabase: SupabaseClient,
   workspaceId: string,
-  monthKey = getMonthKey()
 ): Promise<UsageStatus> {
   if (!workspaceId) {
     throw new Error('Çalışma alanı bulunamadı.');
@@ -24,7 +74,7 @@ export async function getUsageStatus(
 
   const { data: subscription, error: subscriptionError } = await supabase
     .from('subscriptions')
-    .select('plan_name, run_limit, status')
+    .select('plan_name, run_limit')
     .eq('workspace_id', workspaceId)
     .eq('status', 'active')
     .maybeSingle();
@@ -33,15 +83,14 @@ export async function getUsageStatus(
     throw new Error(`Abonelik bilgisi alınamadı: ${subscriptionError.message}`);
   }
 
-  if (!subscription) {
-    throw new Error('Aktif abonelik bulunamadı.');
-  }
+  const policy = resolveLimitPolicy(subscription);
+  const periodKey = getPeriodKey(policy.period);
 
   const { data: counter, error: counterError } = await supabase
     .from('usage_counters')
     .select('id, runs_count')
     .eq('workspace_id', workspaceId)
-    .eq('month_key', monthKey)
+    .eq('month_key', periodKey)
     .maybeSingle();
 
   if (counterError) {
@@ -51,12 +100,18 @@ export async function getUsageStatus(
   const runsCount = counter?.runs_count ?? 0;
 
   return {
-    planName: subscription.plan_name,
-    runLimit: subscription.run_limit,
+    planName: policy.planName,
+    period: policy.period,
+    runLimit: policy.runLimit,
     runsCount,
-    remaining: Math.max(0, subscription.run_limit - runsCount),
-    isExceeded: runsCount >= subscription.run_limit,
-    monthKey,
+    remaining: Math.max(0, policy.runLimit - runsCount),
+    isExceeded: runsCount >= policy.runLimit,
+    periodKey,
+    limitMessage: formatLimitMessage({
+      planName: policy.planName,
+      runLimit: policy.runLimit,
+      period: policy.period,
+    }),
   };
 }
 
@@ -64,22 +119,22 @@ export async function assertCanRun(supabase: SupabaseClient, workspaceId: string
   const usage = await getUsageStatus(supabase, workspaceId);
 
   if (usage.isExceeded) {
-    throw new Error('Aylık kullanım limitine ulaştınız.');
+    throw new UsageLimitError(usage.limitMessage, usage);
   }
 
   return usage;
 }
 
-export async function incrementMonthlyUsage(
+export async function incrementUsageCounter(
   supabase: SupabaseClient,
   workspaceId: string,
-  monthKey = getMonthKey()
+  periodKey: string
 ): Promise<number> {
   const { data: existing, error: existingError } = await supabase
     .from('usage_counters')
     .select('id, runs_count')
     .eq('workspace_id', workspaceId)
-    .eq('month_key', monthKey)
+    .eq('month_key', periodKey)
     .maybeSingle();
 
   if (existingError) {
@@ -91,7 +146,7 @@ export async function incrementMonthlyUsage(
       .from('usage_counters')
       .insert({
         workspace_id: workspaceId,
-        month_key: monthKey,
+        month_key: periodKey,
         runs_count: 1,
       })
       .select('runs_count')

@@ -18,6 +18,13 @@ type AgentRunResponse = {
   result?: string;
   runId?: string;
   error?: string;
+  code?: 'USAGE_LIMIT_EXCEEDED';
+  usage?: {
+    planName: string;
+    runLimit: number;
+    runsCount: number;
+    period: 'day' | 'month';
+  };
 };
 
 export default function AgentRunPage({ params }: { params: { type: string } }) {
@@ -97,6 +104,14 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
       const data = (await response.json()) as AgentRunResponse;
 
       if (!response.ok || data.error) {
+        if (data.code === 'USAGE_LIMIT_EXCEEDED' && data.usage) {
+          const periodLabel = data.usage.period === 'day' ? 'günlük' : 'aylık';
+          setError(
+            `${data.error} (${data.usage.runsCount}/${data.usage.runLimit} ${periodLabel} kullanım).`
+          );
+          return;
+        }
+
         setError(data.error ?? 'Bir hata oluştu.');
         return;
       }
