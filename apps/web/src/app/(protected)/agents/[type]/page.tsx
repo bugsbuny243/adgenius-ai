@@ -40,11 +40,11 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
       try {
         const supabase = createBrowserSupabase();
         const { data, error: loadError } = await supabase
-        .from('agent_types')
-        .select('id, slug, name, icon, description, placeholder, is_active')
-        .eq('slug', params.type)
-        .eq('is_active', true)
-        .maybeSingle();
+          .from('agent_types')
+          .select('id, slug, name, icon, description, placeholder, is_active')
+          .eq('slug', params.type)
+          .eq('is_active', true)
+          .maybeSingle();
 
         if (loadError) {
           setError(`Agent bilgisi alınamadı: ${loadError.message}`);
@@ -70,15 +70,17 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
   async function onRun() {
     setError('');
     setSaveStatus('');
+    setResult('');
+    setRunId(null);
     setRunning(true);
 
     try {
       const data = await postJsonWithSession<AgentRunResponse, { type: string; userInput: string }>('/api/agents/run', {
-          type: params.type,
-          userInput: input,
+        type: params.type,
+        userInput: input,
       });
 
-      setResult(data.result ?? 'Model boş yanıt döndürdü.');
+      setResult(data.result ?? 'AI engine boş yanıt döndürdü.');
       setRunId(data.runId ?? null);
       setSaveTitle('');
     } catch (runError) {
@@ -103,14 +105,11 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
     setSaveStatus('');
 
     try {
-      await postJsonWithSession<{ saved: { id: string } }, { runId: string; title: string; content: string }>(
-        '/api/outputs/save',
-        {
-          runId,
-          title: saveTitle,
-          content: result,
-        },
-      );
+      await postJsonWithSession<{ saved: { id: string } }, { runId: string; title: string; content: string }>('/api/outputs/save', {
+        runId,
+        title: saveTitle,
+        content: result,
+      });
 
       setSaveStatus('Çıktı kaydedildi.');
     } catch (saveError) {

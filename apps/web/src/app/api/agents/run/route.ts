@@ -11,6 +11,22 @@ function getAccessToken(request: Request) {
   return authorization.replace('Bearer ', '').trim();
 }
 
+function resolveStatusCode(error: string) {
+  if (error.includes('Oturum bulunamadı')) {
+    return 401;
+  }
+
+  if (error.includes('limitine ulaştınız')) {
+    return 429;
+  }
+
+  if (error.includes('Görevini yaz')) {
+    return 422;
+  }
+
+  return 400;
+}
+
 export async function POST(request: Request) {
   const accessToken = getAccessToken(request);
 
@@ -38,12 +54,14 @@ export async function POST(request: Request) {
   });
 
   if (!result.ok) {
-    return NextResponse.json({ error: result.error }, { status: 400 });
+    return NextResponse.json({ error: result.error }, { status: resolveStatusCode(result.error) });
   }
 
   return NextResponse.json({
     result: result.data.result,
     runId: result.data.run.id,
     createdAt: result.data.run.created_at,
+    status: result.data.run.status,
+    usage: result.data.usage,
   });
 }
