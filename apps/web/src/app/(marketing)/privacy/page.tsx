@@ -1,5 +1,5 @@
-import { SiteFooter } from '@/components/site-footer';
-import { SiteNavbar } from '@/components/site-navbar';
+import { SiteFooter } from '@/components/layout/footer';
+import { SiteNavbar } from '@/components/layout/navbar';
 
 export default function PrivacyPage() {
   return (

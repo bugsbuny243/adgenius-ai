@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
-import { SiteFooter } from '@/components/site-footer';
-import { SiteNavbar } from '@/components/site-navbar';
+import { SiteFooter } from '@/components/layout/footer';
+import { SiteNavbar } from '@/components/layout/navbar';
 
 const howItWorks = [
   'İhtiyacınıza uygun agent türünü seçin.',

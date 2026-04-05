@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { AuthForm } from '@/components/auth-form';
+import { AuthForm } from '@/components/ui/auth-form';
 
 export default function SignupPage() {
   return (

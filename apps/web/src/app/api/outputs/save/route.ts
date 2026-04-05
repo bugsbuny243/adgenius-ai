@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { saveAgentOutputAction } from '@/app/actions/agent-actions';
+import { saveAgentOutputAction } from '@/actions/agent-actions';
 
 function getAccessToken(request: Request) {
   const authorization = request.headers.get('authorization');
