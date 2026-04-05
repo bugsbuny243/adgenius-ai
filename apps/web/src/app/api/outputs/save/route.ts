@@ -30,11 +30,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Geçersiz istek gövdesi.' }, { status: 400 });
   }
 
+  const runId = body.runId?.trim();
+  const content = body.content?.trim();
+  const title = body.title?.trim();
+
+  if (!runId || !content) {
+    return NextResponse.json({ error: 'Kaydedilecek sonuç bulunamadı.' }, { status: 400 });
+  }
+
   const result = await saveAgentOutput({
     accessToken: accessToken ?? undefined,
-    runId: body.runId,
-    title: body.title,
-    content: body.content,
+    runId,
+    title,
+    content,
   });
 
   if (!result.ok) {

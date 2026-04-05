@@ -57,6 +57,7 @@ export default function RunDetailPage({ params }: { params: { id: string } }) {
         .select('id')
         .eq('agent_run_id', params.id)
         .eq('workspace_id', workspace.id)
+        .eq('user_id', user.id)
         .limit(1)
         .maybeSingle();
 
