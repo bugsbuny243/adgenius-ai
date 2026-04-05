@@ -1,3 +1,8 @@
 export default function SignupPage() {
-  return <div className="panel"><h1 className="text-2xl font-semibold">Kayıt Ol</h1></div>
+  return (
+    <section className="panel">
+      <h1 className="page-title">Signup</h1>
+      <p className="muted">Create an account to start building Gemini-powered business agents.</p>
+    </section>
+  )
 }

@@ -1,6 +1,8 @@
-import { db } from '@/src/lib/db'
-
-export default async function ApprovalsPage() {
-  const approvals = await db.approval.findMany({ where: { status: 'PENDING' }, orderBy: { createdAt: 'desc' } })
-  return <div className="space-y-4"><h1 className="text-3xl font-semibold">Approvals</h1><ul>{approvals.map((a) => <li key={a.id}>{a.title}</li>)}</ul></div>
+export default function ApprovalsPage() {
+  return (
+    <section className="panel">
+      <h1 className="page-title">Approvals</h1>
+      <p className="muted">Review and approve high-impact actions before execution.</p>
+    </section>
+  )
 }

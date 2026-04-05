@@ -1,40 +1,81 @@
-# AdGenius Single Runtime Baseline
+# AgentForge Monorepo (Canonical: `apps/web`)
 
-AdGenius is now deployed as **one Python/FastAPI application** from `apps/api`.
+This repository has completed its **canonical runtime cutover**:
 
-## Canonical app
+- ✅ **Canonical product runtime:** `apps/web`
+- ✅ **Canonical stack:** **Node.js + Next.js 16.2.9 + TypeScript (App Router)**
+- ⚠️ **Legacy runtime:** `apps/api` (Python/FastAPI) is retained only for archive/reference and is **non-canonical**.
 
-- `apps/api` is the only runtime and deployment unit.
-- API endpoints remain under `/api/v1`.
-- Server-rendered product pages are served from the same FastAPI app via templates/static assets.
-- `apps/web` is no longer required for deployment.
+## Monorepo structure
 
-## Included product flow
+- `apps/web` — main product application (canonical)
+- `apps/api` — legacy FastAPI app (archive/reference only)
+- `apps/worker` — legacy/supporting worker code
+- `infra/` — local/dev infrastructure helpers
 
-- landing
-- brief intake
-- campaigns
-- ads
-- publisher inventory
-- serve ad
-- impression
-- click
-- wallet
-- payouts
+## Product direction
 
-## Local run
+**AgentForge** is a system for creating and running business agents powered by **Gemini**.
+
+Initial product shell routes in the canonical app:
+
+- `/`
+- `/login`
+- `/signup`
+- `/dashboard`
+- `/agents`
+- `/runs`
+- `/approvals`
+
+## Local development (default)
+
+From repo root:
 
 ```bash
-cd apps/api
-pip install -e .
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+cd apps/web
+npm install
+npm run dev
 ```
 
-Then open:
+Then open `http://localhost:3000`.
 
-- `http://localhost:8000/` (landing page)
-- `http://localhost:8000/pricing`
-- `http://localhost:8000/brief`
-- `http://localhost:8000/dashboard`
-- `http://localhost:8000/admin`
-- `http://localhost:8000/api/v1/health`
+## Build & run (production baseline)
+
+```bash
+cd apps/web
+npm install
+npm run build
+npm run start
+```
+
+## Environment
+
+Copy web env template:
+
+```bash
+cp apps/web/.env.example apps/web/.env.local
+```
+
+Minimum recommended variables for cutover:
+
+- `NEXT_PUBLIC_APP_NAME`
+- `NEXT_PUBLIC_APP_URL`
+- `GEMINI_API_KEY`
+- `DATABASE_URL` (if Prisma/database features are enabled)
+
+## Deployment (default: `apps/web`)
+
+Use `apps/web` as the service root in your platform settings.
+
+For Railway:
+
+1. Create/update the main service to point to **`apps/web`** as the root directory.
+2. Build command: `npm run build`
+3. Start command: `npm run start`
+4. Set required environment variables from `apps/web/.env.example`.
+
+> Do not point the primary product service at `apps/api`.
+
+## Legacy app note (`apps/api`)
+
+`apps/api` remains in the repository for migration safety and historical reference. It is **not** the canonical runtime and should not be used as the default deployment target for the product site.

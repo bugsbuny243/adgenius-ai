@@ -1,11 +1,17 @@
-import { cookies } from 'next/headers'
+export type SessionUser = {
+  id: string
+  email: string
+  organizationId: string
+}
 
-export async function getSessionUser() {
-  const cookieStore = await cookies()
+/**
+ * Placeholder auth helper for canonical web runtime.
+ * Replace with your production auth provider and session verification.
+ */
+export async function getSessionUser(): Promise<SessionUser | null> {
   return {
-    id: cookieStore.get('agentforge_user_id')?.value ?? 'demo-user',
-    organizationId: cookieStore.get('agentforge_org_id')?.value ?? 'demo-org',
-    email: 'demo@agentforge.local',
-    name: 'Demo User',
+    id: 'local-dev-user',
+    email: 'dev@agentforge.local',
+    organizationId: 'local-dev-org',
   }
 }
