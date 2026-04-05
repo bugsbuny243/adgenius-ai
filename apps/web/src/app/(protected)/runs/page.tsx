@@ -3,8 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
-import { createBrowserSupabase } from '@/lib/supabase/client';
-import { resolveWorkspaceContext } from '@/lib/workspace';
+import { getJsonWithSession } from '@/lib/api-client';
 
 type RunRow = {
   id: string;
@@ -33,22 +32,8 @@ export default function RunsPage() {
   useEffect(() => {
     async function loadRuns() {
       try {
-        const supabase = createBrowserSupabase();
-        const { workspace } = await resolveWorkspaceContext(supabase);
-
-        const { data, error: loadError } = await supabase
-          .from('agent_runs')
-          .select('id, status, user_input, result_text, created_at, agent_types(name, slug)')
-          .eq('workspace_id', workspace.id)
-          .order('created_at', { ascending: false })
-          .limit(30);
-
-        if (loadError) {
-          setError(loadError.message);
-          return;
-        }
-
-        setRuns((data ?? []) as unknown as RunRow[]);
+        const response = await getJsonWithSession<{ items: RunRow[] }>('/api/runs');
+        setRuns(response.items);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Bir hata oluştu.');
       }

@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { ApiRequestError, postJsonWithSession } from '@/lib/api-client';
-import { createBrowserSupabase } from '@/lib/supabase/client';
+import { ApiRequestError, getJsonWithSession, postJsonWithSession } from '@/lib/api-client';
 
 type AgentTypeRow = {
   id: string;
@@ -38,25 +37,8 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
       setError('');
       setLoadingAgent(true);
       try {
-        const supabase = createBrowserSupabase();
-        const { data, error: loadError } = await supabase
-        .from('agent_types')
-        .select('id, slug, name, icon, description, placeholder, is_active')
-        .eq('slug', params.type)
-        .eq('is_active', true)
-        .maybeSingle();
-
-        if (loadError) {
-          setError(`Agent bilgisi alınamadı: ${loadError.message}`);
-          return;
-        }
-
-        if (!data) {
-          setError('Agent türü bulunamadı veya aktif değil.');
-          return;
-        }
-
-        setAgent(data);
+        const payload = await getJsonWithSession<{ item: AgentTypeRow }>(`/api/agents/catalog/${params.type}`);
+        setAgent(payload.item);
       } catch (loadErr) {
         setError(loadErr instanceof Error ? loadErr.message : 'Agent bilgisi yüklenemedi.');
       } finally {
@@ -73,10 +55,13 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
     setRunning(true);
 
     try {
-      const data = await postJsonWithSession<AgentRunResponse, { type: string; userInput: string }>('/api/agents/run', {
+      const data = await postJsonWithSession<AgentRunResponse, { type: string; userInput: string }>(
+        '/api/agents/run',
+        {
           type: params.type,
           userInput: input,
-      });
+        },
+      );
 
       setResult(data.result ?? 'Model boş yanıt döndürdü.');
       setRunId(data.runId ?? null);

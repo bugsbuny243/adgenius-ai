@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
 import { signOut } from '@/lib/auth';
+import { isDevAuthBypassEnabledOnClient } from '@/lib/dev-auth';
 import { createBrowserSupabase, isSupabaseConfigured } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 
@@ -31,6 +32,11 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
 
     async function verifySession() {
       try {
+        if (isDevAuthBypassEnabledOnClient()) {
+          setCheckingAuth(false);
+          return;
+        }
+
         if (!isSupabaseConfigured()) {
           router.replace('/login');
           return;
@@ -55,7 +61,7 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
 
     void verifySession();
 
-    if (!isSupabaseConfigured()) {
+    if (isDevAuthBypassEnabledOnClient() || !isSupabaseConfigured()) {
       return () => {
         mounted = false;
       };
@@ -77,7 +83,9 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
   }, [loginRedirectPath, router]);
 
   async function onLogout() {
-    await signOut();
+    if (!isDevAuthBypassEnabledOnClient()) {
+      await signOut();
+    }
     router.replace('/login');
     router.refresh();
   }

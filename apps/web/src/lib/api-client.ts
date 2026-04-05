@@ -1,3 +1,4 @@
+import { isDevAuthBypassEnabledOnClient } from '@/lib/dev-auth';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 
 export class ApiRequestError extends Error {
@@ -12,6 +13,10 @@ type ApiErrorResponse = {
 };
 
 export async function getAccessTokenOrThrow() {
+  if (isDevAuthBypassEnabledOnClient()) {
+    return null;
+  }
+
   const supabase = createBrowserSupabase();
   const {
     data: { session },
@@ -24,24 +29,10 @@ export async function getAccessTokenOrThrow() {
   return session.access_token;
 }
 
-export async function postJsonWithSession<TResponse, TRequest extends object>(
-  url: string,
-  body: TRequest,
-): Promise<TResponse> {
-  const accessToken = await getAccessTokenOrThrow();
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify(body),
-  });
-
-  let payload: (TResponse & ApiErrorResponse) | ApiErrorResponse = {};
+async function parseApiResponse<T>(response: Response): Promise<T> {
+  let payload: (T & ApiErrorResponse) | ApiErrorResponse = {};
   try {
-    payload = (await response.json()) as (TResponse & ApiErrorResponse) | ApiErrorResponse;
+    payload = (await response.json()) as (T & ApiErrorResponse) | ApiErrorResponse;
   } catch {
     if (!response.ok) {
       throw new ApiRequestError('Sunucudan geçersiz yanıt alındı.', response.status);
@@ -52,5 +43,32 @@ export async function postJsonWithSession<TResponse, TRequest extends object>(
     throw new ApiRequestError(payload.error ?? 'Bir hata oluştu.', response.status);
   }
 
-  return payload as TResponse;
+  return payload as T;
+}
+
+export async function postJsonWithSession<TResponse, TRequest extends object>(url: string, body: TRequest): Promise<TResponse> {
+  const accessToken = await getAccessTokenOrThrow();
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+
+  return parseApiResponse<TResponse>(response);
+}
+
+export async function getJsonWithSession<TResponse>(url: string): Promise<TResponse> {
+  const accessToken = await getAccessTokenOrThrow();
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    cache: 'no-store',
+  });
+
+  return parseApiResponse<TResponse>(response);
 }

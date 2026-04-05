@@ -38,6 +38,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Kaydedilecek sonuç bulunamadı.' }, { status: 400 });
   }
 
+  if (title && title.length > 120) {
+    return NextResponse.json({ error: 'Başlık en fazla 120 karakter olabilir.' }, { status: 400 });
+  }
+
   const result = await saveAgentOutput({
     accessToken: accessToken ?? undefined,
     runId,

@@ -31,3 +31,21 @@ export function createServerSupabase(accessToken?: string): SupabaseClient {
       : undefined,
   });
 }
+
+
+export function createServerSupabaseAdmin(): SupabaseClient {
+  const { supabaseUrl } = getSupabaseEnv();
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!serviceRoleKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY eksik. Dev bypass için gerekli.');
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+}

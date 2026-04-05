@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 
 import { runAgent } from '@/lib/server/agent-service';
 
+const TYPE_REGEX = /^[a-z0-9-]{2,64}$/;
+
 function getAccessToken(request: Request) {
   const authorization = request.headers.get('authorization');
   if (!authorization?.startsWith('Bearer ')) {
@@ -30,10 +32,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Geçersiz istek gövdesi.' }, { status: 400 });
   }
 
+  const type = body.type?.trim();
+  const userInput = body.userInput?.trim();
+
+  if (!type || !TYPE_REGEX.test(type)) {
+    return NextResponse.json({ error: 'Geçerli bir agent type girin.' }, { status: 400 });
+  }
+
+  if (!userInput || userInput.length < 3 || userInput.length > 8000) {
+    return NextResponse.json({ error: 'Prompt 3-8000 karakter aralığında olmalı.' }, { status: 400 });
+  }
+
   const result = await runAgent({
     accessToken: accessToken ?? undefined,
-    type: body.type,
-    userInput: body.userInput,
+    type,
+    userInput,
     model: body.model,
   });
 
@@ -44,6 +57,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     result: result.data.result,
     runId: result.data.run.id,
+    status: result.data.run.status,
     createdAt: result.data.run.created_at,
   });
 }

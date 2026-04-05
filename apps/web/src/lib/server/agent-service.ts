@@ -1,7 +1,8 @@
 import 'server-only';
 
 import { runAI } from '@/lib/ai';
-import { createServerSupabase } from '@/lib/supabase/server';
+import { isDevAuthBypassEnabled, resolveDevBypassWorkspaceContext } from '@/lib/dev-session';
+import { createServerSupabase, createServerSupabaseAdmin } from '@/lib/supabase/server';
 import { assertCanRun, getMonthKey, incrementMonthlyUsage } from '@/lib/usage';
 import { resolveWorkspaceContext, WorkspaceError } from '@/lib/workspace';
 
@@ -40,6 +41,22 @@ function deriveTitle(content: string) {
   return firstLine.length > 80 ? `${firstLine.slice(0, 80)}...` : firstLine;
 }
 
+async function resolveServiceContext(accessToken?: string) {
+  if (accessToken) {
+    const supabase = createServerSupabase(accessToken);
+    const context = await resolveWorkspaceContext(supabase);
+    return { supabase, context };
+  }
+
+  if (isDevAuthBypassEnabled()) {
+    const supabase = createServerSupabaseAdmin();
+    const context = await resolveDevBypassWorkspaceContext(supabase);
+    return { supabase, context };
+  }
+
+  throw new Error('Oturum bulunamadı. Lütfen tekrar giriş yapın.');
+}
+
 export async function runAgent(input: {
   accessToken?: string;
   type?: string;
@@ -53,16 +70,11 @@ export async function runAgent(input: {
   }>
 > {
   try {
-    if (!input.accessToken) {
-      return { ok: false, error: 'Oturum bulunamadı. Lütfen tekrar giriş yapın.' };
-    }
-
     if (!input.type || !input.userInput?.trim()) {
       return { ok: false, error: 'Görevini yaz ve tekrar dene.' };
     }
 
-    const supabase = createServerSupabase(input.accessToken);
-    const { user, workspace } = await resolveWorkspaceContext(supabase);
+    const { supabase, context } = await resolveServiceContext(input.accessToken);
 
     const { data: agentType, error: agentTypeError } = await supabase
       .from('agent_types')
@@ -82,7 +94,7 @@ export async function runAgent(input: {
       return { ok: false, error: 'Bu agent şu anda aktif değil.' };
     }
 
-    const usage = await assertCanRun(supabase, workspace.id);
+    const usage = await assertCanRun(supabase, context.workspace.id);
 
     let resultText = '';
     let modelName = input.model ?? 'ai-standard';
@@ -95,15 +107,17 @@ export async function runAgent(input: {
       });
       resultText = aiResult.text;
       modelName = aiResult.model;
-    } catch {
+    } catch (error) {
       await supabase.from('agent_runs').insert({
-        workspace_id: workspace.id,
-        user_id: user.id,
+        workspace_id: context.workspace.id,
+        user_id: context.user.id,
         agent_type_id: agentType.id,
         user_input: input.userInput,
         model_name: modelName,
         result_text: null,
         status: 'failed',
+        error_message: error instanceof Error ? error.message : 'AI yanıtı alınamadı.',
+        metadata: { bypass: isDevAuthBypassEnabled() && !input.accessToken },
       });
 
       return { ok: false, error: 'AI yanıtı alınamadı. Lütfen tekrar deneyin.' };
@@ -112,13 +126,15 @@ export async function runAgent(input: {
     const { data: createdRun, error: runInsertError } = await supabase
       .from('agent_runs')
       .insert({
-        workspace_id: workspace.id,
-        user_id: user.id,
+        workspace_id: context.workspace.id,
+        user_id: context.user.id,
         agent_type_id: agentType.id,
         user_input: input.userInput,
         model_name: modelName,
         result_text: resultText,
         status: 'completed',
+        error_message: null,
+        metadata: { bypass: isDevAuthBypassEnabled() && !input.accessToken },
       })
       .select('id, created_at, status')
       .single();
@@ -130,7 +146,7 @@ export async function runAgent(input: {
       };
     }
 
-    const nextRunsCount = await incrementMonthlyUsage(supabase, workspace.id, usage.monthKey);
+    const nextRunsCount = await incrementMonthlyUsage(supabase, context.workspace.id, usage.monthKey);
 
     return {
       ok: true,
@@ -155,10 +171,6 @@ export async function saveAgentOutput(input: {
   content?: string;
 }): Promise<ServiceResult<{ id: string; title: string; created_at: string }>> {
   try {
-    if (!input.accessToken) {
-      return { ok: false, error: 'Oturum bulunamadı. Lütfen tekrar giriş yapın.' };
-    }
-
     const runId = input.runId?.trim();
     const content = input.content?.trim();
 
@@ -166,15 +178,14 @@ export async function saveAgentOutput(input: {
       return { ok: false, error: 'Kaydedilecek sonuç bulunamadı.' };
     }
 
-    const supabase = createServerSupabase(input.accessToken);
-    const { user, workspace } = await resolveWorkspaceContext(supabase);
+    const { supabase, context } = await resolveServiceContext(input.accessToken);
 
     const { data: runRow, error: runError } = await supabase
       .from('agent_runs')
       .select('id')
       .eq('id', runId)
-      .eq('workspace_id', workspace.id)
-      .eq('user_id', user.id)
+      .eq('workspace_id', context.workspace.id)
+      .eq('user_id', context.user.id)
       .maybeSingle();
 
     if (runError) {
@@ -188,8 +199,8 @@ export async function saveAgentOutput(input: {
     const { data: existingSaved, error: existingSavedError } = await supabase
       .from('saved_outputs')
       .select('id, title, created_at')
-      .eq('workspace_id', workspace.id)
-      .eq('user_id', user.id)
+      .eq('workspace_id', context.workspace.id)
+      .eq('user_id', context.user.id)
       .eq('agent_run_id', runId)
       .maybeSingle();
 
@@ -206,8 +217,8 @@ export async function saveAgentOutput(input: {
     const { data: saved, error: saveError } = await supabase
       .from('saved_outputs')
       .insert({
-        workspace_id: workspace.id,
-        user_id: user.id,
+        workspace_id: context.workspace.id,
+        user_id: context.user.id,
         agent_run_id: runId,
         title: finalTitle,
         content,
@@ -220,8 +231,8 @@ export async function saveAgentOutput(input: {
         const { data: duplicateSaved } = await supabase
           .from('saved_outputs')
           .select('id, title, created_at')
-          .eq('workspace_id', workspace.id)
-          .eq('user_id', user.id)
+          .eq('workspace_id', context.workspace.id)
+          .eq('user_id', context.user.id)
           .eq('agent_run_id', runId)
           .maybeSingle();
 

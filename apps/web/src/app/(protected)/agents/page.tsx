@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
-import { createBrowserSupabase } from '@/lib/supabase/client';
+import { getJsonWithSession } from '@/lib/api-client';
 
 type AgentRow = {
   id: string;
@@ -19,19 +19,12 @@ export default function AgentsPage() {
 
   useEffect(() => {
     async function loadAgents() {
-      const supabase = createBrowserSupabase();
-      const { data, error: loadError } = await supabase
-        .from('agent_types')
-        .select('id, slug, name, icon, description')
-        .eq('is_active', true)
-        .order('name', { ascending: true });
-
-      if (loadError) {
-        setError(loadError.message);
-        return;
+      try {
+        const response = await getJsonWithSession<{ items: AgentRow[] }>('/api/agents/catalog');
+        setAgents(response.items);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Agent listesi yüklenemedi.');
       }
-
-      setAgents(data ?? []);
     }
 
     void loadAgents();
@@ -59,6 +52,9 @@ export default function AgentsPage() {
           </article>
         ))}
       </div>
+      {!error && agents.length === 0 ? (
+        <p className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4 text-sm text-zinc-300">Aktif agent bulunamadı.</p>
+      ) : null}
     </section>
   );
 }

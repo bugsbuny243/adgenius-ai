@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { createBrowserSupabase } from '@/lib/supabase/client';
-import { resolveWorkspaceContext } from '@/lib/workspace';
+import { getJsonWithSession } from '@/lib/api-client';
 
 type SavedOutputRow = {
   id: string;
@@ -26,23 +25,8 @@ export default function SavedPage() {
   useEffect(() => {
     async function loadSaved() {
       try {
-        const supabase = createBrowserSupabase();
-        const { workspace, user } = await resolveWorkspaceContext(supabase);
-
-        const { data, error: loadError } = await supabase
-          .from('saved_outputs')
-          .select('id, title, content, created_at, agent_runs(agent_types(name, slug))')
-          .eq('workspace_id', workspace.id)
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(50);
-
-        if (loadError) {
-          setError(loadError.message);
-          return;
-        }
-
-        setRows((data ?? []) as unknown as SavedOutputRow[]);
+        const response = await getJsonWithSession<{ items: SavedOutputRow[] }>('/api/saved');
+        setRows(response.items);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Bir hata oluştu.');
       } finally {
