@@ -15,3 +15,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     </html>
   );
 }
+<script
+  async
+  src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXX"
+  crossOrigin="anonymous"
+/>
