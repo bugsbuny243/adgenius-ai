@@ -4,12 +4,13 @@ export function getMonthKey(date = new Date()): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
-type UsageStatus = {
+export type UsageStatus = {
   planName: string;
   runLimit: number;
   runsCount: number;
   remaining: number;
   isExceeded: boolean;
+  monthKey: string;
 };
 
 export async function getUsageStatus(
@@ -17,22 +18,28 @@ export async function getUsageStatus(
   workspaceId: string,
   monthKey = getMonthKey()
 ): Promise<UsageStatus> {
+  if (!workspaceId) {
+    throw new Error('Çalışma alanı bulunamadı.');
+  }
+
   const { data: subscription, error: subscriptionError } = await supabase
     .from('subscriptions')
-    .select('plan_name, run_limit')
+    .select('plan_name, run_limit, status')
     .eq('workspace_id', workspaceId)
+    .eq('status', 'active')
     .maybeSingle();
 
   if (subscriptionError) {
     throw new Error(`Abonelik bilgisi alınamadı: ${subscriptionError.message}`);
   }
 
-  const planName = subscription?.plan_name ?? 'starter';
-  const runLimit = subscription?.run_limit ?? 100;
+  if (!subscription) {
+    throw new Error('Aktif abonelik bulunamadı.');
+  }
 
   const { data: counter, error: counterError } = await supabase
     .from('usage_counters')
-    .select('runs_count')
+    .select('id, runs_count')
     .eq('workspace_id', workspaceId)
     .eq('month_key', monthKey)
     .maybeSingle();
@@ -44,11 +51,12 @@ export async function getUsageStatus(
   const runsCount = counter?.runs_count ?? 0;
 
   return {
-    planName,
-    runLimit,
+    planName: subscription.plan_name,
+    runLimit: subscription.run_limit,
     runsCount,
-    remaining: Math.max(0, runLimit - runsCount),
-    isExceeded: runsCount >= runLimit,
+    remaining: Math.max(0, subscription.run_limit - runsCount),
+    isExceeded: runsCount >= subscription.run_limit,
+    monthKey,
   };
 }
 
@@ -56,7 +64,7 @@ export async function assertCanRun(supabase: SupabaseClient, workspaceId: string
   const usage = await getUsageStatus(supabase, workspaceId);
 
   if (usage.isExceeded) {
-    throw new Error('Aylık çalıştırma limitine ulaştınız. Lütfen planınızı yükseltin.');
+    throw new Error('Aylık kullanım limitine ulaştınız.');
   }
 
   return usage;
@@ -99,10 +107,7 @@ export async function incrementMonthlyUsage(
   const nextRunsCount = existing.runs_count + 1;
   const { data: updated, error: updateError } = await supabase
     .from('usage_counters')
-    .update({
-      runs_count: nextRunsCount,
-      updated_at: new Date().toISOString(),
-    })
+    .update({ runs_count: nextRunsCount, updated_at: new Date().toISOString() })
     .eq('id', existing.id)
     .select('runs_count')
     .single();

@@ -1,18 +1,53 @@
-import Link from 'next/link';
+'use client';
 
-import { agents } from '@/lib/agents';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+
+import { createBrowserSupabase } from '@/lib/supabase/client';
+
+type AgentRow = {
+  id: string;
+  slug: string;
+  name: string;
+  icon: string | null;
+  description: string | null;
+};
 
 export default function AgentsPage() {
+  const [agents, setAgents] = useState<AgentRow[]>([]);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    async function loadAgents() {
+      const supabase = createBrowserSupabase();
+      const { data, error: loadError } = await supabase
+        .from('agent_types')
+        .select('id, slug, name, icon, description')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+      if (loadError) {
+        setError(loadError.message);
+        return;
+      }
+
+      setAgents(data ?? []);
+    }
+
+    void loadAgents();
+  }, []);
+
   return (
     <section className="space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold">Agent Kataloğu</h1>
+        <h1 className="text-2xl font-semibold">Agent kataloğu</h1>
         <p className="text-zinc-300">İhtiyacına uygun agentı seç, görevi gir ve saniyeler içinde sonuç al.</p>
       </div>
+      {error ? <p className="text-sm text-rose-300">{error}</p> : null}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {agents.map((agent) => (
-          <article key={agent.slug} className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5">
-            <p className="text-2xl">{agent.icon}</p>
+          <article key={agent.id} className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5">
+            <p className="text-2xl">{agent.icon ?? '🤖'}</p>
             <h2 className="mt-2 text-lg font-medium">{agent.name}</h2>
             <p className="mt-2 text-sm text-zinc-300">{agent.description}</p>
             <Link

@@ -1,5 +1,20 @@
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 
+export class WorkspaceError extends Error {
+  code: string;
+
+  constructor(message: string, code: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
+type Profile = {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+};
+
 type Workspace = {
   id: string;
   owner_id: string;
@@ -7,102 +22,86 @@ type Workspace = {
   created_at: string;
 };
 
+export type WorkspaceContext = {
+  user: User;
+  workspace: Workspace;
+  profile: Profile | null;
+};
+
 export async function loadCurrentUser(supabase: SupabaseClient): Promise<User | null> {
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser();
+
+  if (error) {
+    throw new WorkspaceError(`Oturum doğrulanamadı: ${error.message}`, 'AUTH_ERROR');
+  }
 
   return user;
 }
 
-export async function bootstrapWorkspaceForUser(supabase: SupabaseClient, user: User): Promise<Workspace> {
-  const profileUpsert = {
-    id: user.id,
-    email: user.email ?? null,
-    full_name: user.user_metadata?.full_name ?? null,
-  };
+export async function resolveWorkspaceContext(supabase: SupabaseClient): Promise<WorkspaceContext> {
+  const user = await loadCurrentUser(supabase);
 
-  const { error: profileError } = await supabase.from('profiles').upsert(profileUpsert, { onConflict: 'id' });
-  if (profileError) {
-    throw new Error(`Profil oluşturulamadı: ${profileError.message}`);
+  if (!user) {
+    throw new WorkspaceError('Oturum bulunamadı.', 'UNAUTHENTICATED');
   }
 
-  const { data: existingMember, error: memberLookupError } = await supabase
+  const { data: membership, error: membershipError } = await supabase
     .from('workspace_members')
     .select('workspace_id, workspaces!inner(id, owner_id, name, created_at)')
     .eq('user_id', user.id)
     .limit(1)
     .maybeSingle();
 
-  if (memberLookupError) {
-    throw new Error(`Workspace üyeliği okunamadı: ${memberLookupError.message}`);
+  if (membershipError) {
+    throw new WorkspaceError(`Çalışma alanı üyeliği okunamadı: ${membershipError.message}`, 'WORKSPACE_QUERY_ERROR');
   }
 
-  if (existingMember?.workspaces) {
-    const workspace = Array.isArray(existingMember.workspaces)
-      ? existingMember.workspaces[0]
-      : existingMember.workspaces;
+  const workspace = Array.isArray(membership?.workspaces) ? membership.workspaces[0] : membership?.workspaces;
 
-    const { error: subError } = await supabase.from('subscriptions').upsert(
-      {
-        workspace_id: workspace.id,
-        plan_name: 'starter',
-        run_limit: 100,
-        status: 'active',
-      },
-      { onConflict: 'workspace_id' }
-    );
-
-    if (subError) {
-      throw new Error(`Abonelik başlatılamadı: ${subError.message}`);
-    }
-
-    return workspace as Workspace;
+  if (!workspace) {
+    throw new WorkspaceError('Çalışma alanı bulunamadı.', 'WORKSPACE_NOT_FOUND');
   }
 
-  const workspaceName = `${(user.email ?? 'Yeni Kullanıcı').split('@')[0]} Workspace`;
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id, email, full_name')
+    .eq('id', user.id)
+    .maybeSingle();
 
-  const { data: workspace, error: workspaceError } = await supabase
-    .from('workspaces')
-    .insert({
-      owner_id: user.id,
-      name: workspaceName,
-    })
-    .select('*')
-    .single();
-
-  if (workspaceError || !workspace) {
-    throw new Error(`Workspace oluşturulamadı: ${workspaceError?.message ?? 'Bilinmeyen hata'}`);
+  if (profileError) {
+    throw new WorkspaceError(`Profil bilgisi alınamadı: ${profileError.message}`, 'PROFILE_QUERY_ERROR');
   }
 
-  const { error: memberInsertError } = await supabase.from('workspace_members').upsert(
-    {
-      workspace_id: workspace.id,
-      user_id: user.id,
-      role: 'owner',
-    },
-    { onConflict: 'workspace_id,user_id' }
-  );
+  return {
+    user,
+    workspace: workspace as Workspace,
+    profile: profile as Profile | null,
+  };
+}
 
-  if (memberInsertError) {
-    throw new Error(`Workspace üyeliği oluşturulamadı: ${memberInsertError.message}`);
+
+export async function bootstrapWorkspaceForUser(supabase: SupabaseClient, user: User): Promise<Workspace> {
+  const { data: membership, error: membershipError } = await supabase
+    .from('workspace_members')
+    .select('workspace_id, workspaces!inner(id, owner_id, name, created_at)')
+    .eq('user_id', user.id)
+    .limit(1)
+    .maybeSingle();
+
+  if (membershipError) {
+    throw new WorkspaceError(`Çalışma alanı üyeliği okunamadı: ${membershipError.message}`, 'WORKSPACE_QUERY_ERROR');
   }
 
-  const { error: subscriptionError } = await supabase.from('subscriptions').upsert(
-    {
-      workspace_id: workspace.id,
-      plan_name: 'starter',
-      run_limit: 100,
-      status: 'active',
-    },
-    { onConflict: 'workspace_id' }
-  );
+  const workspace = Array.isArray(membership?.workspaces) ? membership.workspaces[0] : membership?.workspaces;
 
-  if (subscriptionError) {
-    throw new Error(`Abonelik oluşturulamadı: ${subscriptionError.message}`);
+  if (!workspace) {
+    throw new WorkspaceError('Çalışma alanı bulunamadı.', 'WORKSPACE_NOT_FOUND');
   }
 
-  return workspace;
+  return workspace as Workspace;
 }
 
 export async function getCurrentWorkspace(supabase: SupabaseClient, user: User): Promise<Workspace> {
