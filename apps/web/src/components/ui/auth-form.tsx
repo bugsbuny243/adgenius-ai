@@ -25,23 +25,32 @@ export function AuthForm({ mode }: AuthFormProps) {
     setError(null);
     setLoading(true);
 
-    const authFn = isLogin ? signInWithEmail : signUpWithEmail;
-    const { error: authError } = await authFn(email, password);
+    try {
+      const authFn = isLogin ? signInWithEmail : signUpWithEmail;
+      const { data, error: authError } = await authFn(email, password);
 
-    if (authError) {
-      setError(authError.message);
+      if (authError) {
+        setError(authError.message);
+        return;
+      }
+
+      const hasSession = Boolean(data?.session);
+
+      if (isLogin || hasSession) {
+        router.push('/dashboard');
+        router.refresh();
+        return;
+      }
+
+      setError('Kayıt başarılı. E-postanı doğruladıktan sonra giriş yapabilirsin.');
+      setEmail('');
+      setPassword('');
+    } catch (err) {
+      console.error('Auth submit failed:', err);
+      setError(err instanceof Error ? err.message : 'Beklenmeyen bir hata oluştu.');
+    } finally {
       setLoading(false);
-      return;
     }
-
-    if (isLogin) {
-      router.push('/dashboard');
-      router.refresh();
-      return;
-    }
-
-    setLoading(false);
-    setError('Kayıt başarılı. E-postanı doğruladıktan sonra giriş yapabilirsin.');
   }
 
   return (
