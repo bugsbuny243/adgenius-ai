@@ -5,6 +5,15 @@ import { createServerSupabase } from '@/lib/supabase/server';
 import { assertCanRun, getMonthKey, incrementMonthlyUsage } from '@/lib/usage';
 import { resolveWorkspaceContext, WorkspaceError } from '@/lib/workspace';
 
+const RUN_STATUS = {
+  pending: 'pending',
+  running: 'running',
+  completed: 'completed',
+  failed: 'failed',
+} as const;
+
+type RunStatus = (typeof RUN_STATUS)[keyof typeof RUN_STATUS];
+
 type ServiceResult<T> =
   | {
       ok: true;
@@ -38,6 +47,25 @@ function deriveTitle(content: string) {
   }
 
   return firstLine.length > 80 ? `${firstLine.slice(0, 80)}...` : firstLine;
+}
+
+async function updateRunStatus(params: {
+  supabase: ReturnType<typeof createServerSupabase>;
+  runId: string;
+  status: RunStatus;
+  resultText?: string | null;
+  errorMessage?: string | null;
+  metadata?: Record<string, unknown>;
+}) {
+  await params.supabase
+    .from('agent_runs')
+    .update({
+      status: params.status,
+      result_text: params.resultText ?? null,
+      error_message: params.errorMessage ?? null,
+      metadata: params.metadata ?? {},
+    })
+    .eq('id', params.runId);
 }
 
 export async function runAgent(input: {
@@ -84,31 +112,6 @@ export async function runAgent(input: {
 
     const usage = await assertCanRun(supabase, workspace.id);
 
-    let resultText = '';
-    let modelName = input.model ?? 'ai-standard';
-
-    try {
-      const aiResult = await runAI({
-        systemPrompt: agentType.system_prompt,
-        userInput: input.userInput,
-        model: input.model,
-      });
-      resultText = aiResult.text;
-      modelName = aiResult.model;
-    } catch {
-      await supabase.from('agent_runs').insert({
-        workspace_id: workspace.id,
-        user_id: user.id,
-        agent_type_id: agentType.id,
-        user_input: input.userInput,
-        model_name: modelName,
-        result_text: null,
-        status: 'failed',
-      });
-
-      return { ok: false, error: 'AI yanıtı alınamadı. Lütfen tekrar deneyin.' };
-    }
-
     const { data: createdRun, error: runInsertError } = await supabase
       .from('agent_runs')
       .insert({
@@ -116,9 +119,14 @@ export async function runAgent(input: {
         user_id: user.id,
         agent_type_id: agentType.id,
         user_input: input.userInput,
-        model_name: modelName,
-        result_text: resultText,
-        status: 'completed',
+        model_name: input.model ?? 'ai-standard',
+        status: RUN_STATUS.pending,
+        result_text: null,
+        error_message: null,
+        metadata: {
+          lifecycle: [RUN_STATUS.pending],
+          startedAt: new Date().toISOString(),
+        },
       })
       .select('id, created_at, status')
       .single();
@@ -130,12 +138,77 @@ export async function runAgent(input: {
       };
     }
 
+    await updateRunStatus({
+      supabase,
+      runId: createdRun.id,
+      status: RUN_STATUS.running,
+      metadata: {
+        lifecycle: [RUN_STATUS.pending, RUN_STATUS.running],
+        startedAt: new Date().toISOString(),
+      },
+    });
+
+    let resultText = '';
+    let modelName = input.model ?? 'ai-standard';
+    let usageMetadata: Record<string, unknown> = {};
+
+    try {
+      const aiResult = await runAI({
+        systemPrompt: agentType.system_prompt,
+        userInput: input.userInput,
+        model: input.model,
+      });
+      resultText = aiResult.text;
+      modelName = aiResult.model;
+      usageMetadata = {
+        usage: aiResult.usageMetadata ?? null,
+      };
+    } catch (error) {
+      const cleanMessage = cleanErrorMessage(error, 'Yanıt üretilemedi.');
+      await updateRunStatus({
+        supabase,
+        runId: createdRun.id,
+        status: RUN_STATUS.failed,
+        resultText: null,
+        errorMessage: cleanMessage,
+        metadata: {
+          lifecycle: [RUN_STATUS.pending, RUN_STATUS.running, RUN_STATUS.failed],
+          failedAt: new Date().toISOString(),
+        },
+      });
+
+      return { ok: false, error: 'AI yanıtı alınamadı. Lütfen tekrar deneyin.' };
+    }
+
+    await updateRunStatus({
+      supabase,
+      runId: createdRun.id,
+      status: RUN_STATUS.completed,
+      resultText,
+      errorMessage: null,
+      metadata: {
+        lifecycle: [RUN_STATUS.pending, RUN_STATUS.running, RUN_STATUS.completed],
+        completedAt: new Date().toISOString(),
+        ...usageMetadata,
+      },
+    });
+
+    await supabase
+      .from('agent_runs')
+      .update({
+        model_name: modelName,
+      })
+      .eq('id', createdRun.id);
+
     const nextRunsCount = await incrementMonthlyUsage(supabase, workspace.id, usage.monthKey);
 
     return {
       ok: true,
       data: {
-        run: createdRun,
+        run: {
+          ...createdRun,
+          status: RUN_STATUS.completed,
+        },
         result: resultText,
         usage: {
           runsCount: nextRunsCount,

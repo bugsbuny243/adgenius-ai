@@ -15,9 +15,14 @@ type AgentTypeRow = {
 };
 
 type AgentRunResponse = {
+  ok?: boolean;
   result?: string;
   runId?: string;
-  error?: string;
+  status?: string;
+  error?: {
+    code?: string;
+    message?: string;
+  };
 };
 
 export default function AgentRunPage({ params }: { params: { type: string } }) {
@@ -31,6 +36,7 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
   const [running, setRunning] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadingAgent, setLoadingAgent] = useState(true);
+  const [runState, setRunState] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
 
   useEffect(() => {
     async function loadAgent() {
@@ -67,9 +73,18 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
   }, [params.type]);
 
   async function onRun() {
+    if (!input.trim()) {
+      setError('Lütfen bir görev girin.');
+      setRunState('error');
+      return;
+    }
+
     setError('');
     setSaveStatus('');
     setRunning(true);
+    setRunState('pending');
+    setResult('');
+    setRunId(null);
 
     try {
       const supabase = createBrowserSupabase();
@@ -79,6 +94,7 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
 
       if (!session?.access_token) {
         setError('Oturum bulunamadı. Lütfen tekrar giriş yapın.');
+        setRunState('error');
         return;
       }
 
@@ -96,16 +112,19 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
 
       const data = (await response.json()) as AgentRunResponse;
 
-      if (!response.ok || data.error) {
-        setError(data.error ?? 'Bir hata oluştu.');
+      if (!response.ok || data.ok === false) {
+        setError(data.error?.message ?? 'Bir hata oluştu.');
+        setRunState('error');
         return;
       }
 
       setResult(data.result ?? 'Model boş yanıt döndürdü.');
       setRunId(data.runId ?? null);
       setSaveTitle('');
+      setRunState('success');
     } catch (runError) {
       setError(runError instanceof Error ? runError.message : 'Çalıştırma sırasında hata oluştu.');
+      setRunState('error');
     } finally {
       setRunning(false);
     }
@@ -187,8 +206,15 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
         disabled={running || input.trim().length === 0 || !agent}
         className="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-70"
       >
-        {running ? 'Çalıştırılıyor...' : 'Çalıştır'}
+        {running ? 'İşleniyor...' : 'Çalıştır'}
       </button>
+
+      {runState === 'pending' ? (
+        <p className="rounded-lg border border-zinc-700 bg-zinc-900/60 p-3 text-sm text-zinc-200">İstek alındı, sonuç hazırlanıyor...</p>
+      ) : null}
+      {runState === 'success' ? (
+        <p className="rounded-lg border border-emerald-800 bg-emerald-950/40 p-3 text-sm text-emerald-200">Çalıştırma tamamlandı.</p>
+      ) : null}
 
       {error ? <p className="rounded-lg border border-rose-800 bg-rose-950/50 p-3 text-sm text-rose-200">{error}</p> : null}
 
