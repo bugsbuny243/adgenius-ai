@@ -12,6 +12,7 @@ type AuthFormProps = {
 };
 
 const DEFAULT_POST_AUTH_REDIRECT = '/dashboard';
+const AUTH_REQUEST_TIMEOUT_MS = 20000;
 
 function resolveRedirectTarget(nextValue: string | null) {
   if (!nextValue || !nextValue.startsWith('/')) {
@@ -53,6 +54,24 @@ function toFriendlyAuthError(message: string, mode: AuthMode) {
   return mode === 'login'
     ? 'Giriş sırasında bir sorun oluştu. Lütfen tekrar dene.'
     : 'Kayıt sırasında bir sorun oluştu. Lütfen tekrar dene.';
+}
+
+async function withTimeout<T>(task: Promise<T>, timeoutMs: number) {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const timeoutPromise = new Promise<T>((_resolve, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error('AUTH_TIMEOUT'));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([task, timeoutPromise]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
 }
 
 export function AuthForm({ mode }: AuthFormProps) {
@@ -127,8 +146,8 @@ export function AuthForm({ mode }: AuthFormProps) {
       const sanitizedEmail = email.trim().toLowerCase();
 
       const { data, error: authError } = isLogin
-        ? await supabase.auth.signInWithPassword({ email: sanitizedEmail, password })
-        : await supabase.auth.signUp({ email: sanitizedEmail, password });
+        ? await withTimeout(supabase.auth.signInWithPassword({ email: sanitizedEmail, password }), AUTH_REQUEST_TIMEOUT_MS)
+        : await withTimeout(supabase.auth.signUp({ email: sanitizedEmail, password }), AUTH_REQUEST_TIMEOUT_MS);
 
       if (authError) {
         if (shouldUpdateState()) {
@@ -151,7 +170,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       const {
         data: { session: currentSession },
         error: sessionError,
-      } = await supabase.auth.getSession();
+      } = await withTimeout(supabase.auth.getSession(), AUTH_REQUEST_TIMEOUT_MS);
 
       if (sessionError) {
         if (shouldUpdateState()) {
@@ -174,6 +193,8 @@ export function AuthForm({ mode }: AuthFormProps) {
       if (shouldUpdateState()) {
         if (err instanceof TypeError) {
           setError('Ağ hatası oluştu. İnternet bağlantını kontrol edip tekrar dene.');
+        } else if (err instanceof Error && err.message === 'AUTH_TIMEOUT') {
+          setError('İstek zaman aşımına uğradı. Lütfen tekrar dene.');
         } else {
           setError(isLogin ? 'Giriş sırasında beklenmeyen bir hata oluştu. Lütfen tekrar dene.' : 'Kayıt sırasında beklenmeyen bir hata oluştu. Lütfen tekrar dene.');
         }

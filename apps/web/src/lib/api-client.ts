@@ -11,6 +11,17 @@ type ApiErrorResponse = {
   error?: string;
 };
 
+const API_REQUEST_TIMEOUT_MS = 30000;
+
+function createTimeoutSignal(timeoutMs: number) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+
+  return { signal: controller.signal, timeoutId };
+}
+
 export async function getAccessTokenOrThrow() {
   const supabase = createBrowserSupabase();
   const {
@@ -29,15 +40,28 @@ export async function postJsonWithSession<TResponse, TRequest extends object>(
   body: TRequest,
 ): Promise<TResponse> {
   const accessToken = await getAccessTokenOrThrow();
+  const { signal, timeoutId } = createTimeoutSignal(API_REQUEST_TIMEOUT_MS);
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify(body),
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(body),
+      signal,
+    });
+  } catch (error) {
+    window.clearTimeout(timeoutId);
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new ApiRequestError('İstek zaman aşımına uğradı. Lütfen tekrar deneyin.', 408);
+    }
+
+    throw error;
+  }
+  window.clearTimeout(timeoutId);
 
   let payload: (TResponse & ApiErrorResponse) | ApiErrorResponse = {};
   try {

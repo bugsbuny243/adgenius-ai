@@ -28,40 +28,35 @@ function resolveStatusCode(error: string) {
 }
 
 export async function POST(request: Request) {
-  const accessToken = getAccessToken(request);
-
-  let body: {
-    type?: string;
-    userInput?: string;
-    model?: string;
-  };
-
   try {
-    body = (await request.json()) as {
+    const accessToken = getAccessToken(request);
+
+    const body = (await request.json()) as {
       type?: string;
       userInput?: string;
       model?: string;
     };
-  } catch {
-    return NextResponse.json({ error: 'Geçersiz istek gövdesi.' }, { status: 400 });
+
+    const result = await runAgent({
+      accessToken: accessToken ?? undefined,
+      type: body.type,
+      userInput: body.userInput,
+      model: body.model,
+    });
+
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: resolveStatusCode(result.error) });
+    }
+
+    return NextResponse.json({
+      result: result.data.result,
+      runId: result.data.run.id,
+      createdAt: result.data.run.created_at,
+      status: result.data.run.status,
+      usage: result.data.usage,
+    });
+  } catch (error) {
+    console.error('POST /api/agents/run failed:', error);
+    return NextResponse.json({ error: 'İşlem sırasında beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.' }, { status: 500 });
   }
-
-  const result = await runAgent({
-    accessToken: accessToken ?? undefined,
-    type: body.type,
-    userInput: body.userInput,
-    model: body.model,
-  });
-
-  if (!result.ok) {
-    return NextResponse.json({ error: result.error }, { status: resolveStatusCode(result.error) });
-  }
-
-  return NextResponse.json({
-    result: result.data.result,
-    runId: result.data.run.id,
-    createdAt: result.data.run.created_at,
-    status: result.data.run.status,
-    usage: result.data.usage,
-  });
 }
