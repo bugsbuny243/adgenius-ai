@@ -87,6 +87,26 @@ export async function runAgent(input: {
     let resultText = '';
     let modelName = input.model ?? 'ai-standard';
 
+    const { data: pendingRun, error: pendingRunError } = await supabase
+      .from('agent_runs')
+      .insert({
+        workspace_id: workspace.id,
+        user_id: user.id,
+        agent_type_id: agentType.id,
+        user_input: input.userInput,
+        model_name: modelName,
+        status: 'pending',
+      })
+      .select('id, created_at, status')
+      .single();
+
+    if (pendingRunError || !pendingRun) {
+      return {
+        ok: false,
+        error: `Çalıştırma başlatılamadı: ${pendingRunError?.message ?? 'Bilinmeyen hata'}`,
+      };
+    }
+
     try {
       const aiResult = await runAI({
         systemPrompt: agentType.system_prompt,
@@ -95,54 +115,60 @@ export async function runAgent(input: {
       });
       resultText = aiResult.text;
       modelName = aiResult.model;
-    } catch {
-      await supabase.from('agent_runs').insert({
-        workspace_id: workspace.id,
-        user_id: user.id,
-        agent_type_id: agentType.id,
-        user_input: input.userInput,
-        model_name: modelName,
-        result_text: null,
-        status: 'failed',
-      });
+
+      const { data: completedRun, error: completeError } = await supabase
+        .from('agent_runs')
+        .update({
+          result_text: resultText,
+          model_name: modelName,
+          status: 'completed',
+          error_message: null,
+          metadata: {
+            completed_at: new Date().toISOString(),
+            month_key: usage.monthKey,
+          },
+        })
+        .eq('id', pendingRun.id)
+        .select('id, created_at, status')
+        .single();
+
+      if (completeError || !completedRun) {
+        return {
+          ok: false,
+          error: `Çalıştırma tamamlanamadı: ${completeError?.message ?? 'Bilinmeyen hata'}`,
+        };
+      }
+
+      const nextRunsCount = await incrementMonthlyUsage(supabase, workspace.id, usage.monthKey);
+
+      return {
+        ok: true,
+        data: {
+          run: completedRun,
+          result: resultText,
+          usage: {
+            runsCount: nextRunsCount,
+            monthKey: getMonthKey(),
+          },
+        },
+      };
+    } catch (aiError) {
+      const aiErrorMessage = cleanErrorMessage(aiError, 'AI yanıtı alınamadı. Lütfen tekrar deneyin.');
+
+      await supabase
+        .from('agent_runs')
+        .update({
+          result_text: null,
+          status: 'failed',
+          error_message: aiErrorMessage,
+          metadata: {
+            failed_at: new Date().toISOString(),
+          },
+        })
+        .eq('id', pendingRun.id);
 
       return { ok: false, error: 'AI yanıtı alınamadı. Lütfen tekrar deneyin.' };
     }
-
-    const { data: createdRun, error: runInsertError } = await supabase
-      .from('agent_runs')
-      .insert({
-        workspace_id: workspace.id,
-        user_id: user.id,
-        agent_type_id: agentType.id,
-        user_input: input.userInput,
-        model_name: modelName,
-        result_text: resultText,
-        status: 'completed',
-      })
-      .select('id, created_at, status')
-      .single();
-
-    if (runInsertError || !createdRun) {
-      return {
-        ok: false,
-        error: `Çalıştırma kaydedilemedi: ${runInsertError?.message ?? 'Bilinmeyen hata'}`,
-      };
-    }
-
-    const nextRunsCount = await incrementMonthlyUsage(supabase, workspace.id, usage.monthKey);
-
-    return {
-      ok: true,
-      data: {
-        run: createdRun,
-        result: resultText,
-        usage: {
-          runsCount: nextRunsCount,
-          monthKey: getMonthKey(),
-        },
-      },
-    };
   } catch (error) {
     return { ok: false, error: cleanErrorMessage(error) };
   }

@@ -20,6 +20,7 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const loginRedirectPath = useMemo(() => {
     const nextPath = pathname && pathname !== '/' ? pathname : '/dashboard';
@@ -32,6 +33,7 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
     async function verifySession() {
       try {
         if (!isSupabaseConfigured()) {
+          setIsAuthenticated(false);
           router.replace('/login');
           return;
         }
@@ -42,10 +44,17 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
           error,
         } = await supabase.auth.getSession();
 
-        if (error || !session?.access_token) {
+        const hasSession = Boolean(session?.access_token);
+        if (error || !hasSession) {
+          setIsAuthenticated(false);
           router.replace(loginRedirectPath);
           return;
         }
+
+        setIsAuthenticated(true);
+      } catch {
+        setIsAuthenticated(false);
+        router.replace(loginRedirectPath);
       } finally {
         if (mounted) {
           setCheckingAuth(false);
@@ -66,8 +75,12 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session?.access_token) {
+        setIsAuthenticated(false);
         router.replace(loginRedirectPath);
+        return;
       }
+
+      setIsAuthenticated(true);
     });
 
     return () => {
@@ -78,12 +91,17 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
 
   async function onLogout() {
     await signOut();
+    setIsAuthenticated(false);
     router.replace('/login');
     router.refresh();
   }
 
   if (checkingAuth) {
     return <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-zinc-300">Oturum kontrol ediliyor...</div>;
+  }
+
+  if (!isAuthenticated) {
+    return <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-zinc-300">Giriş sayfasına yönlendiriliyor...</div>;
   }
 
   return (

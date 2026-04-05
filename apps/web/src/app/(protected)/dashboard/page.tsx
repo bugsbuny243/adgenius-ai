@@ -71,6 +71,8 @@ function statusLabel(status: string) {
       return 'Hata';
     case 'running':
       return 'Çalışıyor';
+    case 'pending':
+      return 'Sırada';
     default:
       return status;
   }
