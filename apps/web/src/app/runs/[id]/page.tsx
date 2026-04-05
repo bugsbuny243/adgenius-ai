@@ -1,18 +1,40 @@
 import { notFound } from 'next/navigation'
-import { db } from '@/src/lib/db'
+import { createClient } from '@/src/lib/supabase/server'
+import { getUserWorkspaceId, requireUser } from '@/src/lib/auth'
 
 export default async function RunDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const user = await requireUser()
+  const workspaceId = await getUserWorkspaceId(user.id)
   const { id } = await params
-  const run = await db.run.findUnique({ where: { id }, include: { steps: true, approvals: true } })
-  if (!run) notFound()
+  const supabase = await createClient()
+
+  const { data: run } = await supabase
+    .from('agent_runs')
+    .select('id,user_input,result_text,status,model_name,created_at,agent_types(name)')
+    .eq('workspace_id', workspaceId)
+    .eq('id', id)
+    .maybeSingle()
+
+  if (!run) {
+    notFound()
+  }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-3xl font-semibold">Run #{run.id.slice(0, 8)}</h1>
-      <div className="panel">Summary: {run.summary ?? 'No summary'}</div>
-      <div className="panel">Tasks: {JSON.stringify(run.proposedTasks)}</div>
-      <div className="panel">Risks: {JSON.stringify(run.risks)}</div>
-      <div className="panel">Missing fields: {JSON.stringify(run.missingFields)}</div>
-    </div>
+    <section className="space-y-4">
+      <div className="panel">
+        <h1 className="page-title">Run Detayı</h1>
+        <p className="muted">
+          {(run.agent_types as { name?: string } | null)?.name ?? 'Agent'} • {run.status} • {new Date(run.created_at).toLocaleString('tr-TR')}
+        </p>
+      </div>
+      <div className="panel">
+        <h2>Girdi</h2>
+        <pre className="output-pre">{run.user_input}</pre>
+      </div>
+      <div className="panel">
+        <h2>Çıktı</h2>
+        <pre className="output-pre">{run.result_text}</pre>
+      </div>
+    </section>
   )
 }

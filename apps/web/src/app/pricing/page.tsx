@@ -1,12 +1,23 @@
+const plans = [
+  { name: 'Başlangıç', price: '₺499/ay', desc: 'Aylık 100 run, tek workspace, temel agent kullanımı.' },
+  { name: 'Büyüme', price: '₺1.999/ay', desc: 'Aylık 1.000 run, ekip üyeleri, öncelikli destek.' },
+  { name: 'Kurumsal', price: 'İletişime geçin', desc: 'Özel limitler, güvenlik incelemeleri ve kurumsal onboarding.' },
+]
+
 export default function PricingPage() {
   return (
-    <div className="space-y-4">
-      <h1 className="text-3xl font-semibold">Pricing</h1>
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="panel"><h2 className="font-semibold">Starter</h2><p>5 ajan / 1 organizasyon</p></div>
-        <div className="panel"><h2 className="font-semibold">Scale</h2><p>Sınırsız run + approval akışı</p></div>
-        <div className="panel"><h2 className="font-semibold">Enterprise</h2><p>SSO, audit, özel SLA</p></div>
+    <section className="space-y-4">
+      <h1 className="page-title">Fiyatlandırma</h1>
+      <p className="muted">Koschei planları ile kullanım limitinizi ve ekip kapasitenizi ölçekleyin.</p>
+      <div className="card-grid">
+        {plans.map((plan) => (
+          <article key={plan.name} className="panel">
+            <h2>{plan.name}</h2>
+            <p><strong>{plan.price}</strong></p>
+            <p className="muted">{plan.desc}</p>
+          </article>
+        ))}
       </div>
-    </div>
+    </section>
   )
 }
