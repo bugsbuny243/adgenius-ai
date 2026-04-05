@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { signOut } from '@/lib/auth';
-import { createBrowserSupabase } from '@/lib/supabase/client';
+import { createBrowserSupabase, isSupabaseConfigured } from '@/lib/supabase/client';
 import { loadCurrentUser } from '@/lib/workspace';
 import { cn } from '@/lib/utils';
 
@@ -21,21 +21,61 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [authError, setAuthError] = useState('');
 
   useEffect(() => {
+    let mounted = true;
+
     async function verifyAuth() {
-      const supabase = createBrowserSupabase();
-      const user = await loadCurrentUser(supabase);
+      try {
+        if (!isSupabaseConfigured()) {
+          throw new Error('Supabase yapılandırması eksik.');
+        }
 
-      if (!user) {
+        const supabase = createBrowserSupabase();
+        const user = await loadCurrentUser(supabase);
+
+        if (!user) {
+          router.replace('/login');
+          return;
+        }
+
+        if (mounted) {
+          setAuthError('');
+        }
+      } catch (error) {
+        if (mounted) {
+          setAuthError(error instanceof Error ? error.message : 'Oturum doğrulanamadı.');
+        }
         router.replace('/login');
-        return;
+      } finally {
+        if (mounted) {
+          setCheckingAuth(false);
+        }
       }
-
-      setCheckingAuth(false);
     }
 
     void verifyAuth();
+
+    if (!isSupabaseConfigured()) {
+      return () => {
+        mounted = false;
+      };
+    }
+
+    const supabase = createBrowserSupabase();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session?.access_token) {
+        router.replace('/login');
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [router]);
 
   async function onLogout() {
@@ -45,18 +85,18 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
   }
 
   if (checkingAuth) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-zinc-300">
-        Oturum kontrol ediliyor...
-      </div>
-    );
+    return <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-zinc-300">Oturum kontrol ediliyor...</div>;
+  }
+
+  if (authError) {
+    return <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-4 text-center text-sm text-rose-300">{authError}</div>;
   }
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-6 md:flex-row">
         <aside className="h-fit min-w-64 rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
-          <div className="mb-4 text-lg font-semibold">Koschei</div>
+          <div className="mb-4 text-lg font-semibold">Tradepiglobal AI</div>
           <nav className="space-y-1">
             {appNavItems.map((item) => (
               <Link

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { saveAgentOutputAction } from '@/actions/agent-actions';
+import { saveAgentOutput } from '@/lib/server/agent-service';
 
 function getAccessToken(request: Request) {
   const authorization = request.headers.get('authorization');
@@ -14,13 +14,23 @@ function getAccessToken(request: Request) {
 export async function POST(request: Request) {
   const accessToken = getAccessToken(request);
 
-  const body = (await request.json()) as {
+  let body: {
     runId?: string;
     title?: string;
     content?: string;
   };
 
-  const result = await saveAgentOutputAction({
+  try {
+    body = (await request.json()) as {
+      runId?: string;
+      title?: string;
+      content?: string;
+    };
+  } catch {
+    return NextResponse.json({ error: 'Geçersiz istek gövdesi.' }, { status: 400 });
+  }
+
+  const result = await saveAgentOutput({
     accessToken: accessToken ?? undefined,
     runId: body.runId,
     title: body.title,

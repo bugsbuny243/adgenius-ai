@@ -30,29 +30,37 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
   const [saveStatus, setSaveStatus] = useState('');
   const [running, setRunning] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loadingAgent, setLoadingAgent] = useState(true);
 
   useEffect(() => {
     async function loadAgent() {
       setError('');
-      const supabase = createBrowserSupabase();
-      const { data, error: loadError } = await supabase
+      setLoadingAgent(true);
+      try {
+        const supabase = createBrowserSupabase();
+        const { data, error: loadError } = await supabase
         .from('agent_types')
         .select('id, slug, name, icon, description, placeholder, is_active')
         .eq('slug', params.type)
         .eq('is_active', true)
         .maybeSingle();
 
-      if (loadError) {
-        setError(`Agent bilgisi alınamadı: ${loadError.message}`);
-        return;
-      }
+        if (loadError) {
+          setError(`Agent bilgisi alınamadı: ${loadError.message}`);
+          return;
+        }
 
-      if (!data) {
-        setError('Agent türü bulunamadı veya aktif değil.');
-        return;
-      }
+        if (!data) {
+          setError('Agent türü bulunamadı veya aktif değil.');
+          return;
+        }
 
-      setAgent(data);
+        setAgent(data);
+      } catch (loadErr) {
+        setError(loadErr instanceof Error ? loadErr.message : 'Agent bilgisi yüklenemedi.');
+      } finally {
+        setLoadingAgent(false);
+      }
     }
 
     void loadAgent();
@@ -63,41 +71,44 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
     setSaveStatus('');
     setRunning(true);
 
-    const supabase = createBrowserSupabase();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    try {
+      const supabase = createBrowserSupabase();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-    if (!session?.access_token) {
-      setError('Oturum bulunamadı. Lütfen tekrar giriş yapın.');
+      if (!session?.access_token) {
+        setError('Oturum bulunamadı. Lütfen tekrar giriş yapın.');
+        return;
+      }
+
+      const response = await fetch('/api/agents/run', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          type: params.type,
+          userInput: input,
+        }),
+      });
+
+      const data = (await response.json()) as AgentRunResponse;
+
+      if (!response.ok || data.error) {
+        setError(data.error ?? 'Bir hata oluştu.');
+        return;
+      }
+
+      setResult(data.result ?? 'Model boş yanıt döndürdü.');
+      setRunId(data.runId ?? null);
+      setSaveTitle('');
+    } catch (runError) {
+      setError(runError instanceof Error ? runError.message : 'Çalıştırma sırasında hata oluştu.');
+    } finally {
       setRunning(false);
-      return;
     }
-
-    const response = await fetch('/api/agents/run', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        type: params.type,
-        userInput: input,
-      }),
-    });
-
-    const data = (await response.json()) as AgentRunResponse;
-
-    if (!response.ok || data.error) {
-      setError(data.error ?? 'Bir hata oluştu.');
-      setRunning(false);
-      return;
-    }
-
-    setResult(data.result ?? 'Model boş yanıt döndürdü.');
-    setRunId(data.runId ?? null);
-    setSaveTitle('');
-    setRunning(false);
   }
 
   async function onSave() {
@@ -109,39 +120,42 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
     setSaving(true);
     setSaveStatus('');
 
-    const supabase = createBrowserSupabase();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    try {
+      const supabase = createBrowserSupabase();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-    if (!session?.access_token) {
-      setSaveStatus('Oturum bulunamadı. Tekrar giriş yapın.');
+      if (!session?.access_token) {
+        setSaveStatus('Oturum bulunamadı. Tekrar giriş yapın.');
+        return;
+      }
+
+      const response = await fetch('/api/outputs/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          runId,
+          title: saveTitle,
+          content: result,
+        }),
+      });
+
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok || data.error) {
+        setSaveStatus(data.error ?? 'Bir hata oluştu.');
+        return;
+      }
+
+      setSaveStatus('Çıktı kaydedildi.');
+    } catch (saveError) {
+      setSaveStatus(saveError instanceof Error ? saveError.message : 'Kaydetme sırasında hata oluştu.');
+    } finally {
       setSaving(false);
-      return;
     }
-
-    const response = await fetch('/api/outputs/save', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        runId,
-        title: saveTitle,
-        content: result,
-      }),
-    });
-
-    const data = (await response.json()) as { error?: string };
-    if (!response.ok || data.error) {
-      setSaveStatus(data.error ?? 'Bir hata oluştu.');
-      setSaving(false);
-      return;
-    }
-
-    setSaveStatus('Çıktı kaydedildi.');
-    setSaving(false);
   }
 
   return (
@@ -150,7 +164,7 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
         <h1 className="text-2xl font-semibold">
           {agent?.icon ?? '🤖'} {agent?.name ?? 'Agent'}
         </h1>
-        <p className="text-zinc-300">{agent?.description ?? 'Agent yükleniyor...'}</p>
+        <p className="text-zinc-300">{agent?.description ?? (loadingAgent ? 'Agent yükleniyor...' : 'Agent bilgisi bulunamadı.')}</p>
       </div>
 
       <div className="space-y-2">
