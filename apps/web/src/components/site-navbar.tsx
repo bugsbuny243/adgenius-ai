@@ -1,13 +1,40 @@
-import Link from 'next/link';
+'use client';
 
-const navItems = [
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+
+import { createBrowserSupabase } from '@/lib/supabase/client';
+
+const guestNavItems = [
   { href: '/agents', label: 'Agentlar' },
   { href: '/pricing', label: 'Fiyatlar' },
   { href: '/login', label: 'Giriş' },
   { href: '/signup', label: 'Kayıt' },
 ];
 
+const authNavItems = [
+  { href: '/dashboard', label: 'Dashboard' },
+  { href: '/agents', label: 'Agentlar' },
+  { href: '/pricing', label: 'Fiyatlar' },
+];
+
 export function SiteNavbar() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    async function checkAuth() {
+      const {
+        data: { user },
+      } = await createBrowserSupabase().auth.getUser();
+
+      setIsAuthenticated(Boolean(user));
+    }
+
+    void checkAuth();
+  }, []);
+
+  const navItems = isAuthenticated ? authNavItems : guestNavItems;
+
   return (
     <header className="border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur">
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4">
