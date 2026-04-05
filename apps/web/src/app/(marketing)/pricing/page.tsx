@@ -1,3 +1,4 @@
+import { AdSlotPlaceholder, MobileAnchorAdPlaceholder } from '@/components/ads/ad-slot-placeholder';
 import { SiteFooter } from '@/components/layout/footer';
 import { SiteNavbar } from '@/components/layout/navbar';
 
@@ -11,6 +12,14 @@ export default function PricingPage() {
           AdGenius AI planları ekip boyutuna ve kullanım hacmine göre kademeli olarak sunulur. Güncel paket
           ayrıntıları ve kurumsal teklifler için kısa süre içinde bu sayfada detaylı bir tablo yayınlanacaktır.
         </p>
+
+        <AdSlotPlaceholder
+          slotId="marketing-pricing-content"
+          label="İçerik/Rehber reklam alanı (yakında)"
+          minHeight={120}
+          className="mt-8"
+        />
+        <MobileAnchorAdPlaceholder slotId="marketing-pricing-mobile-anchor" />
       </main>
       <SiteFooter />
     </div>

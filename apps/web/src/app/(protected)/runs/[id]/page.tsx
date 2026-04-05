@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
+import { AdSlotPlaceholder, MobileAnchorAdPlaceholder } from '@/components/ads/ad-slot-placeholder';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { bootstrapWorkspaceForUser, loadCurrentUser } from '@/lib/workspace';
 
@@ -126,6 +127,12 @@ export default function RunDetailPage({ params }: { params: { id: string } }) {
         <p className="whitespace-pre-wrap text-sm text-zinc-100">{run.result_text ?? 'Sonuç boş.'}</p>
       </div>
 
+      <AdSlotPlaceholder
+        slotId="run-result-bottom"
+        label="Sonuç altı reklam alanı (yakında)"
+        minHeight={120}
+      />
+
       {!saved ? (
         <button
           type="button"
@@ -139,6 +146,8 @@ export default function RunDetailPage({ params }: { params: { id: string } }) {
       )}
 
       {status ? <p className="text-sm text-zinc-300">{status}</p> : null}
+
+      <MobileAnchorAdPlaceholder slotId="run-detail-mobile-anchor" />
     </section>
   );
 }

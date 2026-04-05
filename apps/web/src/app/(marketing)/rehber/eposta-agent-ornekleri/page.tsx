@@ -1,3 +1,4 @@
+import { AdSlotPlaceholder, MobileAnchorAdPlaceholder } from '@/components/ads/ad-slot-placeholder';
 import { SiteFooter } from '@/components/layout/footer';
 import { SiteNavbar } from '@/components/layout/navbar';
 
@@ -14,6 +15,14 @@ export default function EpostaAgentOrnekleriPage() {
         <p className="text-zinc-300">
           En iyi sonuç için mesaj amacı, alıcı profili ve beklenen aksiyonu prompt içinde net olarak belirtin.
         </p>
+
+        <AdSlotPlaceholder
+          slotId="marketing-rehber-eposta-agent-ornekleri-content"
+          label="İçerik/Rehber reklam alanı (yakında)"
+          minHeight={120}
+          className="mt-8"
+        />
+        <MobileAnchorAdPlaceholder slotId="marketing-rehber-eposta-agent-ornekleri-mobile-anchor" />
       </main>
       <SiteFooter />
     </div>

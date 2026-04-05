@@ -1,3 +1,4 @@
+import { AdSlotPlaceholder, MobileAnchorAdPlaceholder } from '@/components/ads/ad-slot-placeholder';
 import { SiteFooter } from '@/components/layout/footer';
 import { SiteNavbar } from '@/components/layout/navbar';
 
@@ -15,6 +16,14 @@ export default function IcerikAgentNasilKullanilirPage() {
           İlk çıktıyı doğrudan yayınlamak yerine başlık, veri doğruluğu ve marka dili açısından gözden geçirerek son
           sürümü oluşturun.
         </p>
+
+        <AdSlotPlaceholder
+          slotId="marketing-rehber-icerik-agent-nasil-kullanilir-content"
+          label="İçerik/Rehber reklam alanı (yakında)"
+          minHeight={120}
+          className="mt-8"
+        />
+        <MobileAnchorAdPlaceholder slotId="marketing-rehber-icerik-agent-nasil-kullanilir-mobile-anchor" />
       </main>
       <SiteFooter />
     </div>

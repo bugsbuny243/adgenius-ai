@@ -1,3 +1,4 @@
+import { AdSlotPlaceholder, MobileAnchorAdPlaceholder } from '@/components/ads/ad-slot-placeholder';
 import { SiteFooter } from '@/components/layout/footer';
 import { SiteNavbar } from '@/components/layout/navbar';
 
@@ -15,6 +16,14 @@ export default function AIAgentNedirPage() {
           AdGenius AI içinde agentlar; içerik oluşturma, e-posta taslakları hazırlama, araştırma notları üretme gibi
           görevleri hızlandırmak için kullanılır.
         </p>
+
+        <AdSlotPlaceholder
+          slotId="marketing-rehber-ai-agent-nedir-content"
+          label="İçerik/Rehber reklam alanı (yakında)"
+          minHeight={120}
+          className="mt-8"
+        />
+        <MobileAnchorAdPlaceholder slotId="marketing-rehber-ai-agent-nedir-mobile-anchor" />
       </main>
       <SiteFooter />
     </div>

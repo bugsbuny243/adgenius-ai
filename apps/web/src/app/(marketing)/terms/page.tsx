@@ -1,3 +1,4 @@
+import { AdSlotPlaceholder, MobileAnchorAdPlaceholder } from '@/components/ads/ad-slot-placeholder';
 import { SiteFooter } from '@/components/layout/footer';
 import { SiteNavbar } from '@/components/layout/navbar';
 
@@ -22,6 +23,14 @@ export default function TermsPage() {
           Paket türüne göre kullanım limiti, kota veya abonelik koşulları uygulanabilir. İhlal durumunda erişim
           sınırlandırılabilir.
         </p>
+
+        <AdSlotPlaceholder
+          slotId="marketing-terms-content"
+          label="İçerik/Rehber reklam alanı (yakında)"
+          minHeight={120}
+          className="mt-8"
+        />
+        <MobileAnchorAdPlaceholder slotId="marketing-terms-mobile-anchor" />
       </main>
       <SiteFooter />
     </div>

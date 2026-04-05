@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { AdSlotPlaceholder, MobileAnchorAdPlaceholder } from '@/components/ads/ad-slot-placeholder';
 import { SiteFooter } from '@/components/layout/footer';
 import { SiteNavbar } from '@/components/layout/navbar';
 
@@ -112,6 +113,14 @@ export default function HomePage() {
             ))}
           </div>
         </section>
+
+        <AdSlotPlaceholder
+          slotId="marketing-home-content"
+          label="İçerik/Rehber reklam alanı (yakında)"
+          minHeight={120}
+          className="mt-8"
+        />
+        <MobileAnchorAdPlaceholder slotId="marketing-home-mobile-anchor" />
       </main>
       <SiteFooter />
     </div>

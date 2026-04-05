@@ -1,3 +1,4 @@
+import { AdSlotPlaceholder, MobileAnchorAdPlaceholder } from '@/components/ads/ad-slot-placeholder';
 import { SiteFooter } from '@/components/layout/footer';
 import { SiteNavbar } from '@/components/layout/navbar';
 
@@ -23,6 +24,14 @@ export default function PrivacyPage() {
           Altyapı, barındırma, kimlik doğrulama ve ölçümleme süreçlerinde üçüncü taraf hizmet sağlayıcılar devreye
           alınabilir. Bu sağlayıcılar yalnızca hizmet sunumu için gerekli kapsamda veri işleyebilir.
         </p>
+
+        <AdSlotPlaceholder
+          slotId="marketing-privacy-content"
+          label="İçerik/Rehber reklam alanı (yakında)"
+          minHeight={120}
+          className="mt-8"
+        />
+        <MobileAnchorAdPlaceholder slotId="marketing-privacy-mobile-anchor" />
       </main>
       <SiteFooter />
     </div>

@@ -1,3 +1,4 @@
+import { AdSlotPlaceholder, MobileAnchorAdPlaceholder } from '@/components/ads/ad-slot-placeholder';
 import { SiteFooter } from '@/components/layout/footer';
 import { SiteNavbar } from '@/components/layout/navbar';
 
@@ -19,6 +20,14 @@ export default function AboutPage() {
           Ürün yaklaşımımız net: sade arayüz, ölçülebilir kullanım, insan kontrolünü önceleyen AI destekli
           üretim.
         </p>
+
+        <AdSlotPlaceholder
+          slotId="marketing-about-content"
+          label="İçerik/Rehber reklam alanı (yakında)"
+          minHeight={120}
+          className="mt-8"
+        />
+        <MobileAnchorAdPlaceholder slotId="marketing-about-mobile-anchor" />
       </main>
       <SiteFooter />
     </div>
