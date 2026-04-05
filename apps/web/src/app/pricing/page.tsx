@@ -1,3 +1,4 @@
+import { SiteFooter } from '@/components/site-footer';
 import { SiteNavbar } from '@/components/site-navbar';
 
 export default function PricingPage() {
@@ -6,8 +7,12 @@ export default function PricingPage() {
       <SiteNavbar />
       <main className="mx-auto w-full max-w-5xl px-4 py-12">
         <h1 className="text-3xl font-semibold">Fiyatlar</h1>
-        <p className="mt-3 text-zinc-300">Koschei planları yakında burada detaylı olarak yayınlanacak.</p>
+        <p className="mt-3 max-w-3xl text-zinc-300">
+          Koschei planları ekip boyutuna ve kullanım hacmine göre kademeli olarak sunulur. Güncel paket
+          ayrıntıları ve kurumsal teklifler için kısa süre içinde bu sayfada detaylı bir tablo yayınlanacaktır.
+        </p>
       </main>
+      <SiteFooter />
     </div>
   );
 }
