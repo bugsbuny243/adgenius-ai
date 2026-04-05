@@ -11,6 +11,50 @@ type AuthFormProps = {
   mode: AuthMode;
 };
 
+const DEFAULT_POST_AUTH_REDIRECT = '/dashboard';
+
+function resolveRedirectTarget(nextValue: string | null) {
+  if (!nextValue || !nextValue.startsWith('/')) {
+    return DEFAULT_POST_AUTH_REDIRECT;
+  }
+
+  if (nextValue.startsWith('//')) {
+    return DEFAULT_POST_AUTH_REDIRECT;
+  }
+
+  return nextValue;
+}
+
+function toFriendlyAuthError(message: string, mode: AuthMode) {
+  const normalizedMessage = message.toLowerCase();
+
+  if (normalizedMessage.includes('invalid login credentials')) {
+    return 'E-posta veya şifre hatalı. Lütfen bilgilerini kontrol et.';
+  }
+
+  if (normalizedMessage.includes('email not confirmed')) {
+    return 'E-posta adresini doğruladıktan sonra giriş yapabilirsin.';
+  }
+
+  if (normalizedMessage.includes('user already registered')) {
+    return 'Bu e-posta ile zaten bir hesap var. Giriş yapmayı deneyebilirsin.';
+  }
+
+  if (normalizedMessage.includes('password')) {
+    return mode === 'signup'
+      ? 'Şifren en az 6 karakter olmalı ve kolay tahmin edilememeli.'
+      : 'Şifre doğrulanamadı. Lütfen tekrar dene.';
+  }
+
+  if (normalizedMessage.includes('network') || normalizedMessage.includes('fetch')) {
+    return 'Ağ bağlantısı kurulamadı. İnternetini kontrol edip tekrar dene.';
+  }
+
+  return mode === 'login'
+    ? 'Giriş sırasında bir sorun oluştu. Lütfen tekrar dene.'
+    : 'Kayıt sırasında bir sorun oluştu. Lütfen tekrar dene.';
+}
+
 export function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -22,7 +66,17 @@ export function AuthForm({ mode }: AuthFormProps) {
   const submitRequestRef = useRef(0);
 
   const isLogin = mode === 'login';
+  const [redirectTarget, setRedirectTarget] = useState(DEFAULT_POST_AUTH_REDIRECT);
 
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const nextValue = new URLSearchParams(window.location.search).get('next');
+    setRedirectTarget(resolveRedirectTarget(nextValue));
+  }, []);
   useEffect(() => {
     isMountedRef.current = true;
 
@@ -37,7 +91,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.access_token) {
-        router.replace('/dashboard');
+        router.replace(redirectTarget);
         router.refresh();
       }
     });
@@ -46,7 +100,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       isMountedRef.current = false;
       subscription.unsubscribe();
     };
-  }, [router]);
+  }, [redirectTarget, router]);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -64,63 +118,64 @@ export function AuthForm({ mode }: AuthFormProps) {
 
     try {
       if (!isSupabaseConfigured()) {
-        if (shouldUpdateState()) {
-          setError('Kimlik doğrulama servisi şu anda yapılandırılmamış. Lütfen daha sonra tekrar dene.');
-        }
+        setError('Kimlik doğrulama servisi şu anda kullanılamıyor. Lütfen daha sonra tekrar dene.');
         return;
       }
 
       const supabase = createBrowserSupabase();
+      const sanitizedEmail = email.trim().toLowerCase();
+
       const { data, error: authError } = isLogin
-        ? await supabase.auth.signInWithPassword({ email: email.trim(), password })
-        : await supabase.auth.signUp({ email: email.trim(), password });
+        ? await supabase.auth.signInWithPassword({ email: sanitizedEmail, password })
+        : await supabase.auth.signUp({ email: sanitizedEmail, password });
 
       if (authError) {
         if (shouldUpdateState()) {
-          setError(authError.message);
+          setError(toFriendlyAuthError(authError.message, mode));
         }
         return;
       }
 
-      const sessionFromResponse = data?.session;
-      if (sessionFromResponse?.access_token) {
-        router.replace('/dashboard');
-        router.refresh();
+      const hasSessionFromResponse = Boolean(data.session?.access_token);
+      const isEmailConfirmationFlow = mode === 'signup' && !hasSessionFromResponse;
+
+      if (isEmailConfirmationFlow) {
+        if (shouldUpdateState()) {
+          setSuccessMessage('Kayıt tamamlandı. Devam etmek için e-posta adresini doğrula ve ardından giriş yap.');
+          setPassword('');
+        }
         return;
       }
 
       const {
         data: { session: currentSession },
+        error: sessionError,
       } = await supabase.auth.getSession();
 
-      if (currentSession?.access_token) {
-        router.replace('/dashboard');
-        router.refresh();
-        return;
-      }
-
-      if (isLogin) {
+      if (sessionError) {
         if (shouldUpdateState()) {
-          setError('Giriş işlemi tamamlanamadı. Lütfen bilgilerini kontrol edip tekrar dene.');
+          setError('Oturum doğrulanamadı. Lütfen tekrar giriş yapmayı dene.');
         }
         return;
       }
 
-      if (shouldUpdateState()) {
-        setSuccessMessage('Kayıt başarılı. E-postanı doğruladıktan sonra giriş yapabilirsin.');
-        setEmail('');
-        setPassword('');
+      if (!currentSession?.access_token) {
+        if (shouldUpdateState()) {
+          setError(isLogin ? 'Giriş tamamlanamadı. Lütfen bilgilerini kontrol ederek tekrar dene.' : 'Kayıt tamamlandı ancak oturum açılamadı. Giriş yaparak devam edebilirsin.');
+        }
+        return;
       }
+
+      router.replace(redirectTarget);
+      router.refresh();
     } catch (err) {
       console.error('Auth submit failed:', err);
       if (shouldUpdateState()) {
-        setError(
-          err instanceof TypeError
-            ? 'Ağ hatası oluştu. İnternet bağlantını kontrol edip tekrar dene.'
-            : err instanceof Error
-              ? err.message
-              : 'Beklenmeyen bir hata oluştu.'
-        );
+        if (err instanceof TypeError) {
+          setError('Ağ hatası oluştu. İnternet bağlantını kontrol edip tekrar dene.');
+        } else {
+          setError(isLogin ? 'Giriş sırasında beklenmeyen bir hata oluştu. Lütfen tekrar dene.' : 'Kayıt sırasında beklenmeyen bir hata oluştu. Lütfen tekrar dene.');
+        }
       }
     } finally {
       if (shouldUpdateState()) {
