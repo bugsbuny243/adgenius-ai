@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { signInWithEmail, signUpWithEmail } from '@/lib/auth';
+import { createBrowserSupabase, isSupabaseConfigured } from '@/lib/supabase/client';
 
 type AuthMode = 'login' | 'signup';
 
@@ -16,6 +16,7 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const isLogin = mode === 'login';
@@ -23,11 +24,19 @@ export function AuthForm({ mode }: AuthFormProps) {
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setSuccessMessage(null);
     setLoading(true);
 
     try {
-      const authFn = isLogin ? signInWithEmail : signUpWithEmail;
-      const { data, error: authError } = await authFn(email, password);
+      if (!isSupabaseConfigured()) {
+        setError('Kimlik doğrulama servisi şu anda yapılandırılmamış. Lütfen daha sonra tekrar dene.');
+        return;
+      }
+
+      const supabase = createBrowserSupabase();
+      const { data, error: authError } = isLogin
+        ? await supabase.auth.signInWithPassword({ email, password })
+        : await supabase.auth.signUp({ email, password });
 
       if (authError) {
         setError(authError.message);
@@ -42,7 +51,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         return;
       }
 
-      setError('Kayıt başarılı. E-postanı doğruladıktan sonra giriş yapabilirsin.');
+      setSuccessMessage('Kayıt başarılı. E-postanı doğruladıktan sonra giriş yapabilirsin.');
       setEmail('');
       setPassword('');
     } catch (err) {
@@ -90,6 +99,12 @@ export function AuthForm({ mode }: AuthFormProps) {
       {error ? (
         <p className="rounded-lg border border-rose-800 bg-rose-950/50 px-3 py-2 text-sm text-rose-200">
           {error}
+        </p>
+      ) : null}
+
+      {successMessage ? (
+        <p className="rounded-lg border border-emerald-800 bg-emerald-950/50 px-3 py-2 text-sm text-emerald-200">
+          {successMessage}
         </p>
       ) : null}
 
