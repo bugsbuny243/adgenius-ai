@@ -22,10 +22,17 @@ type Workspace = {
   created_at: string;
 };
 
+type WorkspaceMember = {
+  workspace_id: string;
+  role: 'owner' | 'admin' | 'member';
+  workspaces: Workspace | Workspace[];
+};
+
 export type WorkspaceContext = {
   user: User;
   workspace: Workspace;
   profile: Profile | null;
+  memberRole: 'owner' | 'admin' | 'member';
 };
 
 export async function loadCurrentUser(supabase: SupabaseClient): Promise<User | null> {
@@ -41,6 +48,82 @@ export async function loadCurrentUser(supabase: SupabaseClient): Promise<User | 
   return user;
 }
 
+function normalizeWorkspace(relation: Workspace | Workspace[] | null | undefined): Workspace | null {
+  if (!relation) {
+    return null;
+  }
+
+  return Array.isArray(relation) ? relation[0] ?? null : relation;
+}
+
+export async function resolveCurrentWorkspaceMembership(
+  supabase: SupabaseClient,
+  user: User,
+): Promise<{ workspace: Workspace; role: 'owner' | 'admin' | 'member' }> {
+  const { data: pref } = await supabase
+    .from('user_workspace_preferences')
+    .select('current_workspace_id')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  const preferredWorkspaceId = pref?.current_workspace_id ?? null;
+
+  let query = supabase
+    .from('workspace_members')
+    .select('workspace_id, role, workspaces!inner(id, owner_id, name, created_at)')
+    .eq('user_id', user.id)
+    .limit(1);
+
+  if (preferredWorkspaceId) {
+    query = query.eq('workspace_id', preferredWorkspaceId);
+  }
+
+  const { data: preferredMembership, error: preferredError } = await query.maybeSingle();
+
+  if (preferredError) {
+    throw new WorkspaceError(`Çalışma alanı üyeliği okunamadı: ${preferredError.message}`, 'WORKSPACE_QUERY_ERROR');
+  }
+
+  const preferredWorkspace = normalizeWorkspace((preferredMembership as WorkspaceMember | null)?.workspaces);
+
+  if (preferredMembership && preferredWorkspace) {
+    return {
+      workspace: preferredWorkspace,
+      role: preferredMembership.role,
+    };
+  }
+
+  const { data: fallbackMembership, error: fallbackError } = await supabase
+    .from('workspace_members')
+    .select('workspace_id, role, workspaces!inner(id, owner_id, name, created_at)')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (fallbackError) {
+    throw new WorkspaceError(`Çalışma alanı bilgisi okunamadı: ${fallbackError.message}`, 'WORKSPACE_QUERY_ERROR');
+  }
+
+  const fallbackWorkspace = normalizeWorkspace((fallbackMembership as WorkspaceMember | null)?.workspaces);
+
+  if (!fallbackMembership || !fallbackWorkspace) {
+    throw new WorkspaceError('Çalışma alanı bulunamadı.', 'WORKSPACE_NOT_FOUND');
+  }
+
+  if (preferredWorkspaceId !== fallbackMembership.workspace_id) {
+    await supabase.from('user_workspace_preferences').upsert({
+      user_id: user.id,
+      current_workspace_id: fallbackMembership.workspace_id,
+    });
+  }
+
+  return {
+    workspace: fallbackWorkspace,
+    role: fallbackMembership.role,
+  };
+}
+
 export async function resolveWorkspaceContext(supabase: SupabaseClient): Promise<WorkspaceContext> {
   const user = await loadCurrentUser(supabase);
 
@@ -48,22 +131,7 @@ export async function resolveWorkspaceContext(supabase: SupabaseClient): Promise
     throw new WorkspaceError('Oturum bulunamadı.', 'UNAUTHENTICATED');
   }
 
-  const { data: membership, error: membershipError } = await supabase
-    .from('workspace_members')
-    .select('workspace_id, workspaces!inner(id, owner_id, name, created_at)')
-    .eq('user_id', user.id)
-    .limit(1)
-    .maybeSingle();
-
-  if (membershipError) {
-    throw new WorkspaceError(`Çalışma alanı üyeliği okunamadı: ${membershipError.message}`, 'WORKSPACE_QUERY_ERROR');
-  }
-
-  const workspace = Array.isArray(membership?.workspaces) ? membership.workspaces[0] : membership?.workspaces;
-
-  if (!workspace) {
-    throw new WorkspaceError('Çalışma alanı bulunamadı.', 'WORKSPACE_NOT_FOUND');
-  }
+  const { workspace, role } = await resolveCurrentWorkspaceMembership(supabase, user);
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
@@ -77,31 +145,15 @@ export async function resolveWorkspaceContext(supabase: SupabaseClient): Promise
 
   return {
     user,
-    workspace: workspace as Workspace,
+    workspace,
     profile: profile as Profile | null,
+    memberRole: role,
   };
 }
 
-
 export async function bootstrapWorkspaceForUser(supabase: SupabaseClient, user: User): Promise<Workspace> {
-  const { data: membership, error: membershipError } = await supabase
-    .from('workspace_members')
-    .select('workspace_id, workspaces!inner(id, owner_id, name, created_at)')
-    .eq('user_id', user.id)
-    .limit(1)
-    .maybeSingle();
-
-  if (membershipError) {
-    throw new WorkspaceError(`Çalışma alanı üyeliği okunamadı: ${membershipError.message}`, 'WORKSPACE_QUERY_ERROR');
-  }
-
-  const workspace = Array.isArray(membership?.workspaces) ? membership.workspaces[0] : membership?.workspaces;
-
-  if (!workspace) {
-    throw new WorkspaceError('Çalışma alanı bulunamadı.', 'WORKSPACE_NOT_FOUND');
-  }
-
-  return workspace as Workspace;
+  const membership = await resolveCurrentWorkspaceMembership(supabase, user);
+  return membership.workspace;
 }
 
 export async function getCurrentWorkspace(supabase: SupabaseClient, user: User): Promise<Workspace> {

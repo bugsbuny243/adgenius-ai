@@ -25,6 +25,7 @@ export default function SavedPage() {
   const [activeModalRow, setActiveModalRow] = useState<SavedOutputRow | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [shareLinks, setShareLinks] = useState<Record<string, string>>({});
 
   useEffect(() => {
     async function loadSaved() {
@@ -100,6 +101,33 @@ export default function SavedPage() {
     }
   }
 
+  async function handleCreateShare(id: string) {
+    try {
+      const supabase = createBrowserSupabase();
+      const { user, workspace } = await resolveWorkspaceContext(supabase);
+
+      const { data, error: shareError } = await supabase
+        .from('share_tokens')
+        .insert({
+          workspace_id: workspace.id,
+          resource_type: 'saved_output',
+          resource_id: id,
+          created_by: user.id,
+        })
+        .select('token')
+        .single();
+
+      if (shareError || !data) {
+        setError(`Paylaşım linki üretilemedi: ${shareError?.message ?? 'Bilinmeyen hata'}`);
+        return;
+      }
+
+      setShareLinks((prev) => ({ ...prev, [id]: `${window.location.origin}/share/${data.token}` }));
+    } catch {
+      setError('Paylaşım linki oluşturulurken hata oluştu.');
+    }
+  }
+
   async function handleCopy(id: string, content: string) {
     if (!content.trim()) {
       return;
@@ -156,6 +184,15 @@ export default function SavedPage() {
               </button>
               <button
                 type="button"
+                onClick={() => {
+                  void handleCreateShare(item.id);
+                }}
+                className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 hover:border-zinc-500 hover:text-white"
+              >
+                Read-only link
+              </button>
+              <button
+                type="button"
                 disabled={deletingId === item.id}
                 onClick={() => {
                   void handleDelete(item.id);
@@ -165,6 +202,7 @@ export default function SavedPage() {
                 {deletingId === item.id ? 'Siliniyor...' : 'Sil'}
               </button>
             </div>
+            {shareLinks[item.id] ? <p className="mt-2 break-all text-xs text-indigo-300">{shareLinks[item.id]}</p> : null}
           </article>
         ))}
 
