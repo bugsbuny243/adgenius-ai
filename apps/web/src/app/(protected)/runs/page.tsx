@@ -8,7 +8,7 @@ import { resolveWorkspaceContext } from '@/lib/workspace';
 
 type RunRow = {
   id: string;
-  status: string;
+  status: 'pending' | 'completed' | 'failed' | string;
   user_input: string;
   result_text: string | null;
   created_at: string;
@@ -37,6 +37,7 @@ export default function RunsPage() {
   const [hasMore, setHasMore] = useState(false);
   const [cursor, setCursor] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('all');
   const [agentSlugs, setAgentSlugs] = useState<string[]>([]);
 
   useEffect(() => {
@@ -86,12 +87,12 @@ export default function RunsPage() {
   }, [agentSlugs, runs]);
 
   const visibleRuns = useMemo(() => {
-    if (selectedAgent === 'all') {
-      return runs;
-    }
-
-    return runs.filter((run) => run.agent_types?.slug === selectedAgent);
-  }, [runs, selectedAgent]);
+    return runs.filter((run) => {
+      const agentMatched = selectedAgent === 'all' || run.agent_types?.slug === selectedAgent;
+      const statusMatched = selectedStatus === 'all' || run.status === selectedStatus;
+      return agentMatched && statusMatched;
+    });
+  }, [runs, selectedAgent, selectedStatus]);
 
   async function handleLoadMore() {
     if (!workspaceId || !cursor || loadingMore) {
@@ -136,23 +137,39 @@ export default function RunsPage() {
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Son çalıştırmalar</h1>
-        <label className="flex items-center gap-2 text-sm text-zinc-300" htmlFor="agent-filter">
-          Agent filtresi
-          <select
-            id="agent-filter"
-            value={selectedAgent}
-            onChange={(event) => setSelectedAgent(event.target.value)}
-            className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-100 outline-none ring-indigo-400 focus:ring"
-          >
-            <option value="all">Tüm Agentlar</option>
-            {agentOptions.map((slug) => (
-              <option key={slug} value={slug}>
-                {slug}
-              </option>
-            ))}
-          </select>
-        </label>
+        <h1 className="text-2xl font-semibold">Run geçmişi</h1>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 text-zinc-300" htmlFor="agent-filter">
+            Agent
+            <select
+              id="agent-filter"
+              value={selectedAgent}
+              onChange={(event) => setSelectedAgent(event.target.value)}
+              className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-100 outline-none ring-indigo-400 focus:ring"
+            >
+              <option value="all">Tümü</option>
+              {agentOptions.map((slug) => (
+                <option key={slug} value={slug}>
+                  {slug}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-zinc-300" htmlFor="status-filter">
+            Durum
+            <select
+              id="status-filter"
+              value={selectedStatus}
+              onChange={(event) => setSelectedStatus(event.target.value)}
+              className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-100 outline-none ring-indigo-400 focus:ring"
+            >
+              <option value="all">Tümü</option>
+              <option value="completed">completed</option>
+              <option value="pending">pending</option>
+              <option value="failed">failed</option>
+            </select>
+          </label>
+        </div>
       </div>
 
       {error ? <p className="rounded-lg border border-rose-800 bg-rose-950/40 p-3 text-sm text-rose-200">{error}</p> : null}
@@ -171,11 +188,29 @@ export default function RunsPage() {
               <strong>Girdi:</strong> {truncate(run.user_input)}
             </p>
             <p className="mt-1 text-sm text-zinc-300">
-              <strong>Sonuç:</strong> {truncate(run.result_text)}
+              <strong>Sonuç Önizleme:</strong> {truncate(run.result_text)}
             </p>
-            <Link href={`/runs/${run.id}`} className="mt-3 inline-block text-sm text-indigo-300 hover:text-indigo-200">
-              Detayı Aç
-            </Link>
+
+            <div className="mt-3 flex flex-wrap gap-2 text-sm">
+              <Link href={`/runs/${run.id}`} className="text-indigo-300 hover:text-indigo-200">
+                Detayı Aç
+              </Link>
+              {run.agent_types?.slug ? (
+                <>
+                  <span className="text-zinc-500">•</span>
+                  <Link href={`/agents/${run.agent_types.slug}`} className="text-indigo-300 hover:text-indigo-200">
+                    İlgili Agente Git
+                  </Link>
+                  <span className="text-zinc-500">•</span>
+                  <Link
+                    href={`/agents/${run.agent_types.slug}?prompt=${encodeURIComponent(run.user_input)}`}
+                    className="text-indigo-300 hover:text-indigo-200"
+                  >
+                    Aynı İşi Tekrar Çalıştır
+                  </Link>
+                </>
+              ) : null}
+            </div>
           </article>
         ))}
 

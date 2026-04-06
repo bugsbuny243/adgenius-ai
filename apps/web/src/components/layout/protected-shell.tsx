@@ -13,6 +13,7 @@ const appNavItems = [
   { href: '/agents', label: 'Agentlar' },
   { href: '/runs', label: 'Geçmiş Çalışmalar' },
   { href: '/saved', label: 'Kayıtlı Çıktılar' },
+  { href: '/projects', label: 'Projeler' },
   { href: '/settings', label: 'Ayarlar' },
 ];
 
@@ -87,11 +88,11 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
   function onNewTask() {
     const lastAgentType = window.localStorage.getItem('koschei:last-agent-type');
     if (lastAgentType) {
-      router.push(`/workspace/${lastAgentType}`);
+      router.push(`/agents/${lastAgentType}`);
       return;
     }
 
-    router.push('/dashboard');
+    router.push('/agents');
   }
 
   if (checkingAuth) {
@@ -107,7 +108,7 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-6 md:flex-row">
         <aside className="h-fit min-w-64 rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
           <div className="mb-4 flex items-center justify-between gap-2">
-            <span className="text-lg font-semibold">Koschei AI</span>
+            <span className="text-lg font-semibold">Koschei</span>
             <button
               type="button"
               onClick={onNewTask}

@@ -1,7 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
+import { ApiRequestError, postJsonWithSession } from '@/lib/api-client';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { resolveWorkspaceContext } from '@/lib/workspace';
 
@@ -11,6 +13,7 @@ type SavedOutputRow = {
   content: string;
   created_at: string;
   agent_runs: {
+    user_input: string;
     agent_types: {
       name: string;
       slug: string;
@@ -18,13 +21,22 @@ type SavedOutputRow = {
   } | null;
 };
 
+type ProjectOption = {
+  id: string;
+  name: string;
+};
+
 export default function SavedPage() {
   const [rows, setRows] = useState<SavedOutputRow[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [activeModalRow, setActiveModalRow] = useState<SavedOutputRow | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedProjectByOutput, setSelectedProjectByOutput] = useState<Record<string, string>>({});
+  const [addingProjectOutputId, setAddingProjectOutputId] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadSaved() {
@@ -32,20 +44,29 @@ export default function SavedPage() {
         const supabase = createBrowserSupabase();
         const { workspace, user } = await resolveWorkspaceContext(supabase);
 
-        const { data, error: loadError } = await supabase
-          .from('saved_outputs')
-          .select('id, title, content, created_at, agent_runs(agent_types(name, slug))')
-          .eq('workspace_id', workspace.id)
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(50);
+        const [{ data, error: loadError }, { data: projectsData, error: projectError }] = await Promise.all([
+          supabase
+            .from('saved_outputs')
+            .select('id, title, content, created_at, agent_runs(user_input, agent_types(name, slug))')
+            .eq('workspace_id', workspace.id)
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(100),
+          supabase
+            .from('projects')
+            .select('id, name')
+            .eq('workspace_id', workspace.id)
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false }),
+        ]);
 
-        if (loadError) {
-          setError(loadError.message);
+        if (loadError || projectError) {
+          setError(loadError?.message ?? projectError?.message ?? 'Bir hata oluştu.');
           return;
         }
 
         setRows((data ?? []) as unknown as SavedOutputRow[]);
+        setProjects((projectsData ?? []) as ProjectOption[]);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Bir hata oluştu.');
       } finally {
@@ -56,20 +77,18 @@ export default function SavedPage() {
     void loadSaved();
   }, []);
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        setActiveModalRow(null);
-      }
+  const filteredRows = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase('tr-TR');
+    if (!needle) {
+      return rows;
     }
 
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, []);
-
-  const emptyStateVisible = useMemo(() => rows.length === 0 && !error && !isLoading, [rows.length, error, isLoading]);
+    return rows.filter((item) => {
+      const title = item.title.toLocaleLowerCase('tr-TR');
+      const content = item.content.toLocaleLowerCase('tr-TR');
+      return title.includes(needle) || content.includes(needle);
+    });
+  }, [query, rows]);
 
   async function handleDelete(id: string) {
     const shouldDelete = window.confirm('Bu çıktıyı silmek istediğinden emin misin?');
@@ -116,9 +135,44 @@ export default function SavedPage() {
     }
   }
 
+  async function handleAddToProject(outputId: string) {
+    const selectedProjectId = selectedProjectByOutput[outputId];
+    if (!selectedProjectId) {
+      setError('Önce bir proje seçmelisin.');
+      return;
+    }
+
+    try {
+      setAddingProjectOutputId(outputId);
+      setError('');
+      await postJsonWithSession<{ item: { id: string } }, { projectId: string; savedOutputId: string }>('/api/projects/items', {
+        projectId: selectedProjectId,
+        savedOutputId: outputId,
+      });
+    } catch (projectErr) {
+      if (projectErr instanceof ApiRequestError) {
+        setError(projectErr.message);
+        return;
+      }
+
+      setError(projectErr instanceof Error ? projectErr.message : 'Projeye ekleme başarısız oldu.');
+    } finally {
+      setAddingProjectOutputId(null);
+    }
+  }
+
   return (
     <section className="space-y-4">
-      <h1 className="text-2xl font-semibold">Kayıtlı çıktılar</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold">Kayıtlı çıktılar</h1>
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Kayıtlı çıktılarda ara"
+          className="w-full max-w-xs rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none ring-indigo-400 focus:ring"
+        />
+      </div>
+
       {error ? <p className="rounded-lg border border-rose-800 bg-rose-950/40 p-3 text-sm text-rose-200">{error}</p> : null}
 
       <div className="space-y-3">
@@ -126,16 +180,14 @@ export default function SavedPage() {
           <p className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4 text-sm text-zinc-300">Kayıtlı çıktılar yükleniyor...</p>
         ) : null}
 
-        {rows.map((item) => (
+        {filteredRows.map((item) => (
           <article key={item.id} className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-base font-medium text-zinc-100">{item.title}</h2>
               <p className="text-xs text-zinc-400">{new Date(item.created_at).toLocaleString('tr-TR')}</p>
             </div>
             <p className="mt-1 text-xs text-zinc-400">{item.agent_runs?.agent_types?.name ?? item.agent_runs?.agent_types?.slug ?? 'Agent'}</p>
-            <p className="mt-3 whitespace-pre-wrap text-sm text-zinc-300">
-              {item.content.length > 260 ? `${item.content.slice(0, 260)}...` : item.content}
-            </p>
+            <p className="mt-3 whitespace-pre-wrap text-sm text-zinc-300">{item.content.length > 260 ? `${item.content.slice(0, 260)}...` : item.content}</p>
 
             <div className="mt-4 flex flex-wrap gap-2">
               <button
@@ -152,8 +204,14 @@ export default function SavedPage() {
                 onClick={() => setActiveModalRow(item)}
                 className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 hover:border-zinc-500 hover:text-white"
               >
-                Tamamını Gör
+                Tam İçeriği Gör
               </button>
+              <Link
+                href={`/agents/${item.agent_runs?.agent_types?.slug ?? ''}?prompt=${encodeURIComponent(item.agent_runs?.user_input ?? '')}`}
+                className="rounded-md border border-indigo-700/70 px-3 py-1.5 text-xs text-indigo-200 hover:border-indigo-500 hover:text-indigo-100"
+              >
+                Yeniden Çalıştır
+              </Link>
               <button
                 type="button"
                 disabled={deletingId === item.id}
@@ -165,11 +223,43 @@ export default function SavedPage() {
                 {deletingId === item.id ? 'Siliniyor...' : 'Sil'}
               </button>
             </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <select
+                value={selectedProjectByOutput[item.id] ?? ''}
+                onChange={(event) =>
+                  setSelectedProjectByOutput((current) => ({
+                    ...current,
+                    [item.id]: event.target.value,
+                  }))
+                }
+                className="rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs text-zinc-100"
+              >
+                <option value="">Projeye ekle...</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={addingProjectOutputId === item.id || projects.length === 0}
+                onClick={() => {
+                  void handleAddToProject(item.id);
+                }}
+                className="rounded-md border border-emerald-700/80 px-3 py-1.5 text-xs text-emerald-200 hover:border-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {addingProjectOutputId === item.id ? 'Ekleniyor...' : 'Projeye Ekle'}
+              </button>
+            </div>
           </article>
         ))}
 
-        {emptyStateVisible ? (
-          <p className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4 text-sm text-zinc-300">Henüz kaydedilmiş çıktı bulunmuyor.</p>
+        {!isLoading && filteredRows.length === 0 ? (
+          <p className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4 text-sm text-zinc-300">
+            {rows.length === 0 ? 'Henüz kaydedilmiş çıktı bulunmuyor.' : 'Aramana uygun kayıtlı çıktı bulunamadı.'}
+          </p>
         ) : null}
       </div>
 

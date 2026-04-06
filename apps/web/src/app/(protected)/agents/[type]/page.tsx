@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import { ApiRequestError, postJsonWithSession } from '@/lib/api-client';
 import { createBrowserSupabase } from '@/lib/supabase/client';
+import { resolveWorkspaceContext } from '@/lib/workspace';
 
 type AgentTypeRow = {
   id: string;
@@ -19,6 +21,13 @@ type AgentRunResponse = {
   result?: string;
   runId?: string;
   error?: string;
+};
+
+type LastRunInfo = {
+  id: string;
+  created_at: string;
+  status: string;
+  user_input: string;
 };
 
 function escapeHtml(value: string) {
@@ -84,6 +93,8 @@ function renderMarkdown(text: string): string {
 }
 
 export default function AgentRunPage({ params }: { params: { type: string } }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [agent, setAgent] = useState<AgentTypeRow | null>(null);
   const [input, setInput] = useState('');
   const [result, setResult] = useState('');
@@ -95,6 +106,14 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
   const [saving, setSaving] = useState(false);
   const [loadingAgent, setLoadingAgent] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [lastRunInfo, setLastRunInfo] = useState<LastRunInfo | null>(null);
+
+  useEffect(() => {
+    const prompt = searchParams.get('prompt');
+    if (prompt && prompt !== input) {
+      setInput(prompt);
+    }
+  }, [searchParams, input]);
 
   useEffect(() => {
     async function loadAgent() {
@@ -102,12 +121,21 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
       setLoadingAgent(true);
       try {
         const supabase = createBrowserSupabase();
-        const { data, error: loadError } = await supabase
-          .from('agent_types')
-          .select('id, slug, name, icon, description, placeholder, is_active')
-          .eq('slug', params.type)
-          .eq('is_active', true)
-          .maybeSingle();
+        const { workspace } = await resolveWorkspaceContext(supabase);
+        const [{ data, error: loadError }, { data: recentRun }] = await Promise.all([
+          supabase
+            .from('agent_types')
+            .select('id, slug, name, icon, description, placeholder, is_active')
+            .eq('slug', params.type)
+            .eq('is_active', true)
+            .maybeSingle(),
+          supabase
+            .from('agent_runs')
+            .select('id, created_at, status, user_input, agent_types!inner(slug)')
+            .eq('workspace_id', workspace.id)
+            .order('created_at', { ascending: false })
+            .limit(20),
+        ]);
 
         if (loadError) {
           setError(`Agent bilgisi alınamadı: ${loadError.message}`);
@@ -120,6 +148,12 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
         }
 
         setAgent(data);
+        const latestForAgent = ((recentRun ?? []) as Array<LastRunInfo & { agent_types?: { slug?: string } | { slug?: string }[] | null }>).find((row) => {
+          const relation = row.agent_types;
+          const slug = Array.isArray(relation) ? relation[0]?.slug : relation?.slug;
+          return slug === params.type;
+        });
+        setLastRunInfo(latestForAgent ? { id: latestForAgent.id, created_at: latestForAgent.created_at, status: latestForAgent.status, user_input: latestForAgent.user_input } : null);
       } catch (loadErr) {
         setError(loadErr instanceof Error ? loadErr.message : 'Agent bilgisi yüklenemedi.');
       } finally {
@@ -130,7 +164,23 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
     void loadAgent();
   }, [params.type]);
 
-  async function onRun() {
+  const isInputValid = useMemo(() => {
+    const trimmed = input.trim();
+    return trimmed.length >= 10 && trimmed.length <= 2000;
+  }, [input]);
+
+  async function onRun(prompt?: string) {
+    const effectiveInput = (prompt ?? input).trim();
+    if (!effectiveInput) {
+      setError('Görev metni boş olamaz.');
+      return;
+    }
+
+    if (effectiveInput.length < 10) {
+      setError('Görev metni en az 10 karakter olmalıdır.');
+      return;
+    }
+
     setError('');
     setSaveStatus('');
     setResult('');
@@ -141,14 +191,25 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
     try {
       const data = await postJsonWithSession<AgentRunResponse, { type: string; userInput: string }>('/api/agents/run', {
         type: params.type,
-        userInput: input,
+        userInput: effectiveInput,
       });
 
+      setInput(effectiveInput);
       setResult(data.result ?? 'AI engine boş yanıt döndürdü.');
       setRunId(data.runId ?? null);
       setSaveTitle('');
+      window.localStorage.setItem('koschei:last-agent-type', params.type);
+      setLastRunInfo({
+        id: data.runId ?? '',
+        status: 'completed',
+        created_at: new Date().toISOString(),
+        user_input: effectiveInput,
+      });
     } catch (runError) {
       if (runError instanceof ApiRequestError) {
+        if (runError.status === 429) {
+          router.push('/pricing');
+        }
         setError(runError.message);
         return;
       }
@@ -209,66 +270,92 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
         <p className="text-zinc-300">{agent?.description ?? (loadingAgent ? 'Agent yükleniyor...' : 'Agent bilgisi bulunamadı.')}</p>
       </div>
 
-      <div className="space-y-2">
-        <label className="text-sm text-zinc-300" htmlFor="agent-input">
-          Görevini yaz
-        </label>
-        <textarea
-          id="agent-input"
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          onKeyDown={(event) => {
-            if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && !running) {
-              void onRun();
-            }
-          }}
-          placeholder={agent?.placeholder ?? 'Görevini yaz...'}
-          rows={7}
-          maxLength={2000}
-          className={`w-full rounded-xl border bg-zinc-950 px-4 py-3 text-sm outline-none ring-indigo-400 placeholder:text-zinc-500 focus:ring ${input.length >= 2000 ? 'border-rose-500' : 'border-zinc-700'}`}
-        />
-        <p className={`text-right text-xs ${input.length >= 2000 ? 'text-rose-400' : 'text-zinc-400'}`}>{input.length} / 2000</p>
-      </div>
+      {lastRunInfo ? (
+        <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-3 text-xs text-zinc-300">
+          Son çalıştırma: {new Date(lastRunInfo.created_at).toLocaleString('tr-TR')} · {lastRunInfo.status}
+        </div>
+      ) : null}
 
-      <button
-        type="button"
-        onClick={onRun}
-        disabled={running || input.trim().length === 0 || !agent}
-        className="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-70"
-      >
-        {running ? 'Çalıştırılıyor...' : 'Çalıştır'}
-      </button>
+      <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+        <div className="space-y-2">
+          <label className="text-sm text-zinc-300" htmlFor="agent-input">
+            Görevini yaz
+          </label>
+          <textarea
+            id="agent-input"
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            onKeyDown={(event) => {
+              if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && !running && isInputValid) {
+                void onRun();
+              }
+            }}
+            placeholder={agent?.placeholder ?? 'Görevini yaz...'}
+            rows={10}
+            maxLength={2000}
+            className={`w-full rounded-xl border bg-zinc-950 px-4 py-3 text-sm outline-none ring-indigo-400 placeholder:text-zinc-500 focus:ring ${input.length >= 2000 || (input.trim().length > 0 && input.trim().length < 10) ? 'border-rose-500' : 'border-zinc-700'}`}
+          />
+          <div className="flex items-center justify-between text-xs">
+            <p className={input.trim().length > 0 && input.trim().length < 10 ? 'text-rose-400' : 'text-zinc-400'}>
+              En az 10 karakter. Kısayol: Ctrl/Cmd + Enter
+            </p>
+            <p className={`text-right ${input.length >= 2000 ? 'text-rose-400' : 'text-zinc-400'}`}>{input.length} / 2000</p>
+          </div>
 
-      {error ? <p className="rounded-lg border border-rose-800 bg-rose-950/50 p-3 text-sm text-rose-200">{error}</p> : null}
-
-      <div className="max-h-96 overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-950/70 p-4">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-400">Sonuç</h2>
-          {result ? (
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => {
-                void onCopy();
+                void onRun();
               }}
-              className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-zinc-500 hover:text-white"
+              disabled={running || !isInputValid || !agent}
+              className="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {copied ? 'Kopyalandı ✓' : 'Kopyala'}
+              {running ? 'Çalıştırılıyor...' : 'Çalıştır'}
             </button>
-          ) : null}
+            {lastRunInfo ? (
+              <button
+                type="button"
+                disabled={running}
+                onClick={() => {
+                  void onRun(lastRunInfo.user_input);
+                }}
+                className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-200 hover:border-zinc-500"
+              >
+                Aynı Prompt ile Yeniden Çalıştır
+              </button>
+            ) : null}
+          </div>
         </div>
-        {result ? (
-          <div
-            className="text-sm text-zinc-200"
-            dangerouslySetInnerHTML={{ __html: renderMarkdown(result) }}
-          />
-        ) : (
-          <p className="text-sm text-zinc-200">Henüz bir sonuç yok.</p>
-        )}
+
+        <div className="max-h-[28rem] overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-950/70 p-4">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-400">Sonuç Paneli</h2>
+            {result ? (
+              <button
+                type="button"
+                onClick={() => {
+                  void onCopy();
+                }}
+                className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-zinc-500 hover:text-white"
+              >
+                {copied ? 'Kopyalandı ✓' : 'Kopyala'}
+              </button>
+            ) : null}
+          </div>
+          {result ? (
+            <div className="text-sm text-zinc-200" dangerouslySetInnerHTML={{ __html: renderMarkdown(result) }} />
+          ) : (
+            <p className="text-sm text-zinc-200">Henüz bir sonuç yok.</p>
+          )}
+        </div>
       </div>
+
+      {error ? <p className="rounded-lg border border-rose-800 bg-rose-950/50 p-3 text-sm text-rose-200">{error}</p> : null}
 
       {result ? (
         <div className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-4">
-          <h3 className="mb-2 text-sm font-medium text-zinc-200">Kaydet</h3>
+          <h3 className="mb-2 text-sm font-medium text-zinc-200">Çıktıyı Kaydet</h3>
           <input
             type="text"
             value={saveTitle}
@@ -278,7 +365,9 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
           />
           <button
             type="button"
-            onClick={onSave}
+            onClick={() => {
+              void onSave();
+            }}
             disabled={saving || !runId}
             className="mt-3 rounded-lg border border-zinc-600 px-4 py-2 text-sm text-zinc-200 hover:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-60"
           >
