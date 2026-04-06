@@ -8,8 +8,8 @@ const adsenseEnabled =
   process.env.NEXT_PUBLIC_ENABLE_ADSENSE === 'true' && !!adsenseClient;
 
 export const metadata: Metadata = {
-  title: 'AdGenius AI',
-  description: 'AdGenius AI agent çalışma alanı ve üretim platformu.',
+  title: 'Koschei AI',
+  description: 'Koschei AI — Türkçe konuşan ekipler için AI agent çalışma alanı.',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

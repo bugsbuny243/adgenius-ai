@@ -21,6 +21,68 @@ type AgentRunResponse = {
   error?: string;
 };
 
+function escapeHtml(value: string) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function renderInlineMarkdown(text: string) {
+  let output = text;
+  output = output.replace(/`([^`]+)`/g, '<code class="bg-zinc-800 px-1 rounded text-xs">$1</code>');
+  output = output.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  output = output.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  return output;
+}
+
+function renderMarkdown(text: string): string {
+  const lines = escapeHtml(text).split('\n');
+  const htmlParts: string[] = [];
+  let inList = false;
+
+  for (const line of lines) {
+    if (line.startsWith('- ')) {
+      if (!inList) {
+        htmlParts.push('<ul class="list-disc pl-5 space-y-1">');
+        inList = true;
+      }
+      htmlParts.push(`<li>${renderInlineMarkdown(line.slice(2))}</li>`);
+      continue;
+    }
+
+    if (inList) {
+      htmlParts.push('</ul>');
+      inList = false;
+    }
+
+    if (line.startsWith('### ')) {
+      htmlParts.push(`<h3 class="font-semibold mt-3 mb-1">${renderInlineMarkdown(line.slice(4))}</h3>`);
+      continue;
+    }
+
+    if (line.startsWith('## ')) {
+      htmlParts.push(`<h2 class="text-lg font-semibold mt-4 mb-2">${renderInlineMarkdown(line.slice(3))}</h2>`);
+      continue;
+    }
+
+    if (line.trim().length === 0) {
+      htmlParts.push('<br/>');
+      continue;
+    }
+
+    htmlParts.push(`<p>${renderInlineMarkdown(line)}</p>`);
+  }
+
+  if (inList) {
+    htmlParts.push('</ul>');
+  }
+
+  return htmlParts.join('');
+}
+
 export default function AgentRunPage({ params }: { params: { type: string } }) {
   const [agent, setAgent] = useState<AgentTypeRow | null>(null);
   const [input, setInput] = useState('');
@@ -32,6 +94,7 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
   const [running, setRunning] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadingAgent, setLoadingAgent] = useState(true);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     async function loadAgent() {
@@ -72,6 +135,7 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
     setSaveStatus('');
     setResult('');
     setRunId(null);
+    setCopied(false);
     setRunning(true);
 
     try {
@@ -124,6 +188,18 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
     }
   }
 
+  async function onCopy() {
+    if (!result) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(result);
+    setCopied(true);
+    setTimeout(() => {
+      setCopied(false);
+    }, 2000);
+  }
+
   return (
     <section className="space-y-4">
       <div>
@@ -141,10 +217,17 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
           id="agent-input"
           value={input}
           onChange={(event) => setInput(event.target.value)}
+          onKeyDown={(event) => {
+            if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && !running) {
+              void onRun();
+            }
+          }}
           placeholder={agent?.placeholder ?? 'Görevini yaz...'}
           rows={7}
-          className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm outline-none ring-indigo-400 placeholder:text-zinc-500 focus:ring"
+          maxLength={2000}
+          className={`w-full rounded-xl border bg-zinc-950 px-4 py-3 text-sm outline-none ring-indigo-400 placeholder:text-zinc-500 focus:ring ${input.length >= 2000 ? 'border-rose-500' : 'border-zinc-700'}`}
         />
+        <p className={`text-right text-xs ${input.length >= 2000 ? 'text-rose-400' : 'text-zinc-400'}`}>{input.length} / 2000</p>
       </div>
 
       <button
@@ -158,9 +241,29 @@ export default function AgentRunPage({ params }: { params: { type: string } }) {
 
       {error ? <p className="rounded-lg border border-rose-800 bg-rose-950/50 p-3 text-sm text-rose-200">{error}</p> : null}
 
-      <div className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-4">
-        <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-zinc-400">Sonuç</h2>
-        <p className="whitespace-pre-wrap text-sm text-zinc-200">{result || 'Henüz bir sonuç yok.'}</p>
+      <div className="max-h-96 overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-950/70 p-4">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-400">Sonuç</h2>
+          {result ? (
+            <button
+              type="button"
+              onClick={() => {
+                void onCopy();
+              }}
+              className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-zinc-500 hover:text-white"
+            >
+              {copied ? 'Kopyalandı ✓' : 'Kopyala'}
+            </button>
+          ) : null}
+        </div>
+        {result ? (
+          <div
+            className="text-sm text-zinc-200"
+            dangerouslySetInnerHTML={{ __html: renderMarkdown(result) }}
+          />
+        ) : (
+          <p className="text-sm text-zinc-200">Henüz bir sonuç yok.</p>
+        )}
       </div>
 
       {result ? (
