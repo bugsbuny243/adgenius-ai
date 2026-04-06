@@ -107,6 +107,13 @@ export async function runAgent(input: {
       };
     }
 
+    await supabase.from('activity_logs').insert({
+      workspace_id: workspace.id,
+      actor_user_id: user.id,
+      event_type: 'run_created',
+      metadata: { run_id: pendingRun.id, agent_type: input.type },
+    });
+
     try {
       const aiResult = await runAI({
         systemPrompt: agentType.system_prompt,
@@ -266,6 +273,13 @@ export async function saveAgentOutput(input: {
     if (!saved) {
       return { ok: false, error: 'Çıktı kaydedilemedi.' };
     }
+
+    await supabase.from('activity_logs').insert({
+      workspace_id: workspace.id,
+      actor_user_id: user.id,
+      event_type: 'output_saved',
+      metadata: { saved_output_id: saved.id, run_id: runId },
+    });
 
     return { ok: true, data: saved };
   } catch (error) {

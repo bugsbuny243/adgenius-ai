@@ -36,10 +36,15 @@ type SavedOutputRow = {
     | null;
 };
 
+type ActivityRow = { id: string; event_type: string; created_at: string };
+
 type DashboardData = {
   activeAgents: AgentTypeRow[];
   latestRuns: LatestRunRow[];
   savedOutputs: SavedOutputRow[];
+  activityLogs: ActivityRow[];
+  totalProjects: number;
+  totalMembers: number;
 };
 
 function pickAgentType(relation: AgentTypeRelation | AgentTypeRelation[] | null | undefined) {
@@ -67,6 +72,9 @@ export default function DashboardPage() {
           { data: activeAgents, error: activeAgentsError },
           { data: latestRuns, error: latestRunsError },
           { data: savedOutputs, error: savedOutputsError },
+          { data: activityLogs, error: activityError },
+          { count: projectsCount, error: projectsError },
+          { count: membersCount, error: membersError },
         ] = await Promise.all([
           supabase
             .from('agent_types')
@@ -85,9 +93,17 @@ export default function DashboardPage() {
             .eq('workspace_id', workspace.id)
             .order('created_at', { ascending: false })
             .limit(8),
+          supabase
+            .from('activity_logs')
+            .select('id, event_type, created_at')
+            .eq('workspace_id', workspace.id)
+            .order('created_at', { ascending: false })
+            .limit(8),
+          supabase.from('projects').select('*', { count: 'exact', head: true }).eq('workspace_id', workspace.id),
+          supabase.from('workspace_members').select('*', { count: 'exact', head: true }).eq('workspace_id', workspace.id),
         ]);
 
-        const firstError = activeAgentsError ?? latestRunsError ?? savedOutputsError;
+        const firstError = activeAgentsError ?? latestRunsError ?? savedOutputsError ?? activityError ?? projectsError ?? membersError;
 
         if (firstError) {
           setError(firstError.message);
@@ -98,6 +114,9 @@ export default function DashboardPage() {
           activeAgents: (activeAgents ?? []) as AgentTypeRow[],
           latestRuns: (latestRuns ?? []) as unknown as LatestRunRow[],
           savedOutputs: (savedOutputs ?? []) as unknown as SavedOutputRow[],
+          activityLogs: (activityLogs ?? []) as ActivityRow[],
+          totalProjects: projectsCount ?? 0,
+          totalMembers: membersCount ?? 0,
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Dashboard verileri yüklenemedi.');
@@ -162,6 +181,22 @@ export default function DashboardPage() {
         </div>
       </section>
 
+
+      <section className="grid gap-3 md:grid-cols-3">
+        <article className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
+          <p className="text-xs text-zinc-400">Workspace üyesi</p>
+          <p className="mt-1 text-2xl font-semibold">{data?.totalMembers ?? 0}</p>
+        </article>
+        <article className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
+          <p className="text-xs text-zinc-400">Workspace projesi</p>
+          <p className="mt-1 text-2xl font-semibold">{data?.totalProjects ?? 0}</p>
+        </article>
+        <article className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
+          <p className="text-xs text-zinc-400">Kişisel kayıtlı çıktı</p>
+          <p className="mt-1 text-2xl font-semibold">{data?.savedOutputs.length ?? 0}</p>
+        </article>
+      </section>
+
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="space-y-3">
           <h2 className="text-lg font-medium">Son runlar</h2>
@@ -197,6 +232,18 @@ export default function DashboardPage() {
           </div>
         </section>
       </div>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-medium">Son aktiviteler</h2>
+        <div className="space-y-2">
+          {(data?.activityLogs ?? []).map((activity) => (
+            <p key={activity.id} className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3 text-sm text-zinc-300">
+              {activity.event_type} • {new Date(activity.created_at).toLocaleString('tr-TR')}
+            </p>
+          ))}
+          {!loading && (data?.activityLogs.length ?? 0) === 0 ? <p className="text-sm text-zinc-500">Aktivite yok.</p> : null}
+        </div>
+      </section>
     </section>
   );
 }

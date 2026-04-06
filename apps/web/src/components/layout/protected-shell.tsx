@@ -6,12 +6,14 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { signOut } from '@/lib/auth';
 import { createBrowserSupabase } from '@/lib/supabase/client';
+import { resolveWorkspaceContext } from '@/lib/workspace';
 import { cn } from '@/lib/utils';
 
 const appNavItems = [
   { href: '/dashboard', label: 'Çalışma Alanı' },
   { href: '/agents', label: 'Agentlar' },
   { href: '/runs', label: 'Geçmiş Çalışmalar' },
+  { href: '/projects', label: 'Projeler' },
   { href: '/saved', label: 'Kayıtlı Çıktılar' },
   { href: '/settings', label: 'Ayarlar' },
 ];
@@ -21,6 +23,7 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [workspaceName, setWorkspaceName] = useState('Çalışma Alanı');
 
   const loginRedirectPath = useMemo(() => {
     const nextPath = pathname && pathname !== '/' ? pathname : '/dashboard';
@@ -46,6 +49,9 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
         }
 
         setIsAuthenticated(true);
+
+        const { workspace } = await resolveWorkspaceContext(supabase);
+        setWorkspaceName(workspace.name);
       } catch {
         setIsAuthenticated(false);
         router.replace(loginRedirectPath);
@@ -107,7 +113,10 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-6 md:flex-row">
         <aside className="h-fit min-w-64 rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
           <div className="mb-4 flex items-center justify-between gap-2">
-            <span className="text-lg font-semibold">Koschei AI</span>
+            <div>
+              <p className="text-lg font-semibold">Koschei AI</p>
+              <p className="text-xs text-zinc-400">{workspaceName}</p>
+            </div>
             <button
               type="button"
               onClick={onNewTask}

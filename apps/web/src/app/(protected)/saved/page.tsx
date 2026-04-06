@@ -82,12 +82,20 @@ export default function SavedPage() {
 
     try {
       const supabase = createBrowserSupabase();
+      const { workspace, user } = await resolveWorkspaceContext(supabase);
       const { error: deleteError } = await supabase.from('saved_outputs').delete().eq('id', id);
 
       if (deleteError) {
         setError('Çıktı silinemedi. Lütfen tekrar dene.');
         return;
       }
+
+      await supabase.from('activity_logs').insert({
+        workspace_id: workspace.id,
+        actor_user_id: user.id,
+        event_type: 'output_deleted',
+        metadata: { saved_output_id: id },
+      });
 
       setRows((current) => current.filter((item) => item.id !== id));
       if (activeModalRow?.id === id) {
