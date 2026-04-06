@@ -32,7 +32,7 @@ export async function runAI({
   userInput,
   model = DEFAULT_MODEL_LABEL,
 }: RunAIParams): Promise<AIRunResult> {
-  const apiKey = process.env.AI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY ?? process.env.AI_API_KEY;
 
   if (!apiKey) {
     throw new Error('AI API anahtarı bulunamadı.');

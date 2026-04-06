@@ -8,7 +8,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md space-y-5">
         <div className="space-y-2 text-center">
           <h1 className="text-2xl font-semibold">Giriş Yap</h1>
-          <p className="text-sm text-zinc-400">AdGenius AI hesabınızla devam edin.</p>
+          <p className="text-sm text-zinc-400">Koschei hesabınızla devam edin.</p>
         </div>
         <AuthForm mode="login" />
         <p className="text-center text-sm text-zinc-400">
