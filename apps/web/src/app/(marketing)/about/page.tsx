@@ -8,7 +8,7 @@ export default function AboutPage() {
       <main className="mx-auto w-full max-w-4xl space-y-6 px-4 py-12">
         <h1 className="text-3xl font-semibold">Hakkımızda</h1>
         <p className="text-zinc-300">
-          AdGenius AI, ekiplerin bilgi üretimi ve operasyonel iletişim süreçlerini hızlandırmak için geliştirilen
+          Koschei AI, ekiplerin bilgi üretimi ve operasyonel iletişim süreçlerini hızlandırmak için geliştirilen
           AI agent çalışma alanıdır.
         </p>
         <p className="text-zinc-300">
