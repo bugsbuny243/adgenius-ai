@@ -96,7 +96,7 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-6 md:flex-row">
         <aside className="h-fit min-w-64 rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
-          <div className="mb-4 text-lg font-semibold">AdGenius AI</div>
+          <div className="mb-4 text-lg font-semibold">Koschei AI</div>
           <nav className="space-y-1">
             {appNavItems.map((item) => (
               <Link
