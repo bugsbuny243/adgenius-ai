@@ -9,10 +9,10 @@ import { createBrowserSupabase } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 
 const appNavItems = [
-  { href: '/dashboard', label: 'Dashboard' },
+  { href: '/dashboard', label: 'Çalışma Alanı' },
   { href: '/agents', label: 'Agentlar' },
-  { href: '/runs', label: 'Çalıştırmalar' },
-  { href: '/saved', label: 'Kaydedilenler' },
+  { href: '/runs', label: 'Geçmiş Çalışmalar' },
+  { href: '/saved', label: 'Kayıtlı Çıktılar' },
   { href: '/settings', label: 'Ayarlar' },
 ];
 
@@ -84,6 +84,16 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
     router.refresh();
   }
 
+  function onNewTask() {
+    const lastAgentType = window.localStorage.getItem('koschei:last-agent-type');
+    if (lastAgentType) {
+      router.push(`/workspace/${lastAgentType}`);
+      return;
+    }
+
+    router.push('/dashboard');
+  }
+
   if (checkingAuth) {
     return <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-zinc-300">Oturum kontrol ediliyor...</div>;
   }
@@ -96,7 +106,16 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-6 md:flex-row">
         <aside className="h-fit min-w-64 rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
-          <div className="mb-4 text-lg font-semibold">Koschei AI</div>
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <span className="text-lg font-semibold">Koschei AI</span>
+            <button
+              type="button"
+              onClick={onNewTask}
+              className="rounded-md bg-indigo-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-400"
+            >
+              Yeni Görev
+            </button>
+          </div>
           <nav className="space-y-1">
             {appNavItems.map((item) => (
               <Link
@@ -104,7 +123,7 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
                 href={item.href}
                 className={cn(
                   'block rounded-lg px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white',
-                  pathname.startsWith(item.href) && 'bg-zinc-800 text-white'
+                  pathname.startsWith(item.href) && 'bg-zinc-800 text-white',
                 )}
               >
                 {item.label}
