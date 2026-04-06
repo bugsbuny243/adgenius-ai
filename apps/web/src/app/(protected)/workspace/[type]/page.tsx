@@ -243,7 +243,7 @@ export default function WorkspacePage({ params }: { params: { type: string } }) 
           {agent?.icon ?? '🤖'} {agent?.name ?? 'Agent Workspace'}
         </h1>
         <p className="mt-2 text-sm text-zinc-300">
-          {agent?.description ?? 'Görevi yazın, sonucu konuşma akışında takip edin ve sağ panelde düzenleyip kaydedin.'}
+          {agent?.description ?? 'Görevi yazın, sonucu çalıştırma akışında takip edin ve sağ panelde düzenleyip kaydedin.'}
         </p>
       </header>
 
