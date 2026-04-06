@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react';
 
+import { signOut } from '@/lib/auth';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { getMonthKey } from '@/lib/usage';
 
 type SettingsData = {
   userEmail: string;
+  fullName: string;
   workspaceId: string;
   workspaceName: string;
   planName: string;
@@ -84,8 +86,11 @@ export default function SettingsPage() {
           return;
         }
 
+        const { data: profileData } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
+
         const nextData: SettingsData = {
           userEmail: user.email ?? '-',
+          fullName: profileData?.full_name ?? '-',
           workspaceId: membership.workspace_id,
           workspaceName: workspace.name,
           planName: subscription.plan_name,
@@ -123,10 +128,7 @@ export default function SettingsPage() {
 
     try {
       const supabase = createBrowserSupabase();
-      const { error: updateError } = await supabase
-        .from('workspaces')
-        .update({ name: trimmedName })
-        .eq('id', data.workspaceId);
+      const { error: updateError } = await supabase.from('workspaces').update({ name: trimmedName }).eq('id', data.workspaceId);
 
       if (updateError) {
         setError(`Çalışma alanı güncellenemedi: ${updateError.message}`);
@@ -155,27 +157,32 @@ export default function SettingsPage() {
     return <section className="text-zinc-300">Ayar verisi bulunamadı.</section>;
   }
 
+  const remaining = Math.max(0, data.runLimit - data.runsCount);
+
   return (
     <section className="space-y-6">
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold">Ayarlar</h1>
-        <p className="text-zinc-300">Hesap ve çalışma alanı ayarlarını buradan yönetebilirsin.</p>
+        <p className="text-zinc-300">Profil, workspace ve plan görünürlüğünü buradan yönetebilirsin.</p>
       </div>
 
       <div className="grid gap-4 rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5">
+        <h2 className="text-lg font-semibold">Profil</h2>
+        <div className="space-y-1">
+          <label className="text-sm text-zinc-400">Ad Soyad</label>
+          <input type="text" value={data.fullName} readOnly className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-300" />
+        </div>
         <div className="space-y-1">
           <label className="text-sm text-zinc-400">E-posta</label>
-          <input
-            type="text"
-            value={data.userEmail}
-            readOnly
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-300"
-          />
+          <input type="text" value={data.userEmail} readOnly className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-300" />
         </div>
+      </div>
 
+      <div className="grid gap-4 rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5">
+        <h2 className="text-lg font-semibold">Workspace</h2>
         <div className="space-y-1">
           <label htmlFor="workspaceName" className="text-sm text-zinc-400">
-            Çalışma alanı adı
+            Workspace adı
           </label>
           <input
             id="workspaceName"
@@ -192,35 +199,43 @@ export default function SettingsPage() {
           disabled={saving}
           className="w-fit rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-zinc-100 transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {saving ? 'Kaydediliyor...' : 'Çalışma alanı adını kaydet'}
+          {saving ? 'Kaydediliyor...' : 'Workspace adını kaydet'}
         </button>
       </div>
 
       <div className="grid gap-4 rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5">
         <h2 className="text-lg font-semibold">Plan ve kullanım</h2>
-        <p className="text-sm text-zinc-300">Mevcut plan: {data.planName}</p>
+        <p className="text-sm text-zinc-300">Plan: {data.planName.toUpperCase()}</p>
         <p className="text-sm text-zinc-300">
           Aylık kullanım: {data.runsCount} / {data.runLimit}
         </p>
+        <p className="text-sm text-zinc-300">Kalan kullanım: {remaining}</p>
         <button
           type="button"
-          disabled
           onClick={() => {
-            window.alert('Yakında');
+            window.location.assign('/pricing');
           }}
-          className="w-fit rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 opacity-60"
+          className="w-fit rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 hover:border-zinc-500 hover:text-white"
         >
           Planını Yükselt
         </button>
       </div>
 
-      {message ? (
-        <p className="rounded-lg border border-emerald-800 bg-emerald-950/50 px-3 py-2 text-sm text-emerald-200">{message}</p>
-      ) : null}
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5">
+        <button
+          type="button"
+          onClick={() => {
+            void signOut();
+          }}
+          className="rounded-lg border border-rose-700/80 px-4 py-2 text-sm text-rose-200 hover:border-rose-500"
+        >
+          Çıkış yap
+        </button>
+      </div>
 
-      {error ? (
-        <p className="rounded-lg border border-rose-800 bg-rose-950/50 px-3 py-2 text-sm text-rose-200">{error}</p>
-      ) : null}
+      {message ? <p className="rounded-lg border border-emerald-800 bg-emerald-950/50 px-3 py-2 text-sm text-emerald-200">{message}</p> : null}
+
+      {error ? <p className="rounded-lg border border-rose-800 bg-rose-950/50 px-3 py-2 text-sm text-rose-200">{error}</p> : null}
     </section>
   );
 }
