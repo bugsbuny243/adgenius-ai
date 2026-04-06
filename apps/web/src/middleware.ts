@@ -1,10 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
 
-const PROTECTED_PATH_PREFIXES = ['/dashboard', '/agents', '/runs', '/saved', '/settings'];
+const PROTECTED_EXACT_PATHS = ['/dashboard', '/runs', '/saved', '/settings'];
+const PROTECTED_PATH_PREFIXES = ['/dashboard/', '/agents/', '/runs/', '/saved/', '/settings/', '/workspace/'];
 
 function isProtectedPath(pathname: string): boolean {
-  return PROTECTED_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  if (PROTECTED_EXACT_PATHS.includes(pathname)) {
+    return true;
+  }
+
+  return PROTECTED_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
 function getProjectRef(url: string): string | null {
@@ -68,11 +73,13 @@ async function hasSession(request: NextRequest): Promise<boolean> {
 }
 
 export async function middleware(request: NextRequest): Promise<NextResponse> {
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
   const signedIn = await hasSession(request);
 
   if (isProtectedPath(pathname) && !signedIn) {
-    return NextResponse.redirect(new URL('/signin', request.url));
+    const signinUrl = new URL('/signin', request.url);
+    signinUrl.searchParams.set('next', `${pathname}${search}`);
+    return NextResponse.redirect(signinUrl);
   }
 
   if (signedIn && (pathname === '/signin' || pathname === '/signup')) {
@@ -83,5 +90,14 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/agents/:path*', '/runs/:path*', '/saved/:path*', '/settings/:path*', '/signin', '/signup'],
+  matcher: [
+    '/dashboard/:path*',
+    '/agents/:path*',
+    '/runs/:path*',
+    '/saved/:path*',
+    '/settings/:path*',
+    '/workspace/:path*',
+    '/signin',
+    '/signup',
+  ],
 };
