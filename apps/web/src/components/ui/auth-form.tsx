@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
-import { createBrowserSupabase } from '@/lib/supabase/client';
+import { createBrowserSupabase, SupabaseEnvironmentError } from '@/lib/supabase/client';
 
 type AuthMode = 'login' | 'signup';
 
@@ -13,6 +13,8 @@ type AuthFormProps = {
 
 const DEFAULT_POST_AUTH_REDIRECT = '/dashboard';
 const AUTH_REQUEST_TIMEOUT_MS = 20000;
+const MISSING_SUPABASE_ENV_MESSAGE =
+  'Giriş altyapısı şu anda yapılandırılamadı. Lütfen daha sonra tekrar deneyin.';
 
 function resolveRedirectTarget(nextValue: string | null) {
   if (!nextValue || !nextValue.startsWith('/')) {
@@ -99,31 +101,44 @@ export function AuthForm({ mode }: AuthFormProps) {
   useEffect(() => {
     isMountedRef.current = true;
 
-    const supabase = createBrowserSupabase();
+    let subscription: { unsubscribe: () => void } | null = null;
 
-    void (async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+    try {
+      const supabase = createBrowserSupabase();
 
-      if (session?.access_token) {
-        router.replace(redirectTarget);
-        router.refresh();
+      void (async () => {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (session?.access_token) {
+          router.replace(redirectTarget);
+          router.refresh();
+        }
+      })();
+
+      const authListener = supabase.auth.onAuthStateChange((_event, session) => {
+        if (session?.access_token) {
+          router.replace(redirectTarget);
+          router.refresh();
+        }
+      });
+
+      subscription = authListener.data.subscription;
+    } catch (err) {
+      if (err instanceof SupabaseEnvironmentError) {
+        console.error('Signin page failed to initialize Supabase client.', err);
+        setError(MISSING_SUPABASE_ENV_MESSAGE);
+      } else {
+        throw err;
       }
-    })();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.access_token) {
-        router.replace(redirectTarget);
-        router.refresh();
-      }
-    });
+    }
 
     return () => {
       isMountedRef.current = false;
-      subscription.unsubscribe();
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
   }, [redirectTarget, router]);
 
@@ -199,7 +214,9 @@ export function AuthForm({ mode }: AuthFormProps) {
     } catch (err) {
       console.error('Auth submit failed:', err);
       if (shouldUpdateState()) {
-        if (err instanceof TypeError) {
+        if (err instanceof SupabaseEnvironmentError) {
+          setError(MISSING_SUPABASE_ENV_MESSAGE);
+        } else if (err instanceof TypeError) {
           setError('Ağ hatası oluştu. İnternet bağlantını kontrol edip tekrar dene.');
         } else if (err instanceof Error && err.message === 'AUTH_TIMEOUT') {
           setError('İstek zaman aşımına uğradı. Lütfen tekrar dene.');

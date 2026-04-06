@@ -3,13 +3,18 @@
 import { useEffect } from 'react';
 
 type ErrorPageProps = {
-  error: Error;
+  error: Error & { digest?: string };
   reset: () => void;
 };
 
 export default function ErrorPage({ error, reset }: ErrorPageProps) {
   useEffect(() => {
-    console.error('Application error boundary triggered:', error);
+    console.error('Application error boundary triggered:', {
+      message: error.message,
+      name: error.name,
+      digest: error.digest,
+      stack: error.stack,
+    });
   }, [error]);
 
   const isDevelopment = process.env.NODE_ENV === 'development';
@@ -21,7 +26,8 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
         <p className="mt-3 text-sm text-zinc-300">Beklenmeyen bir sorun oluştu. Lütfen tekrar deneyin.</p>
         {isDevelopment ? (
           <p className="mt-4 rounded-lg border border-rose-800 bg-rose-950/40 px-3 py-2 text-left text-xs text-rose-200">
-            {error.message}
+            Hata ayrıntısı geliştirici konsoluna yazdırıldı.{' '}
+            {error.digest ? `Hata kimliği: ${error.digest}` : 'Hata kimliği alınamadı.'}
           </p>
         ) : null}
         <button

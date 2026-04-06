@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
-import { createBrowserSupabase } from '@/lib/supabase/client';
+import { createBrowserSupabase, SupabaseEnvironmentError } from '@/lib/supabase/client';
 
 const guestNavItems = [
   { href: '/agents', label: 'Agentlar' },
@@ -26,11 +26,21 @@ export function SiteNavbar() {
 
   useEffect(() => {
     async function checkAuth() {
-      const {
-        data: { user },
-      } = await createBrowserSupabase().auth.getUser();
+      try {
+        const {
+          data: { user },
+        } = await createBrowserSupabase().auth.getUser();
 
-      setIsAuthenticated(Boolean(user));
+        setIsAuthenticated(Boolean(user));
+      } catch (err) {
+        if (err instanceof SupabaseEnvironmentError) {
+          console.error('Navbar auth check skipped: Supabase public environment is missing.', err);
+          setIsAuthenticated(false);
+          return;
+        }
+
+        throw err;
+      }
     }
 
     void checkAuth();
