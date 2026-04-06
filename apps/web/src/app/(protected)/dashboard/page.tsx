@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
+import { SkeletonCard, SkeletonList } from '@/components/ui/skeleton';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { getMonthKey } from '@/lib/usage';
 import { resolveWorkspaceContext } from '@/lib/workspace';
@@ -188,28 +189,39 @@ export default function DashboardPage() {
       {error ? <p className="rounded-lg border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-200">{error}</p> : null}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <article className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-4">
-          <p className="text-xs uppercase tracking-wide text-zinc-400">Plan</p>
-          <p className="mt-2 text-lg font-semibold text-white">{data?.subscription?.plan_name ?? 'Plan yok'}</p>
-          <p className="mt-1 text-xs text-zinc-400">Durum: {data?.subscription?.status ?? '—'}</p>
-        </article>
-        <article className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-4">
-          <p className="text-xs uppercase tracking-wide text-zinc-400">Aylık kullanım</p>
-          <p className="mt-2 text-lg font-semibold text-white">
-            {usageSummary.used} / {usageSummary.runLimit || '—'}
-          </p>
-          <p className="mt-1 text-xs text-zinc-400">Ay: {data?.monthKey ?? getMonthKey()}</p>
-        </article>
-        <article className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-4">
-          <p className="text-xs uppercase tracking-wide text-zinc-400">Kalan run</p>
-          <p className="mt-2 text-lg font-semibold text-white">{data?.subscription ? usageSummary.remaining : '—'}</p>
-          <p className="mt-1 text-xs text-zinc-400">Limit yoksa gösterilmez</p>
-        </article>
-        <article className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-4">
-          <p className="text-xs uppercase tracking-wide text-zinc-400">Saved outputs</p>
-          <p className="mt-2 text-lg font-semibold text-white">{data?.savedCount ?? 0}</p>
-          <p className="mt-1 text-xs text-zinc-400">Toplam kayıt</p>
-        </article>
+        {loading ? (
+          <>
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </>
+        ) : (
+          <>
+            <article className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-4">
+              <p className="text-xs uppercase tracking-wide text-zinc-400">Plan</p>
+              <p className="mt-2 text-lg font-semibold text-white">{data?.subscription?.plan_name ?? 'Plan yok'}</p>
+              <p className="mt-1 text-xs text-zinc-400">Durum: {data?.subscription?.status ?? '—'}</p>
+            </article>
+            <article className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-4">
+              <p className="text-xs uppercase tracking-wide text-zinc-400">Aylık kullanım</p>
+              <p className="mt-2 text-lg font-semibold text-white">
+                {usageSummary.used} / {usageSummary.runLimit || '—'}
+              </p>
+              <p className="mt-1 text-xs text-zinc-400">Ay: {data?.monthKey ?? getMonthKey()}</p>
+            </article>
+            <article className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-4">
+              <p className="text-xs uppercase tracking-wide text-zinc-400">Kalan run</p>
+              <p className="mt-2 text-lg font-semibold text-white">{data?.subscription ? usageSummary.remaining : '—'}</p>
+              <p className="mt-1 text-xs text-zinc-400">Limit yoksa gösterilmez</p>
+            </article>
+            <article className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-4">
+              <p className="text-xs uppercase tracking-wide text-zinc-400">Saved outputs</p>
+              <p className="mt-2 text-lg font-semibold text-white">{data?.savedCount ?? 0}</p>
+              <p className="mt-1 text-xs text-zinc-400">Toplam kayıt</p>
+            </article>
+          </>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -221,7 +233,7 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          {loading ? <p className="text-sm text-zinc-400">Yükleniyor…</p> : null}
+          {loading ? <SkeletonList items={4} /> : null}
 
           {!loading && (data?.activeAgents.length ?? 0) === 0 ? (
             <p className="rounded-xl border border-dashed border-zinc-700 bg-zinc-950/40 p-4 text-sm text-zinc-300">
@@ -249,6 +261,8 @@ export default function DashboardPage() {
               Run geçmişi
             </Link>
           </div>
+
+          {loading ? <SkeletonList items={4} /> : null}
 
           {!loading && (data?.latestRuns.length ?? 0) === 0 ? (
             <p className="rounded-xl border border-dashed border-zinc-700 bg-zinc-950/40 p-4 text-sm text-zinc-300">
