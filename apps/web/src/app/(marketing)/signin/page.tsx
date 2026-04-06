@@ -11,6 +11,11 @@ export default function LoginPage() {
           <p className="text-sm text-zinc-400">Koschei hesabınızla devam edin.</p>
         </div>
         <AuthForm mode="login" />
+        <p className="text-right text-sm">
+          <Link href="/reset-password" className="text-zinc-400 hover:text-indigo-300">
+            Şifreni mi unuttun?
+          </Link>
+        </p>
         <p className="text-center text-sm text-zinc-400">
           Hesabın yok mu?{' '}
           <Link href="/signup" className="text-indigo-300 hover:text-indigo-200">
