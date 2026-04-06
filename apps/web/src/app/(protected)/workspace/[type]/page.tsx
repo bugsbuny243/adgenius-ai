@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 import { ChatThread, type ChatMessage } from '@/components/workspace/chat-thread';
 import { OutputEditor } from '@/components/workspace/output-editor';
@@ -51,6 +52,7 @@ function toChatMessages(run: WorkspaceRunItem): ChatMessage[] {
 }
 
 export default function WorkspacePage({ params }: { params: { type: string } }) {
+  const searchParams = useSearchParams();
   const [agent, setAgent] = useState<AgentTypeRow | null>(null);
   const [history, setHistory] = useState<WorkspaceRunItem[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -225,6 +227,20 @@ export default function WorkspacePage({ params }: { params: { type: string } }) 
     await navigator.clipboard.writeText(content);
     setSaveStatus('İçerik panoya kopyalandı.');
   }
+
+
+  useEffect(() => {
+    const prefillPrompt = searchParams.get('prefill')?.trim();
+    const templateName = searchParams.get('template')?.trim();
+
+    if (prefillPrompt && prefillPrompt.length > 0) {
+      setTaskInput(prefillPrompt);
+      setLastPrompt(prefillPrompt);
+      if (templateName) {
+        setSaveStatus(`Template seçildi: ${templateName}`);
+      }
+    }
+  }, [searchParams]);
 
   const tabs = useMemo(
     () => [

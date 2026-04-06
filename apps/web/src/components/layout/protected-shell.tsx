@@ -12,6 +12,9 @@ const appNavItems = [
   { href: '/dashboard', label: 'Çalışma Alanı' },
   { href: '/agents', label: 'Agentlar' },
   { href: '/runs', label: 'Geçmiş Çalışmalar' },
+  { href: '/templates', label: 'Templates' },
+  { href: '/workflows', label: 'Workflows' },
+  { href: '/schedules', label: 'Schedules' },
   { href: '/saved', label: 'Kayıtlı Çıktılar' },
   { href: '/settings', label: 'Ayarlar' },
 ];
