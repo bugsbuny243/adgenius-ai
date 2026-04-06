@@ -143,6 +143,8 @@ export async function runAgent(input: {
 
       const nextRunsCount = await incrementMonthlyUsage(supabase, workspace.id, usage.monthKey);
 
+      await supabase.rpc('refresh_profile_metrics', { p_user_id: user.id, p_workspace_id: workspace.id });
+
       return {
         ok: true,
         data: {
@@ -181,6 +183,7 @@ export async function saveAgentOutput(input: {
   runId?: string;
   title?: string;
   content?: string;
+  projectName?: string;
 }): Promise<ServiceResult<{ id: string; title: string; created_at: string }>> {
   try {
     if (!input.accessToken) {
@@ -226,6 +229,16 @@ export async function saveAgentOutput(input: {
     }
 
     if (existingSaved) {
+      await supabase
+        .from('saved_outputs')
+        .update({
+          title: input.title?.trim() || existingSaved.title,
+          content,
+          project_name: input.projectName?.trim() || null,
+        })
+        .eq('id', existingSaved.id);
+
+      await supabase.rpc('refresh_profile_metrics', { p_user_id: user.id, p_workspace_id: workspace.id });
       return { ok: true, data: existingSaved };
     }
 
@@ -239,6 +252,7 @@ export async function saveAgentOutput(input: {
         agent_run_id: runId,
         title: finalTitle,
         content,
+        project_name: input.projectName?.trim() || null,
       })
       .select('id, title, created_at')
       .single();
@@ -266,6 +280,8 @@ export async function saveAgentOutput(input: {
     if (!saved) {
       return { ok: false, error: 'Çıktı kaydedilemedi.' };
     }
+
+    await supabase.rpc('refresh_profile_metrics', { p_user_id: user.id, p_workspace_id: workspace.id });
 
     return { ok: true, data: saved };
   } catch (error) {

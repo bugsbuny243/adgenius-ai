@@ -83,8 +83,8 @@ export default function WorkspacePage({ params }: { params: { type: string } }) 
             .maybeSingle(),
           supabase
             .from('agent_runs')
-            .select('id, created_at, status, user_input, result_text')
-            .eq('agent_type', params.type)
+            .select('id, created_at, status, user_input, result_text, agent_types!inner(slug)')
+            .eq('agent_types.slug', params.type)
             .order('created_at', { ascending: false })
             .limit(10),
         ]);
@@ -99,7 +99,13 @@ export default function WorkspacePage({ params }: { params: { type: string } }) 
           return;
         }
 
-        const mappedHistory = (historyData ?? []) as WorkspaceRunItem[];
+        const mappedHistory = ((historyData ?? []) as unknown as Array<WorkspaceRunItem & { agent_types?: { slug: string } | { slug: string }[] }>).map((row) => ({
+          id: row.id,
+          created_at: row.created_at,
+          status: row.status,
+          user_input: row.user_input,
+          result_text: row.result_text ?? null,
+        }));
 
         setAgent(agentData as AgentTypeRow);
         setHistory(mappedHistory);
@@ -169,13 +175,20 @@ export default function WorkspacePage({ params }: { params: { type: string } }) 
       const supabase = createBrowserSupabase();
       const { data: refreshedRuns, error: refreshError } = await supabase
         .from('agent_runs')
-        .select('id, created_at, status, user_input, result_text')
-        .eq('agent_type', params.type)
+        .select('id, created_at, status, user_input, result_text, agent_types!inner(slug)')
+        .eq('agent_types.slug', params.type)
         .order('created_at', { ascending: false })
         .limit(10);
 
       if (!refreshError) {
-        setHistory((refreshedRuns ?? []) as WorkspaceRunItem[]);
+        const mappedRefreshed = ((refreshedRuns ?? []) as unknown as Array<WorkspaceRunItem & { agent_types?: { slug: string } | { slug: string }[] }>).map((row) => ({
+          id: row.id,
+          created_at: row.created_at,
+          status: row.status,
+          user_input: row.user_input,
+          result_text: row.result_text ?? null,
+        }));
+        setHistory(mappedRefreshed);
       }
     } catch (runError) {
       if (runError instanceof ApiRequestError) {

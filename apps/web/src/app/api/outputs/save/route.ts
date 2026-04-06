@@ -19,11 +19,13 @@ export async function POST(request: Request) {
       runId?: string;
       title?: string;
       content?: string;
+      projectName?: string;
     };
 
     const runId = body.runId?.trim();
     const content = body.content?.trim();
     const title = body.title?.trim();
+    const projectName = body.projectName?.trim();
 
     if (!runId || !content) {
       return NextResponse.json({ error: 'Kaydedilecek sonuç bulunamadı.' }, { status: 400 });
@@ -34,6 +36,7 @@ export async function POST(request: Request) {
       runId,
       title,
       content,
+      projectName,
     });
 
     if (!result.ok) {

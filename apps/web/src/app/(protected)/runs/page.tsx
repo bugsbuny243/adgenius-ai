@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
+import { SkeletonList } from '@/components/ui/skeleton';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { resolveWorkspaceContext } from '@/lib/workspace';
 
@@ -158,7 +159,7 @@ export default function RunsPage() {
       {error ? <p className="rounded-lg border border-rose-800 bg-rose-950/40 p-3 text-sm text-rose-200">{error}</p> : null}
 
       <div className="space-y-3">
-        {loadingInitial ? <p className="text-sm text-zinc-400">Kayıtlar yükleniyor...</p> : null}
+        {loadingInitial ? <SkeletonList items={3} /> : null}
 
         {visibleRuns.map((run) => (
           <article key={run.id} className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-4">
@@ -173,9 +174,17 @@ export default function RunsPage() {
             <p className="mt-1 text-sm text-zinc-300">
               <strong>Sonuç:</strong> {truncate(run.result_text)}
             </p>
-            <Link href={`/runs/${run.id}`} className="mt-3 inline-block text-sm text-indigo-300 hover:text-indigo-200">
-              Detayı Aç
-            </Link>
+            <div className="mt-3 flex flex-wrap gap-3">
+              <Link href={`/runs/${run.id}`} className="inline-block text-sm text-indigo-300 hover:text-indigo-200">
+                Detayı Aç
+              </Link>
+              <Link
+                href={`/agents/${run.agent_types?.slug ?? ''}?prompt=${encodeURIComponent(run.user_input)}&source=rerun`}
+                className="inline-block text-sm text-emerald-300 hover:text-emerald-200"
+              >
+                Yeniden çalıştır
+              </Link>
+            </div>
           </article>
         ))}
 

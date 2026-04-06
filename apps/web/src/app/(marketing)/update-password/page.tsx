@@ -50,7 +50,8 @@ export default function UpdatePasswordPage() {
         return;
       }
 
-      router.replace('/dashboard');
+      await supabase.auth.signOut();
+      router.replace('/signin?passwordUpdated=1');
       router.refresh();
     } catch {
       setError('Şifre güncelleme sırasında beklenmeyen bir hata oluştu.');
