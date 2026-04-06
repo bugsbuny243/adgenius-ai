@@ -161,9 +161,10 @@ export function AuthForm({ mode }: AuthFormProps) {
 
       if (isEmailConfirmationFlow) {
         if (shouldUpdateState()) {
-          setSuccessMessage('Kayıt tamamlandı. Devam etmek için e-posta adresini doğrula ve ardından giriş yap.');
           setPassword('');
         }
+        router.replace('/confirm-email');
+        router.refresh();
         return;
       }
 

@@ -123,6 +123,8 @@ export async function runAgent(input: {
           model_name: modelName,
           status: 'completed',
           error_message: null,
+          tokens_input: aiResult.tokensInput,
+          tokens_output: aiResult.tokensOutput,
           metadata: {
             completed_at: new Date().toISOString(),
             month_key: usage.monthKey,
