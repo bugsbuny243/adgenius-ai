@@ -18,13 +18,31 @@ type RunDetail = {
   } | null;
 };
 
-export default function RunDetailPage({ params }: { params: { id: string } }) {
+type RouteParams = { id: string } | Promise<{ id: string }>;
+
+async function resolveRunId(params: RouteParams): Promise<string> {
+  const resolved = await Promise.resolve(params);
+  return resolved.id;
+}
+
+export default function RunDetailPage({ params }: { params: RouteParams }) {
+  const [runId, setRunId] = useState('');
   const [run, setRun] = useState<RunDetail | null>(null);
   const [saved, setSaved] = useState(false);
   const [status, setStatus] = useState('');
 
   useEffect(() => {
-    async function loadRunDetail() {
+    void (async () => {
+      setRunId(await resolveRunId(params));
+    })();
+  }, [params]);
+
+  useEffect(() => {
+    if (!runId) {
+      return;
+    }
+
+    async function loadRunDetail(): Promise<void> {
       const supabase = createBrowserSupabase();
       const user = await loadCurrentUser(supabase);
       if (!user) {
@@ -37,7 +55,7 @@ export default function RunDetailPage({ params }: { params: { id: string } }) {
       const { data: runData, error: runError } = await supabase
         .from('agent_runs')
         .select('id, user_input, result_text, status, created_at, agent_types(name, slug)')
-        .eq('id', params.id)
+        .eq('id', runId)
         .eq('workspace_id', workspace.id)
         .maybeSingle();
 
@@ -56,7 +74,7 @@ export default function RunDetailPage({ params }: { params: { id: string } }) {
       const { data: savedOutput } = await supabase
         .from('saved_outputs')
         .select('id')
-        .eq('agent_run_id', params.id)
+        .eq('agent_run_id', runId)
         .eq('workspace_id', workspace.id)
         .eq('user_id', user.id)
         .limit(1)
@@ -66,9 +84,9 @@ export default function RunDetailPage({ params }: { params: { id: string } }) {
     }
 
     void loadRunDetail();
-  }, [params.id]);
+  }, [runId]);
 
-  async function onSave() {
+  async function onSave(): Promise<void> {
     if (!run?.result_text) {
       return;
     }
@@ -116,7 +134,7 @@ export default function RunDetailPage({ params }: { params: { id: string } }) {
       {!saved ? (
         <button
           type="button"
-          onClick={onSave}
+          onClick={() => void onSave()}
           className="rounded-lg border border-zinc-600 px-4 py-2 text-sm text-zinc-200 hover:border-zinc-400"
         >
           Kaydet

@@ -14,7 +14,7 @@ type AuthFormProps = {
 const DEFAULT_POST_AUTH_REDIRECT = '/dashboard';
 const AUTH_REQUEST_TIMEOUT_MS = 20000;
 
-function resolveRedirectTarget(nextValue: string | null) {
+function resolveRedirectTarget(nextValue: string | null): string {
   if (!nextValue || !nextValue.startsWith('/')) {
     return DEFAULT_POST_AUTH_REDIRECT;
   }
@@ -26,7 +26,7 @@ function resolveRedirectTarget(nextValue: string | null) {
   return nextValue;
 }
 
-function toFriendlyAuthError(message: string, mode: AuthMode) {
+function toFriendlyAuthError(message: string, mode: AuthMode): string {
   const normalizedMessage = message.toLowerCase();
 
   if (normalizedMessage.includes('invalid login credentials')) {
@@ -56,7 +56,7 @@ function toFriendlyAuthError(message: string, mode: AuthMode) {
     : 'Kayıt sırasında bir sorun oluştu. Lütfen tekrar dene.';
 }
 
-async function withTimeout<T>(task: Promise<T>, timeoutMs: number) {
+async function withTimeout<T>(task: Promise<T>, timeoutMs: number): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
   const timeoutPromise = new Promise<T>((_resolve, reject) => {
@@ -87,7 +87,6 @@ export function AuthForm({ mode }: AuthFormProps) {
   const isLogin = mode === 'login';
   const [redirectTarget, setRedirectTarget] = useState(DEFAULT_POST_AUTH_REDIRECT);
 
-
   useEffect(() => {
     if (typeof window === 'undefined') {
       return;
@@ -96,6 +95,7 @@ export function AuthForm({ mode }: AuthFormProps) {
     const nextValue = new URLSearchParams(window.location.search).get('next');
     setRedirectTarget(resolveRedirectTarget(nextValue));
   }, []);
+
   useEffect(() => {
     isMountedRef.current = true;
 
@@ -127,7 +127,7 @@ export function AuthForm({ mode }: AuthFormProps) {
     };
   }, [redirectTarget, router]);
 
-  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (loading) {
       return;
@@ -135,7 +135,7 @@ export function AuthForm({ mode }: AuthFormProps) {
 
     const submitRequestId = submitRequestRef.current + 1;
     submitRequestRef.current = submitRequestId;
-    const shouldUpdateState = () => isMountedRef.current && submitRequestRef.current === submitRequestId;
+    const shouldUpdateState = (): boolean => isMountedRef.current && submitRequestRef.current === submitRequestId;
 
     setError(null);
     setSuccessMessage(null);
@@ -164,6 +164,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           setSuccessMessage('Kayıt tamamlandı. Devam etmek için e-posta adresini doğrula ve ardından giriş yap.');
           setPassword('');
         }
+        router.push('/confirm-email');
         return;
       }
 
@@ -181,19 +182,21 @@ export function AuthForm({ mode }: AuthFormProps) {
 
       if (!currentSession?.access_token) {
         if (shouldUpdateState()) {
-          setError(isLogin ? 'Giriş tamamlanamadı. Lütfen bilgilerini kontrol ederek tekrar dene.' : 'Kayıt tamamlandı ancak oturum açılamadı. Giriş yaparak devam edebilirsin.');
+          setError(
+            isLogin
+              ? 'Giriş tamamlanamadı. Lütfen bilgilerini kontrol ederek tekrar dene.'
+              : 'Kayıt tamamlandı ancak oturum açılamadı. Giriş yaparak devam edebilirsin.',
+          );
         }
         return;
       }
 
-      if (!isLogin) {
-        await fetch('/api/bootstrap', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${currentSession.access_token}`,
-          },
-        });
-      }
+      await fetch('/api/bootstrap', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${currentSession.access_token}`,
+        },
+      });
 
       router.replace(redirectTarget);
       router.refresh();
@@ -205,7 +208,11 @@ export function AuthForm({ mode }: AuthFormProps) {
         } else if (err instanceof Error && err.message === 'AUTH_TIMEOUT') {
           setError('İstek zaman aşımına uğradı. Lütfen tekrar dene.');
         } else {
-          setError(isLogin ? 'Giriş sırasında beklenmeyen bir hata oluştu. Lütfen tekrar dene.' : 'Kayıt sırasında beklenmeyen bir hata oluştu. Lütfen tekrar dene.');
+          setError(
+            isLogin
+              ? 'Giriş sırasında beklenmeyen bir hata oluştu. Lütfen tekrar dene.'
+              : 'Kayıt sırasında beklenmeyen bir hata oluştu. Lütfen tekrar dene.',
+          );
         }
       }
     } finally {
@@ -229,7 +236,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           onChange={(event) => setEmail(event.target.value)}
           required
           className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none ring-indigo-400 placeholder:text-zinc-500 focus:ring"
-          placeholder="ornek@adgenius.ai"
+          placeholder="ornek@koschei.ai"
         />
       </div>
       <div className="space-y-1">

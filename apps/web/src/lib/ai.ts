@@ -2,12 +2,17 @@ import 'server-only';
 
 import { GoogleGenAI } from '@google/genai';
 
-const DEFAULT_MODEL_LABEL = 'ai-standard';
-const PROVIDER_MODEL = process.env.AI_PROVIDER_MODEL ?? 'gemini-2.5-flash';
+const DEFAULT_MODEL_LABEL = 'koschei-text-v1';
+const PROVIDER_MODEL = 'gemini-2.5-flash';
 
 const MODEL_ALIAS_MAP: Record<string, string> = {
   'ai-standard': PROVIDER_MODEL,
   'koschei-text-v1': PROVIDER_MODEL,
+};
+
+type UsageMetadataLike = {
+  promptTokenCount?: number;
+  candidatesTokenCount?: number;
 };
 
 export type RunAIParams = {
@@ -19,11 +24,13 @@ export type RunAIParams = {
 export type AIRunResult = {
   text: string;
   model: string;
+  tokensInput: number;
+  tokensOutput: number;
   usageMetadata: unknown;
   raw: unknown;
 };
 
-function resolveProviderModel(model: string) {
+function resolveProviderModel(model: string): string {
   return MODEL_ALIAS_MAP[model] ?? model;
 }
 
@@ -32,7 +39,7 @@ export async function runAI({
   userInput,
   model = DEFAULT_MODEL_LABEL,
 }: RunAIParams): Promise<AIRunResult> {
-  const apiKey = process.env.GEMINI_API_KEY ?? process.env.AI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
     throw new Error('AI API anahtarı bulunamadı.');
@@ -49,10 +56,15 @@ export async function runAI({
     });
 
     const text = response.text?.trim();
+    const usageMetadata = response.usageMetadata as UsageMetadataLike | undefined;
+    const tokensInput = usageMetadata?.promptTokenCount ?? 0;
+    const tokensOutput = usageMetadata?.candidatesTokenCount ?? 0;
 
     return {
       text: text && text.length > 0 ? text : 'AI engine bir yanıt döndürmedi.',
       model,
+      tokensInput,
+      tokensOutput,
       usageMetadata: response.usageMetadata ?? null,
       raw: response,
     };

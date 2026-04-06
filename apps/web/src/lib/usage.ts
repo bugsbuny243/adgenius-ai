@@ -75,46 +75,14 @@ export async function incrementMonthlyUsage(
   workspaceId: string,
   monthKey = getMonthKey()
 ): Promise<number> {
-  const { data: existing, error: existingError } = await supabase
-    .from('usage_counters')
-    .select('id, runs_count')
-    .eq('workspace_id', workspaceId)
-    .eq('month_key', monthKey)
-    .maybeSingle();
+  const { data, error } = await supabase.rpc('increment_usage_counter', {
+    p_workspace_id: workspaceId,
+    p_month_key: monthKey,
+  });
 
-  if (existingError) {
-    throw new Error(`Kullanım sayacı okunamadı: ${existingError.message}`);
+  if (error) {
+    throw new Error(`Kullanım sayacı güncellenemedi: ${error.message}`);
   }
 
-  if (!existing) {
-    const { data: inserted, error: insertError } = await supabase
-      .from('usage_counters')
-      .insert({
-        workspace_id: workspaceId,
-        month_key: monthKey,
-        runs_count: 1,
-      })
-      .select('runs_count')
-      .single();
-
-    if (insertError || !inserted) {
-      throw new Error(`Kullanım sayacı oluşturulamadı: ${insertError?.message ?? 'Bilinmeyen hata'}`);
-    }
-
-    return inserted.runs_count;
-  }
-
-  const nextRunsCount = existing.runs_count + 1;
-  const { data: updated, error: updateError } = await supabase
-    .from('usage_counters')
-    .update({ runs_count: nextRunsCount, updated_at: new Date().toISOString() })
-    .eq('id', existing.id)
-    .select('runs_count')
-    .single();
-
-  if (updateError || !updated) {
-    throw new Error(`Kullanım sayacı güncellenemedi: ${updateError?.message ?? 'Bilinmeyen hata'}`);
-  }
-
-  return updated.runs_count;
+  return data as number;
 }
