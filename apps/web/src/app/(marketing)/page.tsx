@@ -6,7 +6,7 @@ import { SiteNavbar } from '@/components/layout/navbar';
 const howItWorks = [
   'İhtiyacınıza uygun agent türünü seçin.',
   'Hedefinizi ve bağlamı net bir şekilde tanımlayın.',
-  'AdGenius AI engine çıktısını üretin, düzenleyin ve kaydedin.',
+  'Koschei engine çıktısını üretin, düzenleyin ve kaydedin.',
 ];
 
 const forWho = [
@@ -18,7 +18,7 @@ const forWho = [
 
 const faq = [
   {
-    question: 'AdGenius AI ne sunar?',
+    question: 'Koschei ne sunar?',
     answer:
       'Tekrarlayan üretim görevlerini hızlandıran, kurumsal düzende kullanılabilen AI agent çalışma alanı sunar.',
   },
@@ -39,12 +39,12 @@ export default function HomePage() {
       <SiteNavbar />
       <main className="mx-auto w-full max-w-6xl space-y-16 px-4 py-14">
         <section className="space-y-6 rounded-3xl border border-zinc-800 bg-zinc-900/60 p-8 md:p-12">
-          <p className="text-sm uppercase tracking-[0.2em] text-zinc-400">AdGenius AI</p>
+          <p className="text-sm uppercase tracking-[0.2em] text-zinc-400">Koschei</p>
           <h1 className="max-w-3xl text-3xl font-semibold leading-tight md:text-5xl">
             AI destekli agent çalışma alanı ile ekip üretimini hızlandırın
           </h1>
           <p className="max-w-3xl text-zinc-300 md:text-lg">
-            AdGenius AI; içerik, e-posta, araştırma ve operasyon görevlerinde düzenli, izlenebilir ve tekrar
+            Koschei; içerik, e-posta, araştırma ve operasyon görevlerinde düzenli, izlenebilir ve tekrar
             kullanılabilir bir üretim akışı sağlar.
           </p>
           <div className="flex flex-wrap gap-3">
@@ -67,7 +67,7 @@ export default function HomePage() {
           <article className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
             <h2 className="text-2xl font-semibold">Hakkımızda kısa özet</h2>
             <p className="mt-3 text-zinc-300">
-              AdGenius AI, ekiplerin tekrar eden dijital üretim işlerini daha hızlı ve daha tutarlı yönetmesi
+              Koschei, ekiplerin tekrar eden dijital üretim işlerini daha hızlı ve daha tutarlı yönetmesi
               için tasarlanmış bir AI agent platformudur.
             </p>
           </article>

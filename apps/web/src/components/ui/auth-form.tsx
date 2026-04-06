@@ -186,6 +186,15 @@ export function AuthForm({ mode }: AuthFormProps) {
         return;
       }
 
+      if (!isLogin) {
+        await fetch('/api/bootstrap', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${currentSession.access_token}`,
+          },
+        });
+      }
+
       router.replace(redirectTarget);
       router.refresh();
     } catch (err) {
