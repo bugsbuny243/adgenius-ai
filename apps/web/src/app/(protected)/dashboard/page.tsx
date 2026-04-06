@@ -40,6 +40,14 @@ type DashboardData = {
   activeAgents: AgentTypeRow[];
   latestRuns: LatestRunRow[];
   savedOutputs: SavedOutputRow[];
+  clonedTemplates: WorkspaceTemplateRow[];
+};
+
+type WorkspaceTemplateRow = {
+  id: string;
+  title: string;
+  category: string;
+  created_at: string;
 };
 
 function pickAgentType(relation: AgentTypeRelation | AgentTypeRelation[] | null | undefined) {
@@ -67,6 +75,7 @@ export default function DashboardPage() {
           { data: activeAgents, error: activeAgentsError },
           { data: latestRuns, error: latestRunsError },
           { data: savedOutputs, error: savedOutputsError },
+          { data: clonedTemplates, error: clonedTemplatesError },
         ] = await Promise.all([
           supabase
             .from('agent_types')
@@ -85,9 +94,15 @@ export default function DashboardPage() {
             .eq('workspace_id', workspace.id)
             .order('created_at', { ascending: false })
             .limit(8),
+          supabase
+            .from('workspace_templates')
+            .select('id, title, category, created_at')
+            .eq('workspace_id', workspace.id)
+            .order('created_at', { ascending: false })
+            .limit(8),
         ]);
 
-        const firstError = activeAgentsError ?? latestRunsError ?? savedOutputsError;
+        const firstError = activeAgentsError ?? latestRunsError ?? savedOutputsError ?? clonedTemplatesError;
 
         if (firstError) {
           setError(firstError.message);
@@ -98,6 +113,7 @@ export default function DashboardPage() {
           activeAgents: (activeAgents ?? []) as AgentTypeRow[],
           latestRuns: (latestRuns ?? []) as unknown as LatestRunRow[],
           savedOutputs: (savedOutputs ?? []) as unknown as SavedOutputRow[],
+          clonedTemplates: (clonedTemplates ?? []) as WorkspaceTemplateRow[],
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Dashboard verileri yüklenemedi.');
@@ -162,7 +178,7 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-3">
         <section className="space-y-3">
           <h2 className="text-lg font-medium">Son runlar</h2>
           <div className="space-y-2">
@@ -193,6 +209,24 @@ export default function DashboardPage() {
             ))}
             {!loading && (data?.savedOutputs.length ?? 0) === 0 ? (
               <p className="rounded-xl border border-dashed border-zinc-700 bg-zinc-950/40 p-4 text-sm text-zinc-300">Henüz kayıtlı çıktı yok.</p>
+            ) : null}
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-medium">Klonlanan Template&apos;ler</h2>
+          <div className="space-y-2">
+            {(data?.clonedTemplates ?? []).map((template) => (
+              <article key={template.id} className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
+                <p className="text-sm font-medium text-zinc-100">{template.title}</p>
+                <p className="mt-1 text-xs text-zinc-400">{template.category}</p>
+                <p className="mt-1 text-xs text-zinc-500">{new Date(template.created_at).toLocaleString('tr-TR')}</p>
+              </article>
+            ))}
+            {!loading && (data?.clonedTemplates.length ?? 0) === 0 ? (
+              <p className="rounded-xl border border-dashed border-zinc-700 bg-zinc-950/40 p-4 text-sm text-zinc-300">
+                Henüz klonlanmış template yok. Public gallery&apos;den bir template klonlayın.
+              </p>
             ) : null}
           </div>
         </section>

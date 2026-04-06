@@ -15,6 +15,13 @@ function createFallbackWorkspaceSlug(userId: string): string {
   return `ws-${userId.replace(/-/g, '').slice(0, 8)}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
+
+function createCreatorHandle(email: string | undefined, userId: string): string {
+  const emailPrefix = (email ?? 'creator').split('@')[0]?.toLowerCase() ?? 'creator';
+  const normalized = emailPrefix.replace(/[^a-z0-9_]/g, '_').slice(0, 24);
+  return `${normalized || 'creator'}_${userId.replace(/-/g, '').slice(0, 6)}`;
+}
+
 export async function POST(request: Request): Promise<NextResponse> {
   try {
     const accessToken = getAccessToken(request);
@@ -87,6 +94,13 @@ export async function POST(request: Request): Promise<NextResponse> {
       id: user.id,
       email: user.email,
       full_name: user.email?.split('@')[0] ?? null,
+    });
+
+    await supabase.from('creator_profiles').upsert({
+      user_id: user.id,
+      display_name: user.email?.split('@')[0] ?? 'Creator',
+      handle: createCreatorHandle(user.email, user.id),
+      public_profile_enabled: false,
     });
 
     await supabase.from('subscriptions').insert({

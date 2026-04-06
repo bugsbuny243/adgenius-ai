@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 const footerLinks = [
   { href: '/about', label: 'Hakkımızda' },
+  { href: '/templates', label: 'Template Gallery' },
   { href: '/privacy', label: 'Gizlilik' },
   { href: '/terms', label: 'Şartlar' },
   { href: '/contact', label: 'İletişim' },

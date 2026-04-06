@@ -7,6 +7,7 @@ import { createBrowserSupabase, SupabaseEnvironmentError } from '@/lib/supabase/
 
 const guestNavItems = [
   { href: '/agents', label: 'Agentlar' },
+  { href: '/templates', label: "Template'ler" },
   { href: '/pricing', label: 'Fiyatlar' },
   { href: '/about', label: 'Hakkımızda' },
   { href: '/contact', label: 'İletişim' },
@@ -17,6 +18,7 @@ const guestNavItems = [
 const authNavItems = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/agents', label: 'Agentlar' },
+  { href: '/templates', label: "Template'ler" },
   { href: '/pricing', label: 'Fiyatlar' },
   { href: '/about', label: 'Hakkımızda' },
 ];

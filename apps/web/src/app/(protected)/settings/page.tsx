@@ -202,16 +202,12 @@ export default function SettingsPage() {
         <p className="text-sm text-zinc-300">
           Aylık kullanım: {data.runsCount} / {data.runLimit}
         </p>
-        <button
-          type="button"
-          disabled
-          onClick={() => {
-            window.alert('Yakında');
-          }}
-          className="w-fit rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 opacity-60"
+        <a
+          href="/pricing"
+          className="w-fit rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 hover:border-zinc-500 hover:text-white"
         >
           Planını Yükselt
-        </button>
+        </a>
       </div>
 
       {message ? (
