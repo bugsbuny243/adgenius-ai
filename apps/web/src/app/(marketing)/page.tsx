@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 import { SiteFooter } from '@/components/layout/footer';
-import { SiteNavbar } from '@/components/layout/navbar';
+import { PublicNavbar } from '@/components/layout/public-navbar';
 
 const highlights = [
   'Task composer ile tek ekranda çalıştırma, sonuç alma ve kaydetme',
@@ -12,7 +12,7 @@ const highlights = [
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <SiteNavbar />
+      <PublicNavbar />
       <main className="mx-auto w-full max-w-6xl px-4 py-12">
         <section className="rounded-3xl border border-zinc-800 bg-zinc-900/60 p-8 md:p-10">
           <p className="text-xs uppercase tracking-[0.2em] text-zinc-400">Koschei</p>
