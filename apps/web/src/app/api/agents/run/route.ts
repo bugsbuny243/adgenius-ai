@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 
 import { runAgent } from '@/lib/server/agent-service';
 
+export const maxDuration = 60;
+
 function getAccessToken(request: Request) {
   const authorization = request.headers.get('authorization');
   if (!authorization?.startsWith('Bearer ')) {
