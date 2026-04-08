@@ -94,15 +94,22 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     return NextResponse.next();
   }
 
+  const protectedPath = isProtectedPath(pathname);
+  const authEntryPath = pathname === '/signin' || pathname === '/signup';
+
+  if (!protectedPath && !authEntryPath) {
+    return NextResponse.next();
+  }
+
   const signedIn = await hasSession(request);
 
-  if (isProtectedPath(pathname) && !signedIn) {
+  if (protectedPath && !signedIn) {
     const signinUrl = new URL('/signin', request.url);
     signinUrl.searchParams.set('next', `${pathname}${search}`);
     return NextResponse.redirect(signinUrl);
   }
 
-  if (signedIn && (pathname === '/signin' || pathname === '/signup')) {
+  if (signedIn && authEntryPath) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
