@@ -1,8 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
 
+const BYPASS_EXACT_PATHS = new Set(['/api/health', '/favicon.ico', '/robots.txt', '/ads.txt']);
+const BYPASS_PREFIXES = ['/_next'];
+
 const PROTECTED_EXACT_PATHS = ['/dashboard', '/runs', '/saved', '/settings'];
 const PROTECTED_PATH_PREFIXES = ['/dashboard/', '/agents/', '/runs/', '/saved/', '/settings/', '/workspace/'];
+
+function shouldBypassMiddleware(pathname: string): boolean {
+  if (BYPASS_EXACT_PATHS.has(pathname)) {
+    return true;
+  }
+
+  return BYPASS_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
 
 function isProtectedPath(pathname: string): boolean {
   if (PROTECTED_EXACT_PATHS.includes(pathname)) {
@@ -56,24 +67,33 @@ async function hasSession(request: NextRequest): Promise<boolean> {
     return false;
   }
 
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-  });
+  try {
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    });
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser(accessToken);
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser(accessToken);
 
-  return !error && Boolean(user);
+    return !error && Boolean(user);
+  } catch {
+    return false;
+  }
 }
 
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const { pathname, search } = request.nextUrl;
+
+  if (shouldBypassMiddleware(pathname)) {
+    return NextResponse.next();
+  }
+
   const signedIn = await hasSession(request);
 
   if (isProtectedPath(pathname) && !signedIn) {
@@ -90,14 +110,5 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 }
 
 export const config = {
-  matcher: [
-    '/dashboard/:path*',
-    '/agents/:path*',
-    '/runs/:path*',
-    '/saved/:path*',
-    '/settings/:path*',
-    '/workspace/:path*',
-    '/signin',
-    '/signup',
-  ],
+  matcher: ['/((?!_next/static|_next/image).*)'],
 };
