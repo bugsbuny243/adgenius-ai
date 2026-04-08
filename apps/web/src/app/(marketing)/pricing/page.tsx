@@ -47,7 +47,7 @@ const faqs = [
   },
   {
     question: 'Ödeme nasıl yapılır?',
-    answer: 'Shopier ile güvenli Türk Lirası ödeme.',
+    answer: 'Ödeme adımı ücretli planlar açıldığında güvenli altyapı üzerinden tamamlanır.',
   },
   {
     question: 'Plan değiştirebilir miyim?',
