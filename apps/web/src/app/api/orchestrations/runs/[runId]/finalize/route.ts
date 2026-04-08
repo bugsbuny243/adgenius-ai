@@ -1,10 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 import { createServerSupabase } from '@/lib/supabase/server';
 import { resolveWorkspaceContext } from '@/lib/workspace';
 
 type Params = {
-  params: { runId: string };
+  params: Promise<{ runId: string }>;
 };
 
 function getAccessToken(request: Request) {
@@ -16,12 +16,12 @@ function getAccessToken(request: Request) {
   return authorization.replace('Bearer ', '').trim();
 }
 
-export async function POST(request: Request, { params }: Params) {
+export async function POST(request: NextRequest, { params }: Params) {
   try {
     const accessToken = getAccessToken(request);
     const supabase = createServerSupabase(accessToken ?? undefined);
     const { workspace, user } = await resolveWorkspaceContext(supabase);
-    const { runId } = params;
+    const { runId } = await params;
 
     const { data: runSteps, error: runStepError } = await supabase
       .from('orchestration_run_steps')
