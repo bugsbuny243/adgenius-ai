@@ -7,6 +7,17 @@ type Params = {
   params: Promise<{ runId: string }>;
 };
 
+type NamedStep = {
+  name?: string | null;
+};
+
+type RunStepRow = {
+  step_order: number;
+  status: string;
+  output_payload: { summary?: string } | null;
+  orchestration_steps: NamedStep | NamedStep[] | null;
+};
+
 function getAccessToken(request: Request) {
   const authorization = request.headers.get('authorization');
   if (!authorization?.startsWith('Bearer ')) {
@@ -14,6 +25,23 @@ function getAccessToken(request: Request) {
   }
 
   return authorization.replace('Bearer ', '').trim();
+}
+
+function isNamedStep(value: unknown): value is NamedStep {
+  return typeof value === 'object' && value !== null && 'name' in value;
+}
+
+function getStepName(value: unknown): string | null {
+  if (Array.isArray(value)) {
+    const first = value[0];
+    return isNamedStep(first) ? first.name ?? null : null;
+  }
+
+  if (isNamedStep(value)) {
+    return value.name ?? null;
+  }
+
+  return null;
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
@@ -33,7 +61,9 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: runStepError?.message ?? 'Run adımları alınamadı.' }, { status: 400 });
     }
 
-    const waitingApproval = runSteps.find((item) => item.status === 'waiting_approval' || item.status === 'pending');
+    const typedRunSteps = runSteps as RunStepRow[];
+
+    const waitingApproval = typedRunSteps.find((item) => item.status === 'waiting_approval' || item.status === 'pending');
     if (waitingApproval) {
       return NextResponse.json(
         { error: 'Tüm adımlar onaylanmadan final teslim oluşturulamaz.' },
@@ -41,11 +71,9 @@ export async function POST(request: NextRequest, { params }: Params) {
       );
     }
 
-    const sections = runSteps.map((item) => {
-      const stepName = Array.isArray(item.orchestration_steps)
-        ? item.orchestration_steps[0]?.name
-        : item.orchestration_steps?.name;
-      const summary = (item.output_payload as { summary?: string } | null)?.summary ?? 'Özet yok.';
+    const sections = typedRunSteps.map((item) => {
+      const stepName = getStepName(item.orchestration_steps);
+      const summary = item.output_payload?.summary ?? 'Özet yok.';
       return {
         title: stepName ?? `Adım ${item.step_order}`,
         body: summary,
