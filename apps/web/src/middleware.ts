@@ -124,5 +124,5 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image).*)'],
+  matcher: ['/((?!_next|favicon.ico|robots.txt|ads.txt).*)'],
 };
