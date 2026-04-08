@@ -1,7 +1,21 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
 
-const BYPASS_EXACT_PATHS = new Set(['/api/health', '/favicon.ico', '/robots.txt', '/ads.txt']);
+const BYPASS_EXACT_PATHS = new Set([
+  '/',
+  '/api/health',
+  '/signin',
+  '/signup',
+  '/pricing',
+  '/about',
+  '/contact',
+  '/privacy',
+  '/terms',
+  '/favicon.ico',
+  '/robots.txt',
+  '/ads.txt',
+]);
+
 const BYPASS_PREFIXES = ['/_next'];
 
 const PROTECTED_EXACT_PATHS = ['/dashboard', '/runs', '/saved', '/settings'];
@@ -94,23 +108,16 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     return NextResponse.next();
   }
 
-  const protectedPath = isProtectedPath(pathname);
-  const authEntryPath = pathname === '/signin' || pathname === '/signup';
-
-  if (!protectedPath && !authEntryPath) {
+  if (!isProtectedPath(pathname)) {
     return NextResponse.next();
   }
 
   const signedIn = await hasSession(request);
 
-  if (protectedPath && !signedIn) {
+  if (!signedIn) {
     const signinUrl = new URL('/signin', request.url);
     signinUrl.searchParams.set('next', `${pathname}${search}`);
     return NextResponse.redirect(signinUrl);
-  }
-
-  if (signedIn && authEntryPath) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
   return NextResponse.next();
