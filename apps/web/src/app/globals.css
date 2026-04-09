@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #070b16;
+  --panel: rgba(15, 20, 36, 0.82);
+  --line: rgba(109, 242, 255, 0.28);
+  --text: #e9eeff;
+  --muted: #a4b1d8;
+}
+
+body {
+  background:
+    radial-gradient(900px 500px at 0% -10%, rgba(124, 78, 255, 0.25), transparent),
+    radial-gradient(700px 500px at 100% 0%, rgba(32, 170, 255, 0.2), transparent),
+    var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.glass {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(14px);
+}
