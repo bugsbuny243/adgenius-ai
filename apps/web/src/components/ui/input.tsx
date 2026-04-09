@@ -1,23 +1,25 @@
-import React from 'react';
+import * as React from 'react';
 
-interface InputProps {
-    type?: string;
-    placeholder?: string;
-    value?: string;
-    onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-    className?: string;
-}
+import { cn } from '@/lib/utils';
 
-const Input: React.FC<InputProps> = ({ type = 'text', placeholder, value, onChange, className }) => {
+type InputProps = React.InputHTMLAttributes<HTMLInputElement>;
+
+const Input = React.forwardRef<HTMLInputElement, InputProps>(
+  ({ className, type = 'text', ...props }, ref) => {
     return (
-        <input
-            type={type}
-            placeholder={placeholder}
-            value={value}
-            onChange={onChange}
-            className={`border rounded p-2 ${className}`}
-        />
+      <input
+        ref={ref}
+        type={type}
+        className={cn(
+          'flex h-10 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 disabled:cursor-not-allowed disabled:opacity-50',
+          className,
+        )}
+        {...props}
+      />
     );
-};
+  },
+);
 
-export default Input;
+Input.displayName = 'Input';
+
+export { Input };

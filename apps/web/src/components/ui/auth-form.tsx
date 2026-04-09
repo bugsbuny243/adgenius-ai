@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 import { createBrowserSupabase, SupabaseEnvironmentError } from '@/lib/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 type AuthMode = 'login' | 'signup';
 
@@ -237,14 +239,14 @@ export function AuthForm({ mode }: AuthFormProps) {
         <label htmlFor="email" className="text-sm text-zinc-300">
           E-posta
         </label>
-        <input
+        <Input
           id="email"
           type="email"
           autoComplete="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           required
-          className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none ring-indigo-400 placeholder:text-zinc-500 focus:ring"
+          className="w-full"
           placeholder="ornek@koschei.ai"
         />
       </div>
@@ -252,7 +254,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         <label htmlFor="password" className="text-sm text-zinc-300">
           Şifre
         </label>
-        <input
+        <Input
           id="password"
           type="password"
           autoComplete={isLogin ? 'current-password' : 'new-password'}
@@ -260,7 +262,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           onChange={(event) => setPassword(event.target.value)}
           required
           minLength={6}
-          className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none ring-indigo-400 placeholder:text-zinc-500 focus:ring"
+          className="w-full"
           placeholder="••••••••"
         />
       </div>
@@ -275,13 +277,13 @@ export function AuthForm({ mode }: AuthFormProps) {
         </p>
       ) : null}
 
-      <button
+      <Button
         type="submit"
         disabled={loading}
-        className="w-full rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-70"
+        className="w-full"
       >
         {loading ? 'İşleniyor...' : isLogin ? 'Giriş Yap' : 'Hesap Oluştur'}
-      </button>
+      </Button>
     </form>
   );
 }
