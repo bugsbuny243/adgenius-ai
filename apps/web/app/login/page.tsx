@@ -1,14 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const router = useRouter();
+  const searchParams = useSearchParams();
 
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -19,19 +19,20 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/dashboard`
+        emailRedirectTo: `${window.location.origin}/auth/callback`
       }
     });
 
     if (error) {
       setMessage(error.message);
     } else {
-      setMessage('Magic link e-posta adresinize gönderildi.');
-      router.refresh();
+      setMessage('Magic link e-posta adresinize gönderildi. Linke tıklayıp devam edin.');
     }
 
     setLoading(false);
   }
+
+  const loginError = searchParams.get('error');
 
   return (
     <main className="mx-auto max-w-xl panel">
@@ -59,6 +60,7 @@ export default function LoginPage() {
         </button>
       </form>
       {message ? <p className="mt-4 text-sm text-lilac">{message}</p> : null}
+      {loginError ? <p className="mt-4 text-sm text-red-300">Giriş hatası: {loginError}</p> : null}
     </main>
   );
 }

@@ -1,12 +1,7 @@
 import { redirect } from 'next/navigation';
 import { Nav } from '@/components/nav';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
-
-const agents = [
-  { name: 'Creative Strategist', status: 'Healthy', queue: 3 },
-  { name: 'Copy Optimizer', status: 'Healthy', queue: 7 },
-  { name: 'Spend Guard', status: 'Attention', queue: 14 }
-];
+import { getWorkspaceContext } from '@/lib/workspace';
 
 export default async function AgentsPage() {
   const supabase = await createSupabaseServerClient();
@@ -16,22 +11,44 @@ export default async function AgentsPage() {
 
   if (!user) redirect('/login');
 
+  const { workspaceId } = await getWorkspaceContext();
+
+  const { data: agents, error } = await supabase
+    .from('agent_types')
+    .select('id, key, name, description, model_name, is_active')
+    .or(`workspace_id.eq.${workspaceId},workspace_id.is.null`)
+    .order('name', { ascending: true });
+
+  if (error) {
+    throw new Error(`Failed to load agents: ${error.message}`);
+  }
+
   return (
     <main>
       <Nav />
       <section className="panel">
-        <h2 className="mb-4 text-2xl font-semibold">Agent Operations</h2>
-        <div className="space-y-3">
-          {agents.map((agent) => (
-            <div key={agent.name} className="flex items-center justify-between rounded-xl border border-white/10 px-4 py-3">
-              <div>
-                <p className="font-medium">{agent.name}</p>
-                <p className="text-sm text-white/60">Status: {agent.status}</p>
+        <h2 className="mb-4 text-2xl font-semibold">Agent Registry</h2>
+        {agents && agents.length > 0 ? (
+          <div className="space-y-3">
+            {agents.map((agent) => (
+              <div key={agent.id} className="rounded-xl border border-white/10 px-4 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{agent.name}</p>
+                    <p className="text-sm text-white/60">Key: {agent.key}</p>
+                    <p className="text-sm text-white/60">Model: {agent.model_name}</p>
+                    <p className="mt-1 text-sm text-white/80">{agent.description || 'No description yet.'}</p>
+                  </div>
+                  <span className="rounded-md border border-white/10 px-2 py-1 text-xs uppercase text-white/70">
+                    {agent.is_active ? 'active' : 'inactive'}
+                  </span>
+                </div>
               </div>
-              <p className="text-sm">Queue: {agent.queue}</p>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-white/70">No agent types found in this workspace yet.</p>
+        )}
       </section>
     </main>
   );
