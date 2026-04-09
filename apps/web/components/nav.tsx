@@ -2,7 +2,8 @@ import Link from 'next/link';
 
 const links = [
   { href: '/dashboard', label: 'Dashboard' },
-  { href: '/agents', label: 'Agents' }
+  { href: '/agents', label: 'Agents' },
+  { href: '/projects', label: 'Projects' }
 ];
 
 export function Nav() {

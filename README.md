@@ -1,23 +1,46 @@
 # Koschei AI Command Center
 
-Bu repo artık **Next.js 16 + React + TypeScript + Tailwind + Supabase Auth** mimarisine hizalanmıştır.
+Workspace tabanlı bir **AI command center foundation**:
+- Next.js App Router + TypeScript + Tailwind
+- Supabase Auth + Postgres + RLS
+- Gemini-only orchestration (Supabase Edge Function)
 
-## Neler düzeltildi?
+## Current product scope
 
-- Vanilla `index.html/main.js` demodan **App Router** tabanlı Next.js uygulamasına geçildi.
-- Koschei branding “Koschei AI Command Center” olarak netleştirildi.
-- Supabase auth ile **login + protected pages + middleware** akışı eklendi.
-- `/dashboard` ve `/agents` sayfaları auth korumalı hale getirildi.
-- Railway benzeri platformlarda deploy edilebilir standart Next.js çalışma modeli (`next build && next start`) benimsendi.
+Bu repo artık demo shell olmaktan çıkarılıp şu temel akışlara hizalandı:
+- Magic-link login + auth callback bootstrap
+- Workspace, membership, profile foundation
+- Real dashboard metrics (workspace verisine dayalı)
+- Agent registry (Supabase `agent_types`)
+- Project list + project detail + project item creation
+- Agent run logging + saved outputs
+- Minimal subscription / usage awareness
 
-## Proje yapısı
+## Tech stack
 
-- `apps/web/app` → Next.js App Router sayfaları
-- `apps/web/middleware.ts` → auth koruması
-- `apps/web/lib/supabase-*.ts` → Supabase istemci yardımcıları
-- `supabase/functions/gemini-orchestrator/index.ts` → Edge Function orchestrator (opsiyonel backend görevleri)
+- `apps/web`: Next.js 16, React 19, TypeScript, Tailwind
+- `supabase/schema.sql`: workspace-centric SQL foundation + RLS
+- `supabase/functions/gemini-orchestrator/index.ts`: Gemini orchestrator
 
-## Hızlı başlangıç
+## Required environment variables
+
+`apps/web/.env.local`:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY
+```
+
+Supabase Edge Function secrets:
+
+```bash
+SUPABASE_URL=https://YOUR-PROJECT.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY
+GEMINI_API_KEY=YOUR_GEMINI_KEY
+```
+
+## Run web app
 
 ```bash
 cd apps/web
@@ -25,26 +48,62 @@ npm install
 npm run dev
 ```
 
-Sonra: `http://localhost:3000`
+Open `http://localhost:3000`.
 
-## Gerekli environment değişkenleri
+## Auth + bootstrap flow
 
-`.env.local` örneği:
+1. `/login` magic-link request gönderir.
+2. Magic-link `/auth/callback` route'una döner.
+3. Callback:
+   - session exchange yapar,
+   - `profiles` upsert eder,
+   - kullanıcıda workspace yoksa default workspace + owner membership + workspace user oluşturur,
+   - `subscriptions` ve `usage_counters` için default kayıt açar.
+4. User `/dashboard` içinde workspace-backed state görür.
 
-```bash
-NEXT_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY
-GEMINI_API_KEY=YOUR_GEMINI_KEY
+## Main app routes
+
+- `/login`
+- `/dashboard`
+- `/agents`
+- `/projects`
+- `/projects/[id]`
+
+## Database notes
+
+`supabase/schema.sql` şu tabloları içerir:
+- `workspaces`
+- `workspace_members`
+- `workspace_users`
+- `profiles`
+- `agent_types`
+- `projects`
+- `project_items`
+- `agent_runs`
+- `saved_outputs`
+- `subscriptions`
+- `usage_counters`
+- `usage_metering`
+
+Legacy/out-of-scope `ad_events` kaldırılmıştır.
+
+## Gemini orchestrator payload (breaking update)
+
+POST body (minimum):
+
+```json
+{
+  "workspaceId": "uuid",
+  "userId": "uuid",
+  "agentTypeId": "uuid",
+  "userInput": "your prompt"
+}
 ```
 
-## Auth akışı
+Optional fields:
+- `projectId`
+- `modelName`
+- `metadata`
+- `saveOutput` (default `true`)
 
-1. Kullanıcı `/login` sayfasında email ile magic-link ister.
-2. Supabase session cookie’si set edilir.
-3. `middleware.ts`, `/dashboard` ve `/agents` için session kontrolü yapar.
-4. Session yoksa `/login`’e redirect eder.
-
-## Not
-
-Eski demo dosyaları (`server.mjs`, `src/index.html`, `src/main.js`) repo içinde geçmiş referans olarak tutuldu, ancak yeni ana akış Next.js uygulamasıdır.
+Response includes `runId`, generated `resultText`, and token usage.
