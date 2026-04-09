@@ -1,15 +1,15 @@
 # Koschei x Gemini x Supabase Starter
 
-Bu kurulum, Koschei'yi premium bir ön yüz olarak kullanıp Gemini'yi arka planda çok-ajans motoru şeklinde konumlandırır.
+Bu repo, **Koschei premium frontend + Gemini ajan orkestrasyonu + Supabase backend** kombinasyonunu hızlıca ayağa kaldırmak için hazırlandı.
 
-## Neler var?
+## Özellikler
 
-- **Premium Frontend:** Cam efekti, metrik panosu ve canlı web editör.
-- **Gemini Orchestrator:** Supabase Edge Function üzerinden Gemini API çağrısı.
-- **Supabase Backend:** Kullanıcı, proje, ajan koşusu ve kullanım metrikleri için şema.
-- **AdSense Hazırlığı:** HTML içinde script + reklam slotu hazır.
+- **Premium Frontend:** Glassmorphism panel, canlı web editör, görev prompt çalıştırma, JSON çıktı ekranı.
+- **Gemini Orchestrator:** Supabase Edge Function ile Gemini 2.5 Pro çağrısı ve ajan çıktılarının DB'ye yazılması.
+- **Supabase Backend:** Proje, ajan koşuları ve reklam olayları için ölçeklenebilir şema + index + RLS politikaları.
+- **AdSense Hazırlığı:** HTML içinde ad slotu, repo kökünde `Ads.txt`, local server'da `/ads.txt` route.
 
-## Çalıştırma
+## Hızlı Başlangıç
 
 ```bash
 cd apps/web
@@ -18,16 +18,31 @@ npm start
 
 Ardından `http://localhost:4173` aç.
 
-## Supabase Deploy
+## Supabase Kurulumu
 
-1. Supabase projesi aç.
+1. Supabase projesi oluştur.
 2. `supabase/schema.sql` dosyasını SQL Editor'de çalıştır.
-3. Edge function olarak `supabase/functions/gemini-orchestrator/index.ts` yükle.
-4. Environment değişkenlerini `.env.example`'e göre tanımla.
+3. Edge Function olarak `supabase/functions/gemini-orchestrator/index.ts` dosyasını deploy et.
+4. Aşağıdaki environment değişkenlerini tanımla:
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `GEMINI_API_KEY`
 
-## Ölçek notları (1M kullanıcı hedefi)
+## Frontend Üzerinden Gemini Çalıştırma
 
-- Supabase üzerinde read replica + connection pooling.
-- Edge function için regional dağıtım ve kuyruk tabanlı agent işleme.
-- Gemini çağrılarında response caching + token budget limitleme.
-- Frontend tarafında CDN ve image optimization.
+Panelde şu alanları doldur:
+
+- `Function URL`: `https://<project-ref>.functions.supabase.co/gemini-orchestrator`
+- `Function Key`: Supabase anon key (veya güvenli gateway key)
+- `Project ID`
+- `User ID`
+- `Prompt`
+
+`Gemini Görev Çalıştır` ile edge function çağrılır ve sonuç arayüzde görüntülenir.
+
+## 1M kullanıcı hedefi için altyapı notları
+
+- **DB:** partitioning/archiving (agent_runs), read replicas, pooling.
+- **Queue:** uzun ajan görevlerini kuyruk sistemiyle asenkron çalıştır.
+- **Cache:** sık prompt/sonuçlar için Redis cache katmanı.
+- **Observability:** p95 latency, token kullanım, maliyet budget alarmı.
