@@ -1,4 +1,3 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
 
 const BYPASS_EXACT_PATHS = new Set([
@@ -67,11 +66,32 @@ function extractAccessToken(request: NextRequest, supabaseUrl: string): string |
   }
 }
 
-async function hasSession(request: NextRequest): Promise<boolean> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+function tokenHasNotExpired(token: string): boolean {
+  const parts = token.split('.');
 
-  if (!supabaseUrl || !supabaseAnonKey) {
+  if (parts.length < 2) {
+    return false;
+  }
+
+  try {
+    const encodedPayload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const normalizedPayload = encodedPayload.padEnd(Math.ceil(encodedPayload.length / 4) * 4, '=');
+    const payload = JSON.parse(atob(normalizedPayload)) as { exp?: number };
+
+    if (typeof payload.exp !== 'number') {
+      return true;
+    }
+
+    return payload.exp * 1000 > Date.now();
+  } catch {
+    return false;
+  }
+}
+
+function hasSession(request: NextRequest): boolean {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  if (!supabaseUrl) {
     return false;
   }
 
@@ -81,27 +101,10 @@ async function hasSession(request: NextRequest): Promise<boolean> {
     return false;
   }
 
-  try {
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-      },
-    });
-
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser(accessToken);
-
-    return !error && Boolean(user);
-  } catch {
-    return false;
-  }
+  return tokenHasNotExpired(accessToken);
 }
 
-export async function middleware(request: NextRequest): Promise<NextResponse> {
+export function middleware(request: NextRequest): NextResponse {
   const { pathname, search } = request.nextUrl;
 
   if (shouldBypassMiddleware(pathname)) {
@@ -112,7 +115,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     return NextResponse.next();
   }
 
-  const signedIn = await hasSession(request);
+  const signedIn = hasSession(request);
 
   if (!signedIn) {
     const signinUrl = new URL('/signin', request.url);
