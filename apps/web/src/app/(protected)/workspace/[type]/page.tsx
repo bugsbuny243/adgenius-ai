@@ -1,328 +1,304 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ChatThread, type ChatMessage } from '@/components/workspace/chat-thread';
-import { OutputEditor } from '@/components/workspace/output-editor';
-import { RunHistory, type WorkspaceRunItem } from '@/components/workspace/run-history';
-import { TaskComposer } from '@/components/workspace/task-composer';
-import { ApiRequestError, postJsonWithSession } from '@/lib/api-client';
 import { createBrowserSupabase } from '@/lib/supabase/client';
+import { resolveWorkspaceContext } from '@/lib/workspace';
 
-type AgentTypeRow = {
+type StreamLog = {
   id: string;
-  slug: string;
-  name: string;
-  icon: string | null;
-  description: string | null;
-  placeholder: string | null;
-  is_active: boolean;
+  role: 'system' | 'user' | 'assistant' | 'error';
+  message: string;
+  createdAt: string;
 };
 
-type AgentRunResponse = {
-  result?: string;
-  runId?: string;
-  error?: string;
+type WsIncomingMessage =
+  | { type: 'ack'; status: string }
+  | { type: 'stream'; chunk: string }
+  | { type: 'done'; status: string; output_preview?: string }
+  | { type: 'error'; message?: string; details?: unknown };
+
+type SessionContext = {
+  userId: string;
+  workspaceId: string;
 };
 
-type MobileTab = 'gorev' | 'sonuc' | 'gecmis';
+const DEFAULT_WS_URL = 'ws://localhost:8000/ws/agent';
+const DEFAULT_PREVIEW_DOC = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Koschei Live Preview</title>
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0;
+        padding: 24px;
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        background: #09090b;
+        color: #f4f4f5;
+      }
+      .placeholder {
+        border: 1px dashed #3f3f46;
+        border-radius: 16px;
+        padding: 20px;
+        background: #18181b;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="placeholder">
+      <h2>Live Preview hazır</h2>
+      <p>Soldan prompt gönderdiğinde stream edilen HTML/CSS/JS burada canlı render edilir.</p>
+    </div>
+  </body>
+</html>`;
 
-function toChatMessages(run: WorkspaceRunItem): ChatMessage[] {
-  const baseTime = run.created_at;
-  const messages: ChatMessage[] = [
-    {
-      id: `${run.id}-user`,
-      role: 'user',
-      content: run.user_input,
-      createdAt: baseTime,
-    },
-  ];
-
-  if (run.result_text) {
-    messages.push({
-      id: `${run.id}-assistant`,
-      role: 'assistant',
-      content: run.result_text,
-      createdAt: baseTime,
-    });
-  }
-
-  return messages;
+function getWsEndpoint(): string {
+  const value = process.env.NEXT_PUBLIC_AGENT_WS_URL?.trim();
+  return value && value.length > 0 ? value : DEFAULT_WS_URL;
 }
 
-export default function WorkspacePage({ params }: { params: { type: string } }) {
-  const [agent, setAgent] = useState<AgentTypeRow | null>(null);
-  const [history, setHistory] = useState<WorkspaceRunItem[]>([]);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [taskInput, setTaskInput] = useState('');
-  const [lastPrompt, setLastPrompt] = useState('');
-  const [editorContent, setEditorContent] = useState('');
-  const [activeRunId, setActiveRunId] = useState<string | null>(null);
-  const [saveTitle, setSaveTitle] = useState('');
-  const [saveStatus, setSaveStatus] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [running, setRunning] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [activeMobileTab, setActiveMobileTab] = useState<MobileTab>('gorev');
+function toErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return 'Beklenmeyen bir hata oluştu.';
+}
+
+function isWsIncomingMessage(value: unknown): value is WsIncomingMessage {
+  return typeof value === 'object' && value !== null && 'type' in value;
+}
+
+export default function WorkspaceDualPanePage({ params }: { params: { type: string } }) {
+  const [sessionContext, setSessionContext] = useState<SessionContext | null>(null);
+  const [prompt, setPrompt] = useState('');
+  const [streamedCode, setStreamedCode] = useState('');
+  const [logs, setLogs] = useState<StreamLog[]>([]);
+  const [isLoadingContext, setIsLoadingContext] = useState(true);
+  const [isRunning, setIsRunning] = useState(false);
+
+  const websocketRef = useRef<WebSocket | null>(null);
+  const runIndexRef = useRef(0);
+
+  const wsEndpoint = useMemo(() => getWsEndpoint(), []);
+  const previewDoc = streamedCode.trim().length > 0 ? streamedCode : DEFAULT_PREVIEW_DOC;
+
+  const appendLog = useCallback((role: StreamLog['role'], message: string) => {
+    const createdAt = new Date().toISOString();
+
+    setLogs((current) => [
+      ...current,
+      {
+        id: `${createdAt}-${current.length + 1}`,
+        role,
+        message,
+        createdAt,
+      },
+    ]);
+  }, []);
 
   useEffect(() => {
-    async function bootstrap() {
-      setLoading(true);
-      setError('');
+    async function loadContext() {
+      setIsLoadingContext(true);
 
       try {
         const supabase = createBrowserSupabase();
+        const context = await resolveWorkspaceContext(supabase);
 
-        const [{ data: agentData, error: agentError }, { data: historyData, error: historyError }] = await Promise.all([
-          supabase
-            .from('agent_types')
-            .select('id, slug, name, icon, description, placeholder, is_active')
-            .eq('slug', params.type)
-            .eq('is_active', true)
-            .maybeSingle(),
-          supabase
-            .from('agent_runs')
-            .select('id, created_at, status, user_input, result_text')
-            .eq('agent_type', params.type)
-            .order('created_at', { ascending: false })
-            .limit(10),
-        ]);
+        setSessionContext({
+          userId: context.user.id,
+          workspaceId: context.workspace.id,
+        });
 
-        if (agentError || historyError) {
-          setError(agentError?.message ?? historyError?.message ?? 'Workspace yüklenemedi.');
-          return;
-        }
-
-        if (!agentData) {
-          setError('Agent bulunamadı veya aktif değil.');
-          return;
-        }
-
-        const mappedHistory = (historyData ?? []) as WorkspaceRunItem[];
-
-        setAgent(agentData as AgentTypeRow);
-        setHistory(mappedHistory);
-
-        if (mappedHistory.length > 0) {
-          const latest = mappedHistory[0];
-          setMessages(toChatMessages(latest));
-          setTaskInput(latest.user_input);
-          setLastPrompt(latest.user_input);
-          setEditorContent(latest.result_text ?? '');
-          setActiveRunId(latest.id);
-          if (latest.result_text) {
-            setSaveTitle(`${(agentData as AgentTypeRow).name} - ${new Date().toLocaleString('tr-TR')}`);
-          }
-        }
-
-        window.localStorage.setItem('koschei:last-agent-type', params.type);
-      } catch (bootstrapError) {
-        setError(bootstrapError instanceof Error ? bootstrapError.message : 'Workspace açılamadı.');
+        appendLog('system', `Workspace hazır • agent tipi: ${params.type}`);
+      } catch (error) {
+        appendLog('error', `Context yüklenemedi: ${toErrorMessage(error)}`);
       } finally {
-        setLoading(false);
+        setIsLoadingContext(false);
       }
     }
 
-    void bootstrap();
-  }, [params.type]);
+    void loadContext();
+  }, [appendLog, params.type]);
 
-  async function executeRun(prompt: string) {
-    setRunning(true);
-    setError('');
-    setSaveStatus('');
-
-    const userMessage: ChatMessage = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content: prompt,
-      createdAt: new Date().toISOString(),
+  useEffect(() => {
+    return () => {
+      websocketRef.current?.close();
+      websocketRef.current = null;
     };
+  }, []);
 
-    setMessages((current) => [...current, userMessage]);
+  async function runWorkspacePrompt(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
 
-    try {
-      const data = await postJsonWithSession<AgentRunResponse, { type: string; userInput: string }>('/api/agents/run', {
-        type: params.type,
-        userInput: prompt,
-      });
+    if (!sessionContext || isRunning || prompt.trim().length === 0) {
+      return;
+    }
 
-      const resultText = data.result ?? 'Boş sonuç döndü.';
+    runIndexRef.current += 1;
+    const currentRun = runIndexRef.current;
 
-      const assistantMessage: ChatMessage = {
-        id: `assistant-${data.runId ?? Date.now()}`,
-        role: 'assistant',
-        content: resultText,
-        createdAt: new Date().toISOString(),
+    setIsRunning(true);
+    setStreamedCode('');
+
+    appendLog('user', prompt.trim());
+    appendLog('system', `WebSocket bağlanıyor: ${wsEndpoint}`);
+
+    websocketRef.current?.close();
+
+    const ws = new WebSocket(wsEndpoint);
+    websocketRef.current = ws;
+
+    ws.onopen = () => {
+      const payload = {
+        prompt: prompt.trim(),
+        workspace_id: sessionContext.workspaceId,
+        user_id: sessionContext.userId,
       };
 
-      setMessages((current) => [...current, assistantMessage]);
-      setEditorContent(resultText);
-      setLastPrompt(prompt);
-      setTaskInput(prompt);
-      setActiveRunId(data.runId ?? null);
+      ws.send(JSON.stringify(payload));
+      appendLog('system', 'Prompt gönderildi. Stream bekleniyor...');
+    };
 
-      if (agent) {
-        setSaveTitle(`${agent.name} - ${new Date().toLocaleString('tr-TR')}`);
-      }
+    ws.onmessage = (messageEvent) => {
+      try {
+        const parsed: unknown = JSON.parse(String(messageEvent.data));
 
-      const supabase = createBrowserSupabase();
-      const { data: refreshedRuns, error: refreshError } = await supabase
-        .from('agent_runs')
-        .select('id, created_at, status, user_input, result_text')
-        .eq('agent_type', params.type)
-        .order('created_at', { ascending: false })
-        .limit(10);
+        if (!isWsIncomingMessage(parsed)) {
+          appendLog('error', 'Bilinmeyen WebSocket mesajı alındı.');
+          return;
+        }
 
-      if (!refreshError) {
-        setHistory((refreshedRuns ?? []) as WorkspaceRunItem[]);
+        if (parsed.type === 'ack') {
+          appendLog('system', `ACK alındı: ${parsed.status}`);
+          return;
+        }
+
+        if (parsed.type === 'stream') {
+          setStreamedCode((current) => `${current}${parsed.chunk}`);
+          appendLog('assistant', parsed.chunk);
+          return;
+        }
+
+        if (parsed.type === 'done') {
+          appendLog('system', `Çalıştırma tamamlandı: ${parsed.status}`);
+          if (runIndexRef.current === currentRun) {
+            setIsRunning(false);
+          }
+          ws.close();
+          return;
+        }
+
+        if (parsed.type === 'error') {
+          appendLog('error', parsed.message ?? 'WebSocket hata mesajı alındı.');
+          if (runIndexRef.current === currentRun) {
+            setIsRunning(false);
+          }
+          ws.close();
+        }
+      } catch {
+        appendLog('error', 'WebSocket mesajı parse edilemedi.');
       }
-    } catch (runError) {
-      if (runError instanceof ApiRequestError) {
-        setError(runError.message);
-      } else {
-        setError(runError instanceof Error ? runError.message : 'Çalıştırma sırasında hata oluştu.');
+    };
+
+    ws.onerror = () => {
+      appendLog('error', 'WebSocket bağlantısında hata oluştu.');
+      if (runIndexRef.current === currentRun) {
+        setIsRunning(false);
       }
-    } finally {
-      setRunning(false);
-    }
+    };
+
+    ws.onclose = () => {
+      if (runIndexRef.current === currentRun) {
+        setIsRunning(false);
+      }
+      if (websocketRef.current === ws) {
+        websocketRef.current = null;
+      }
+    };
   }
-
-  async function handleSave(content: string) {
-    if (!activeRunId || content.trim().length === 0) {
-      setSaveStatus('Kaydetmek için önce bir sonuç üretin.');
-      return;
-    }
-
-    setSaving(true);
-    setSaveStatus('');
-
-    try {
-      await postJsonWithSession<{ saved: { id: string } }, { runId: string; title: string; content: string }>('/api/outputs/save', {
-        runId: activeRunId,
-        title: saveTitle,
-        content,
-      });
-
-      setSaveStatus('Çıktı kaydedildi.');
-    } catch (saveError) {
-      if (saveError instanceof ApiRequestError) {
-        setSaveStatus(saveError.message);
-      } else {
-        setSaveStatus(saveError instanceof Error ? saveError.message : 'Kaydetme sırasında hata oluştu.');
-      }
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleCopy(content: string) {
-    if (content.trim().length === 0) {
-      setSaveStatus('Kopyalanacak içerik yok.');
-      return;
-    }
-
-    await navigator.clipboard.writeText(content);
-    setSaveStatus('İçerik panoya kopyalandı.');
-  }
-
-  const tabs = useMemo(
-    () => [
-      { id: 'gorev' as const, label: 'Görev' },
-      { id: 'sonuc' as const, label: 'Sonuç' },
-      { id: 'gecmis' as const, label: 'Geçmiş' },
-    ],
-    [],
-  );
 
   return (
     <section className="space-y-4">
       <header className="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-4">
-        <p className="text-xs uppercase tracking-wide text-indigo-300">Çalışma Alanı</p>
-        <h1 className="mt-1 text-2xl font-semibold text-white">
-          {agent?.icon ?? '🤖'} {agent?.name ?? 'Agent Workspace'}
-        </h1>
+        <p className="text-xs uppercase tracking-wide text-indigo-300">Generative Workspace</p>
+        <h1 className="mt-1 text-2xl font-semibold text-white">{params.type} • Split-Screen</h1>
         <p className="mt-2 text-sm text-zinc-300">
-          {agent?.description ?? 'Görevi yazın, sonucu çalıştırma akışında takip edin ve sağ panelde düzenleyip kaydedin.'}
+          Sol panelde prompt + stream log, sağ panelde canlı iframe önizleme.
         </p>
       </header>
 
-      {error ? <p className="rounded-lg border border-rose-800 bg-rose-950/40 p-3 text-sm text-rose-200">{error}</p> : null}
+      <div className="grid min-h-[calc(100vh-220px)] grid-cols-1 gap-4 xl:grid-cols-2">
+        <aside className="flex h-full flex-col rounded-2xl border border-zinc-800 bg-zinc-950/60 p-4">
+          <h2 className="mb-3 text-sm font-medium text-zinc-200">The Brain • Task Composer & Logs</h2>
 
-      <div className="mb-1 flex gap-2 md:hidden">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveMobileTab(tab.id)}
-            className={`rounded-lg px-3 py-2 text-sm ${activeMobileTab === tab.id ? 'bg-indigo-500 text-white' : 'border border-zinc-700 text-zinc-300'}`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+          <form onSubmit={runWorkspacePrompt} className="space-y-3">
+            <textarea
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+              rows={8}
+              placeholder="UI üretimi için prompt gir. Örn: Hero + pricing + CTA içeren modern bir landing sayfası üret."
+              className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 outline-none ring-indigo-400 placeholder:text-zinc-500 focus:ring"
+              disabled={isLoadingContext || isRunning}
+            />
+            <button
+              type="submit"
+              disabled={isLoadingContext || isRunning || prompt.trim().length === 0}
+              className="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {isRunning ? 'Streaming...' : 'Çalıştır'}
+            </button>
+          </form>
 
-      <div className="grid gap-4 md:grid-cols-12">
-        <aside className={`space-y-4 md:col-span-3 ${activeMobileTab !== 'gecmis' ? 'hidden md:block' : ''}`}>
-          <section className="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-4">
-            <h2 className="text-sm font-medium text-zinc-200">Agent Özeti</h2>
-            <p className="mt-2 text-sm text-zinc-300">Tip: {agent?.slug ?? '-'}</p>
-            <p className="mt-1 text-sm text-zinc-400">Toplam son çalışma: {history.length}</p>
-          </section>
-          <RunHistory
-            runs={history}
-            activeRunId={activeRunId}
-            onSelect={(run) => {
-              setTaskInput(run.user_input);
-              setLastPrompt(run.user_input);
-              setEditorContent(run.result_text ?? '');
-              setMessages(toChatMessages(run));
-              setActiveRunId(run.id);
-              setActiveMobileTab('gorev');
-            }}
-            onRerun={(run) => {
-              setTaskInput(run.user_input);
-              setLastPrompt(run.user_input);
-              void executeRun(run.user_input);
-            }}
-          />
+          <div className="mt-4 flex min-h-0 flex-1 flex-col rounded-xl border border-zinc-800 bg-zinc-900/40 p-3">
+            <p className="mb-2 text-xs uppercase tracking-wide text-zinc-400">Visual Log (Thought Process + Raw Stream)</p>
+
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+              {logs.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-zinc-700 p-3 text-sm text-zinc-400">
+                  Henüz log yok. Prompt gönderince stream adımları burada görünür.
+                </p>
+              ) : (
+                logs.map((log) => (
+                  <article
+                    key={log.id}
+                    className={`rounded-lg border p-2 text-sm ${
+                      log.role === 'user'
+                        ? 'border-indigo-500/40 bg-indigo-500/10 text-indigo-100'
+                        : log.role === 'assistant'
+                          ? 'border-zinc-700 bg-zinc-900/70 text-zinc-100'
+                          : log.role === 'error'
+                            ? 'border-rose-700/60 bg-rose-950/30 text-rose-200'
+                            : 'border-zinc-700/60 bg-zinc-900/60 text-zinc-300'
+                    }`}
+                  >
+                    <p className="whitespace-pre-wrap">{log.message}</p>
+                    <p className="mt-1 text-[11px] opacity-70">{new Date(log.createdAt).toLocaleTimeString('tr-TR')}</p>
+                  </article>
+                ))
+              )}
+            </div>
+
+            <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+              <p className="mb-2 text-xs uppercase tracking-wide text-zinc-400">Aggregated Code</p>
+              <pre className="max-h-44 overflow-auto whitespace-pre-wrap text-xs text-zinc-300">{streamedCode || '// Stream edilen kod burada birikir.'}</pre>
+            </div>
+          </div>
         </aside>
 
-        <main className={`space-y-4 md:col-span-4 ${activeMobileTab === 'sonuc' || activeMobileTab === 'gecmis' ? 'hidden md:block' : ''}`}>
-          <ChatThread messages={messages} loading={loading} />
-          <TaskComposer
-            value={taskInput}
-            onChange={setTaskInput}
-            onSubmit={() => {
-              if (!running && taskInput.trim().length > 0) {
-                void executeRun(taskInput.trim());
-              }
-            }}
-            isRunning={running}
-            placeholder={agent?.placeholder ?? undefined}
-            lastPrompt={lastPrompt}
-            onUseLastPrompt={() => setTaskInput(lastPrompt)}
-          />
-        </main>
-
-        <aside className={`md:col-span-5 ${activeMobileTab === 'gorev' || activeMobileTab === 'gecmis' ? 'hidden md:block' : ''}`}>
-          <OutputEditor
-            initialContent={editorContent}
-            saveTitle={saveTitle}
-            onTitleChange={setSaveTitle}
-            onSave={(content) => {
-              void handleSave(content);
-            }}
-            onContentAutosave={setEditorContent}
-            onCopy={handleCopy}
-            onClear={() => {
-              setEditorContent('');
-              setSaveStatus('Editör içeriği temizlendi.');
-            }}
-            saving={saving}
-            saveStatus={saveStatus}
-          />
-        </aside>
+        <section className="flex h-full flex-col rounded-2xl border border-zinc-800 bg-zinc-950/60 p-4">
+          <h2 className="mb-3 text-sm font-medium text-zinc-200">The Canvas • Live Preview</h2>
+          <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950">
+            <iframe
+              title="live-preview"
+              sandbox="allow-scripts"
+              srcDoc={previewDoc}
+              className="h-full min-h-[480px] w-full bg-white"
+            />
+          </div>
+        </section>
       </div>
     </section>
   );
