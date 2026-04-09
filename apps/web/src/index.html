@@ -4,8 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Koschei x Gemini Command Center</title>
-    <meta name="description" content="Koschei ön yüzü, Gemini ajan orkestrasyonu ve Supabase backend ile premium büyüme platformu." />
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script>
+    <meta
+      name="description"
+      content="Koschei ön yüzü, Gemini ajan orkestrasyonu ve Supabase backend ile premium büyüme platformu."
+    />
+    <script
+      async
+      src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX"
+      crossorigin="anonymous"
+    ></script>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
@@ -15,19 +22,30 @@
         <p class="badge">KOSCHEI FRONT CONTROL</p>
         <h1>Gemini Gücüyle 1M Kullanıcı Ölçekli Growth Motoru</h1>
         <p>
-          Tüm ajanlar Supabase üzerinden stateful çalışır, Gemini çok-ajans orkestrasyonuyla canlı görev alır
-          ve Koschei panelinden tek noktadan yönetilir.
+          Tüm ajanlar Supabase üzerinde stateful çalışır. Canlı web editör ve Gemini orkestratör ile kampanya,
+          funnel ve gelir kararları tek panelden yönetilir.
         </p>
         <div class="hero-actions">
           <button id="deployBtn">Orkestrasyonu Başlat</button>
-          <button class="secondary">Canlı Demo</button>
+          <button class="secondary" id="runPromptBtn">Gemini Görev Çalıştır</button>
+          <span id="statusPill" data-tone="idle">Hazır</span>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Orkestratör Ayarları</h2>
+        <div class="settings-grid">
+          <label>Function URL <input id="functionUrl" value="https://YOUR-PROJECT.functions.supabase.co/gemini-orchestrator" /></label>
+          <label>Function Key <input id="functionKey" type="password" placeholder="SUPABASE_ANON_KEY" /></label>
+          <label>Project ID <input id="projectId" value="default-project" /></label>
+          <label>User ID <input id="userId" value="koschei-admin" /></label>
         </div>
       </section>
 
       <section class="grid">
         <article class="card">
           <h2>Canlı Web Editör</h2>
-          <p>Prompt + HTML + JS düzenle, sağ panelde anında çıktı al.</p>
+          <p>HTML kampanya bloğunu düzenle, sağ panelde anında görüntüle.</p>
           <textarea id="editor" spellcheck="false"><h3>Ad Creative</h3><p>Gemini destekli kampanya bloğu.</p></textarea>
         </article>
 
@@ -35,6 +53,15 @@
           <h2>Preview</h2>
           <iframe id="preview"></iframe>
         </article>
+      </section>
+
+      <section class="card">
+        <h2>Görev Promptu</h2>
+        <textarea id="promptInput" spellcheck="false"></textarea>
+      </section>
+
+      <section class="card">
+        <div class="progress" id="agentProgress" style="--progress: 0%"><span>0%</span></div>
       </section>
 
       <section class="card metrics">
@@ -56,13 +83,26 @@
         </div>
       </section>
 
-      <section class="card">
-        <h2>Gemini Ajan Ağı</h2>
-        <ul id="agentList"></ul>
+      <section class="grid">
+        <article class="card">
+          <h2>Gemini Ajan Ağı</h2>
+          <ul id="agentList"></ul>
+        </article>
+        <article class="card">
+          <h2>Orkestratör Çıktısı</h2>
+          <pre id="orchestratorOutput">Henüz görev çalıştırılmadı.</pre>
+        </article>
       </section>
 
       <section class="card ads-slot">
-        <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-XXXXXXXXXXXXXXXX" data-ad-slot="1234567890" data-ad-format="auto" data-full-width-responsive="true"></ins>
+        <ins
+          class="adsbygoogle"
+          style="display:block"
+          data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+          data-ad-slot="1234567890"
+          data-ad-format="auto"
+          data-full-width-responsive="true"
+        ></ins>
       </section>
     </main>
     <script type="module" src="/main.js"></script>
