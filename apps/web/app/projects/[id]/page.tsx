@@ -21,7 +21,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     'use server';
 
     const title = String(formData.get('title') ?? '').trim();
-    const content = String(formData.get('content') ?? '').trim();
+    const details = String(formData.get('details') ?? '').trim();
 
     if (!title) return;
 
@@ -38,8 +38,10 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       workspace_id: currentWorkspaceId,
       project_id: id,
       user_id: currentUser.id,
+      item_type: 'note',
       title,
-      content: content || null
+      status: 'open',
+      payload: details ? { details } : null
     });
 
     revalidatePath(`/projects/${id}`);
@@ -60,7 +62,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const [{ data: items }, { data: outputs }] = await Promise.all([
     supabase
       .from('project_items')
-      .select('id, title, content, status, created_at')
+      .select('id, item_type, title, status, payload, source_output_id, created_at')
       .eq('project_id', project.id)
       .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: false }),
@@ -95,8 +97,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 outline-none focus:border-neon"
           />
           <input
-            name="content"
-            placeholder="Item details"
+            name="details"
+            placeholder="Item details (optional)"
             className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 outline-none focus:border-neon"
           />
           <button type="submit" className="rounded-lg bg-neon px-4 py-2 font-semibold text-ink">
@@ -113,8 +115,14 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               {items.map((item) => (
                 <div key={item.id} className="rounded-lg border border-white/10 px-3 py-2">
                   <p className="font-medium">{item.title}</p>
-                  <p className="text-sm text-white/70">{item.content || 'No details.'}</p>
+                  <p className="text-sm text-white/70">
+                    {(item.payload && typeof item.payload === 'object' && 'details' in item.payload
+                      ? String(item.payload.details ?? '')
+                      : '') || 'No details.'}
+                  </p>
+                  <p className="text-xs text-white/50">Type: {item.item_type}</p>
                   <p className="text-xs text-white/50">Status: {item.status}</p>
+                  {item.source_output_id ? <p className="text-xs text-white/50">From output: {item.source_output_id}</p> : null}
                 </div>
               ))}
             </div>
