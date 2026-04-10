@@ -11,11 +11,10 @@ export default function ContactPage() {
       <h1 className="text-3xl font-bold">Contact</h1>
       <p className="text-white/75">If you have a support request or business inquiry, please reach us by email:</p>
       <p className="font-medium">
-        <a className="text-neon hover:underline" href="mailto:contact@yourdomain.com">
-          contact@yourdomain.com
+        <a className="text-neon hover:underline" href="mailto:hello@tradepigloball.co">
+          hello@tradepigloball.co
         </a>
       </p>
-      <p className="text-sm text-white/60">Replace this placeholder with your real support email before launch.</p>
     </main>
   );
 }

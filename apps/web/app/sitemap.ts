@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next';
 
-const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.example.com';
+const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://tradepigloball.co';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const routes = ['/', '/about', '/contact', '/privacy-policy'];

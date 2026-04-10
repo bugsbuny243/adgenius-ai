@@ -20,8 +20,8 @@ export default function PrivacyPolicyPage() {
       </p>
       <p className="text-white/75">
         If you have privacy questions, contact us at{' '}
-        <a className="text-neon hover:underline" href="mailto:contact@yourdomain.com">
-          contact@yourdomain.com
+        <a className="text-neon hover:underline" href="mailto:hello@tradepigloball.co">
+          hello@tradepigloball.co
         </a>
         .
       </p>
