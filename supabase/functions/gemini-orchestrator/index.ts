@@ -24,8 +24,54 @@ type OrchestratorPayload = {
   };
 };
 
+type AuthenticatedUser = {
+  id: string;
+};
+
 function normalizeIds(ids: string[] | undefined) {
   return [...new Set((ids ?? []).map((id) => id.trim()).filter(Boolean))];
+}
+
+function jsonResponse(status: number, payload: Record<string, unknown>) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
+
+function parseBearerToken(authHeader: string | null) {
+  if (!authHeader) return null;
+
+  const [scheme, token] = authHeader.split(' ');
+  if (scheme?.toLowerCase() !== 'bearer' || !token) {
+    return null;
+  }
+
+  return token.trim();
+}
+
+async function resolveAuthenticatedUser(req: Request): Promise<AuthenticatedUser | null> {
+  const token = parseBearerToken(req.headers.get('authorization'));
+  if (!token) return null;
+
+  const authClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
+    global: {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    }
+  });
+
+  const {
+    data: { user },
+    error
+  } = await authClient.auth.getUser();
+
+  if (error || !user) {
+    return null;
+  }
+
+  return { id: user.id };
 }
 
 Deno.serve(async (req) => {
@@ -34,18 +80,25 @@ Deno.serve(async (req) => {
   }
 
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ ok: false, error: 'Only POST is supported' }), {
-      status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    return jsonResponse(405, { ok: false, error: 'Only POST is supported' });
   }
 
-  const body: OrchestratorPayload = await req.json();
+  const authenticatedUser = await resolveAuthenticatedUser(req);
+  if (!authenticatedUser) {
+    return jsonResponse(401, { ok: false, error: 'Authentication required' });
+  }
+
+  let body: OrchestratorPayload;
+  try {
+    body = await req.json();
+  } catch {
+    return jsonResponse(400, { ok: false, error: 'Invalid JSON payload' });
+  }
+
   const workspaceId = body.workspaceId?.trim();
-  const userId = body.userId?.trim();
+  const requestedUserId = body.userId?.trim();
   const agentTypeId = body.agentTypeId?.trim();
   const projectId = body.projectId?.trim() || null;
-  const modelName = body.modelName?.trim() || 'gemini-2.5-pro';
   const userInput = body.userInput?.trim();
   const metadata = body.metadata ?? {};
   const saveOutput = body.saveOutput ?? true;
@@ -54,20 +107,67 @@ Deno.serve(async (req) => {
   const sourceIds = normalizeIds(body.contextSelection?.sourceIds);
   const savedOutputIds = normalizeIds(body.contextSelection?.savedOutputIds);
 
-  if (!workspaceId || !userId || !agentTypeId || !userInput) {
-    return new Response(
-      JSON.stringify({
-        ok: false,
-        error: 'workspaceId, userId, agentTypeId and userInput are required'
-      }),
-      {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
+  if (!workspaceId || !agentTypeId || !userInput) {
+    return jsonResponse(400, {
+      ok: false,
+      error: 'workspaceId, agentTypeId and userInput are required'
+    });
+  }
+
+  if (requestedUserId && requestedUserId !== authenticatedUser.id) {
+    return jsonResponse(403, { ok: false, error: 'userId does not match authenticated user' });
   }
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
+
+  const { data: membership, error: membershipError } = await supabase
+    .from('workspace_members')
+    .select('workspace_id')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', authenticatedUser.id)
+    .maybeSingle();
+
+  if (membershipError) {
+    return jsonResponse(500, { ok: false, error: 'Failed to verify workspace membership' });
+  }
+
+  if (!membership) {
+    return jsonResponse(403, { ok: false, error: 'User is not authorized for workspace' });
+  }
+
+  if (projectId) {
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('id', projectId)
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+
+    if (projectError) {
+      return jsonResponse(500, { ok: false, error: 'Failed to validate project access' });
+    }
+
+    if (!project) {
+      return jsonResponse(403, { ok: false, error: 'Project does not belong to workspace' });
+    }
+  }
+
+  const { data: agentType, error: agentTypeError } = await supabase
+    .from('agent_types')
+    .select('id, workspace_id, model_name, is_active')
+    .eq('id', agentTypeId)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (agentTypeError) {
+    return jsonResponse(500, { ok: false, error: 'Failed to validate agent type' });
+  }
+
+  if (!agentType || (agentType.workspace_id !== null && agentType.workspace_id !== workspaceId)) {
+    return jsonResponse(403, { ok: false, error: 'Agent type is unavailable for workspace' });
+  }
+
+  const modelName = agentType.model_name?.trim() || 'gemini-2.5-pro';
 
   const [memoryResult, knowledgeResult, sourceResult, outputResult] = await Promise.all([
     workspaceMemoryEntryIds.length
@@ -102,16 +202,22 @@ Deno.serve(async (req) => {
   ]);
 
   if (memoryResult.error || knowledgeResult.error || sourceResult.error || outputResult.error) {
-    return new Response(JSON.stringify({ ok: false, error: 'Failed to load selected context.' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    return jsonResponse(500, { ok: false, error: 'Failed to load selected context.' });
   }
 
   const memoryEntries = memoryResult.data ?? [];
   const knowledgeEntries = knowledgeResult.data ?? [];
   const selectedSources = sourceResult.data ?? [];
   const selectedOutputs = outputResult.data ?? [];
+
+  if (
+    memoryEntries.length !== workspaceMemoryEntryIds.length ||
+    knowledgeEntries.length !== projectKnowledgeEntryIds.length ||
+    selectedSources.length !== sourceIds.length ||
+    selectedOutputs.length !== savedOutputIds.length
+  ) {
+    return jsonResponse(403, { ok: false, error: 'One or more selected context records are invalid for this workspace' });
+  }
 
   const assembledContext = {
     workspaceMemory: memoryEntries,
@@ -135,7 +241,7 @@ Deno.serve(async (req) => {
       workspace_id: workspaceId,
       project_id: projectId,
       agent_type_id: agentTypeId,
-      user_id: userId,
+      user_id: authenticatedUser.id,
       input_text: userInput,
       assembled_context: assembledContext,
       system_instruction: systemInstruction
@@ -144,17 +250,14 @@ Deno.serve(async (req) => {
     .single();
 
   if (snapshotError || !snapshot) {
-    return new Response(JSON.stringify({ ok: false, error: snapshotError?.message ?? 'Failed to create context snapshot' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    return jsonResponse(500, { ok: false, error: snapshotError?.message ?? 'Failed to create context snapshot' });
   }
 
   const { data: run, error: runError } = await supabase
     .from('agent_runs')
     .insert({
       workspace_id: workspaceId,
-      user_id: userId,
+      user_id: authenticatedUser.id,
       agent_type_id: agentTypeId,
       project_id: projectId,
       context_snapshot_id: snapshot.id,
@@ -169,10 +272,7 @@ Deno.serve(async (req) => {
     .single();
 
   if (runError || !run) {
-    return new Response(JSON.stringify({ ok: false, error: runError?.message ?? 'Failed to create run' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    return jsonResponse(500, { ok: false, error: runError?.message ?? 'Failed to create run' });
   }
 
   const runContextRows = [
@@ -270,10 +370,7 @@ Deno.serve(async (req) => {
       })
       .eq('id', run.id);
 
-    return new Response(JSON.stringify({ ok: false, error: errorMessage, runId: run.id }), {
-      status: 502,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    return jsonResponse(502, { ok: false, error: errorMessage, runId: run.id });
   }
 
   await supabase
@@ -291,7 +388,7 @@ Deno.serve(async (req) => {
   if (saveOutput) {
     await supabase.from('saved_outputs').insert({
       workspace_id: workspaceId,
-      user_id: userId,
+      user_id: authenticatedUser.id,
       agent_run_id: run.id,
       project_id: projectId,
       title: 'Gemini Output',
@@ -309,7 +406,7 @@ Deno.serve(async (req) => {
   await supabase.from('usage_metering').insert([
     {
       workspace_id: workspaceId,
-      user_id: userId,
+      user_id: authenticatedUser.id,
       agent_run_id: run.id,
       metric: 'run',
       quantity: 1,
@@ -317,7 +414,7 @@ Deno.serve(async (req) => {
     },
     {
       workspace_id: workspaceId,
-      user_id: userId,
+      user_id: authenticatedUser.id,
       agent_run_id: run.id,
       metric: 'token_total',
       quantity: totalTokens,

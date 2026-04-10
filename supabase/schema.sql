@@ -50,9 +50,11 @@ create table if not exists public.agent_types (
   model_name text not null default 'gemini-2.5-pro',
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique (workspace_id, key)
+  updated_at timestamptz not null default now()
 );
+
+alter table public.agent_types
+  drop constraint if exists agent_types_workspace_id_key_key;
 
 -- ---------------------------------------------------------
 -- Product domain entities
@@ -172,19 +174,6 @@ create table if not exists public.project_knowledge_entries (
   updated_at timestamptz not null default now()
 );
 
-create table if not exists public.run_context_sources (
-  id uuid primary key default gen_random_uuid(),
-  workspace_id uuid not null references public.workspaces(id) on delete cascade,
-  agent_run_id uuid not null references public.agent_runs(id) on delete cascade,
-  context_snapshot_id uuid not null references public.context_snapshots(id) on delete cascade,
-  source_id uuid references public.knowledge_sources(id) on delete set null,
-  chunk_id uuid references public.knowledge_chunks(id) on delete set null,
-  saved_output_id uuid references public.saved_outputs(id) on delete set null,
-  project_item_id uuid references public.project_items(id) on delete set null,
-  role text not null,
-  created_at timestamptz not null default now()
-);
-
 create table if not exists public.saved_outputs (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
@@ -195,6 +184,19 @@ create table if not exists public.saved_outputs (
   title text,
   content text not null,
   metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.run_context_sources (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  agent_run_id uuid not null references public.agent_runs(id) on delete cascade,
+  context_snapshot_id uuid not null references public.context_snapshots(id) on delete cascade,
+  source_id uuid references public.knowledge_sources(id) on delete set null,
+  chunk_id uuid references public.knowledge_chunks(id) on delete set null,
+  saved_output_id uuid references public.saved_outputs(id) on delete set null,
+  project_item_id uuid references public.project_items(id) on delete set null,
+  role text not null,
   created_at timestamptz not null default now()
 );
 
@@ -260,8 +262,15 @@ drop table if exists public.ad_events;
 -- ---------------------------------------------------------
 create index if not exists idx_workspaces_owner on public.workspaces(owner_user_id);
 create index if not exists idx_workspace_members_workspace_user on public.workspace_members(workspace_id, user_id);
+create index if not exists idx_workspace_members_user_workspace on public.workspace_members(user_id, workspace_id);
 create index if not exists idx_workspace_users_workspace_user on public.workspace_users(workspace_id, user_id);
 create index if not exists idx_agent_types_workspace_active on public.agent_types(workspace_id, is_active);
+create unique index if not exists ux_agent_types_workspace_key
+  on public.agent_types(workspace_id, key)
+  where workspace_id is not null;
+create unique index if not exists ux_agent_types_global_key
+  on public.agent_types(key)
+  where workspace_id is null;
 create index if not exists idx_projects_workspace on public.projects(workspace_id, created_at desc);
 create index if not exists idx_project_items_workspace_project on public.project_items(workspace_id, project_id, created_at desc);
 create index if not exists idx_project_items_source_output on public.project_items(source_output_id);
@@ -507,4 +516,4 @@ values
   (null, 'creative-strategist', 'Creative Strategist', 'Plans messaging and campaign direction.', 'gemini-2.5-pro'),
   (null, 'copy-optimizer', 'Copy Optimizer', 'Refines drafts and improves clarity.', 'gemini-2.5-pro'),
   (null, 'ops-assistant', 'Ops Assistant', 'Summarizes tasks and execution plans.', 'gemini-2.5-pro')
-on conflict (workspace_id, key) do nothing;
+on conflict do nothing;
