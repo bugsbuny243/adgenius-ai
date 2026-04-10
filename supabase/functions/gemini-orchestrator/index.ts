@@ -16,7 +16,17 @@ type OrchestratorPayload = {
   userInput?: string;
   metadata?: Record<string, unknown>;
   saveOutput?: boolean;
+  contextSelection?: {
+    workspaceMemoryEntryIds?: string[];
+    projectKnowledgeEntryIds?: string[];
+    sourceIds?: string[];
+    savedOutputIds?: string[];
+  };
 };
+
+function normalizeIds(ids: string[] | undefined) {
+  return [...new Set((ids ?? []).map((id) => id.trim()).filter(Boolean))];
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -39,6 +49,10 @@ Deno.serve(async (req) => {
   const userInput = body.userInput?.trim();
   const metadata = body.metadata ?? {};
   const saveOutput = body.saveOutput ?? true;
+  const workspaceMemoryEntryIds = normalizeIds(body.contextSelection?.workspaceMemoryEntryIds);
+  const projectKnowledgeEntryIds = normalizeIds(body.contextSelection?.projectKnowledgeEntryIds);
+  const sourceIds = normalizeIds(body.contextSelection?.sourceIds);
+  const savedOutputIds = normalizeIds(body.contextSelection?.savedOutputIds);
 
   if (!workspaceId || !userId || !agentTypeId || !userInput) {
     return new Response(
@@ -55,6 +69,87 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
 
+  const [memoryResult, knowledgeResult, sourceResult, outputResult] = await Promise.all([
+    workspaceMemoryEntryIds.length
+      ? supabase
+          .from('workspace_memory_entries')
+          .select('id, title, content, entry_type, priority')
+          .eq('workspace_id', workspaceId)
+          .eq('is_active', true)
+          .in('id', workspaceMemoryEntryIds)
+      : Promise.resolve({ data: [], error: null }),
+    projectKnowledgeEntryIds.length
+      ? supabase
+          .from('project_knowledge_entries')
+          .select('id, title, content, entry_type, source_id')
+          .eq('workspace_id', workspaceId)
+          .in('id', projectKnowledgeEntryIds)
+      : Promise.resolve({ data: [], error: null }),
+    sourceIds.length
+      ? supabase
+          .from('knowledge_sources')
+          .select('id, title, raw_text, source_type, source_url, project_id')
+          .eq('workspace_id', workspaceId)
+          .in('id', sourceIds)
+      : Promise.resolve({ data: [], error: null }),
+    savedOutputIds.length
+      ? supabase
+          .from('saved_outputs')
+          .select('id, title, content, project_id, project_item_id')
+          .eq('workspace_id', workspaceId)
+          .in('id', savedOutputIds)
+      : Promise.resolve({ data: [], error: null })
+  ]);
+
+  if (memoryResult.error || knowledgeResult.error || sourceResult.error || outputResult.error) {
+    return new Response(JSON.stringify({ ok: false, error: 'Failed to load selected context.' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const memoryEntries = memoryResult.data ?? [];
+  const knowledgeEntries = knowledgeResult.data ?? [];
+  const selectedSources = sourceResult.data ?? [];
+  const selectedOutputs = outputResult.data ?? [];
+
+  const assembledContext = {
+    workspaceMemory: memoryEntries,
+    projectKnowledge: knowledgeEntries,
+    sources: selectedSources.map((source) => ({
+      id: source.id,
+      title: source.title,
+      sourceType: source.source_type,
+      sourceUrl: source.source_url,
+      rawText: source.raw_text
+    })),
+    savedOutputs: selectedOutputs
+  };
+
+  const systemInstruction =
+    'You are a workspace-aware agent. Use provided workspace memory, project knowledge, sources, and saved outputs when they are relevant and prefer them over generic assumptions.';
+
+  const { data: snapshot, error: snapshotError } = await supabase
+    .from('context_snapshots')
+    .insert({
+      workspace_id: workspaceId,
+      project_id: projectId,
+      agent_type_id: agentTypeId,
+      user_id: userId,
+      input_text: userInput,
+      assembled_context: assembledContext,
+      system_instruction: systemInstruction
+    })
+    .select('id')
+    .single();
+
+  if (snapshotError || !snapshot) {
+    return new Response(JSON.stringify({ ok: false, error: snapshotError?.message ?? 'Failed to create context snapshot' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
   const { data: run, error: runError } = await supabase
     .from('agent_runs')
     .insert({
@@ -62,6 +157,7 @@ Deno.serve(async (req) => {
       user_id: userId,
       agent_type_id: agentTypeId,
       project_id: projectId,
+      context_snapshot_id: snapshot.id,
       model_name: modelName,
       status: 'running',
       user_input: userInput,
@@ -79,11 +175,75 @@ Deno.serve(async (req) => {
     });
   }
 
+  const runContextRows = [
+    ...selectedSources.map((source) => ({
+      workspace_id: workspaceId,
+      agent_run_id: run.id,
+      context_snapshot_id: snapshot.id,
+      source_id: source.id,
+      role: 'knowledge_source'
+    })),
+    ...selectedOutputs.map((output) => ({
+      workspace_id: workspaceId,
+      agent_run_id: run.id,
+      context_snapshot_id: snapshot.id,
+      saved_output_id: output.id,
+      project_item_id: output.project_item_id,
+      role: 'saved_output'
+    })),
+    ...knowledgeEntries
+      .filter((entry) => entry.source_id)
+      .map((entry) => ({
+        workspace_id: workspaceId,
+        agent_run_id: run.id,
+        context_snapshot_id: snapshot.id,
+        source_id: entry.source_id,
+        role: 'project_knowledge_source'
+      }))
+  ];
+
+  if (runContextRows.length > 0) {
+    await supabase.from('run_context_sources').insert(runContextRows);
+  }
+
+  const contextText = [
+    memoryEntries.length
+      ? `Workspace memory:\n${memoryEntries.map((entry) => `- ${entry.title}: ${entry.content}`).join('\n')}`
+      : null,
+    knowledgeEntries.length
+      ? `Project knowledge:\n${knowledgeEntries.map((entry) => `- ${entry.title}: ${entry.content}`).join('\n')}`
+      : null,
+    selectedSources.length
+      ? `Sources:\n${selectedSources
+          .map((source) => `- ${source.title}: ${(source.raw_text ?? '').slice(0, 1200)}`)
+          .join('\n')}`
+      : null,
+    selectedOutputs.length
+      ? `Saved outputs:\n${selectedOutputs.map((output) => `- ${output.title || output.id}: ${output.content}`).join('\n')}`
+      : null
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+
   const geminiResponse = await fetch(`${GEMINI_URL}?key=${Deno.env.get('GEMINI_API_KEY')}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: userInput }] }],
+      systemInstruction: {
+        parts: [{ text: systemInstruction }]
+      },
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: contextText
+                ? `${contextText}\n\nUser request:\n${userInput}`
+                : userInput
+            }
+          ]
+        }
+      ],
       generationConfig: {
         temperature: 0.6,
         topP: 0.9
@@ -123,7 +283,7 @@ Deno.serve(async (req) => {
       result_text: resultText,
       tokens_input: tokensInput,
       tokens_output: tokensOutput,
-      metadata: { ...metadata, gemini_usage: payload?.usageMetadata ?? null },
+      metadata: { ...metadata, gemini_usage: payload?.usageMetadata ?? null, context_snapshot_id: snapshot.id },
       updated_at: new Date().toISOString()
     })
     .eq('id', run.id);
@@ -136,7 +296,7 @@ Deno.serve(async (req) => {
       project_id: projectId,
       title: 'Gemini Output',
       content: resultText,
-      metadata: { source: 'gemini-orchestrator' }
+      metadata: { source: 'gemini-orchestrator', context_snapshot_id: snapshot.id }
     });
   }
 
@@ -169,6 +329,7 @@ Deno.serve(async (req) => {
     JSON.stringify({
       ok: true,
       runId: run.id,
+      contextSnapshotId: snapshot.id,
       data: {
         resultText,
         tokensInput,

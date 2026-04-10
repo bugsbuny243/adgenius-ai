@@ -1,3 +1,4 @@
+import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { Nav } from '@/components/nav';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
@@ -13,6 +14,37 @@ export default async function DashboardPage() {
 
   const { workspaceId, workspaceName } = await getWorkspaceContext();
 
+  async function addWorkspaceMemory(formData: FormData) {
+    'use server';
+
+    const title = String(formData.get('title') ?? '').trim();
+    const content = String(formData.get('content') ?? '').trim();
+    const entryType = String(formData.get('entry_type') ?? 'note').trim() || 'note';
+
+    if (!title || !content) return;
+
+    const serverSupabase = await createSupabaseServerClient();
+    const {
+      data: { user: currentUser }
+    } = await serverSupabase.auth.getUser();
+
+    if (!currentUser) redirect('/login');
+
+    const { workspaceId: currentWorkspaceId } = await getWorkspaceContext();
+
+    await serverSupabase.from('workspace_memory_entries').insert({
+      workspace_id: currentWorkspaceId,
+      entry_type: entryType,
+      title,
+      content,
+      priority: 0,
+      is_active: true,
+      created_by: currentUser.id
+    });
+
+    revalidatePath('/dashboard');
+  }
+
   const [
     { count: activeAgentsCount },
     { count: projectsCount },
@@ -20,7 +52,8 @@ export default async function DashboardPage() {
     { count: savedOutputsCount },
     { data: recentRuns },
     { data: subscription },
-    { data: usage }
+    { data: usage },
+    { data: workspaceMemory }
   ] = await Promise.all([
     supabase.from('agent_types').select('id', { count: 'exact', head: true }).or(`workspace_id.eq.${workspaceId},workspace_id.is.null`).eq('is_active', true),
     supabase.from('projects').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId),
@@ -33,7 +66,15 @@ export default async function DashboardPage() {
       .order('created_at', { ascending: false })
       .limit(5),
     supabase.from('subscriptions').select('plan_name, status, run_limit').eq('workspace_id', workspaceId).maybeSingle(),
-    supabase.from('usage_counters').select('runs_count').eq('workspace_id', workspaceId).maybeSingle()
+    supabase.from('usage_counters').select('runs_count').eq('workspace_id', workspaceId).maybeSingle(),
+    supabase
+      .from('workspace_memory_entries')
+      .select('id, entry_type, title, content, created_at')
+      .eq('workspace_id', workspaceId)
+      .eq('is_active', true)
+      .order('priority', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(8)
   ]);
 
   return (
@@ -86,6 +127,53 @@ export default async function DashboardPage() {
             </div>
           ) : (
             <p className="text-sm text-white/70">No runs yet for this workspace.</p>
+          )}
+        </article>
+      </section>
+
+      <section className="mt-4 grid gap-4 lg:grid-cols-2">
+        <article className="panel">
+          <h3 className="mb-3 text-lg font-semibold">Workspace Memory</h3>
+          <form action={addWorkspaceMemory} className="space-y-2">
+            <input
+              name="title"
+              required
+              placeholder="Memory title"
+              className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-neon"
+            />
+            <textarea
+              name="content"
+              required
+              rows={4}
+              placeholder="Reusable workspace context"
+              className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-neon"
+            />
+            <input
+              name="entry_type"
+              defaultValue="note"
+              placeholder="Type (note, guideline, persona...)"
+              className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-neon"
+            />
+            <button type="submit" className="rounded-lg border border-white/20 px-3 py-2 text-sm hover:border-neon">
+              Add memory entry
+            </button>
+          </form>
+        </article>
+
+        <article className="panel">
+          <h3 className="mb-3 text-lg font-semibold">Active Memory Entries</h3>
+          {workspaceMemory && workspaceMemory.length > 0 ? (
+            <div className="space-y-2 text-sm">
+              {workspaceMemory.map((entry) => (
+                <div key={entry.id} className="rounded-lg border border-white/10 px-3 py-2">
+                  <p className="font-medium">{entry.title}</p>
+                  <p className="text-xs text-white/60">{entry.entry_type}</p>
+                  <p className="text-white/75 line-clamp-3">{entry.content}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-white/70">No workspace memory entries yet.</p>
           )}
         </article>
       </section>

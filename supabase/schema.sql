@@ -100,6 +100,91 @@ create table if not exists public.agent_runs (
   updated_at timestamptz not null default now()
 );
 
+
+create table if not exists public.context_snapshots (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  project_id uuid references public.projects(id) on delete set null,
+  agent_type_id uuid not null references public.agent_types(id) on delete restrict,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  input_text text not null,
+  assembled_context jsonb not null default '{}'::jsonb,
+  system_instruction text,
+  created_at timestamptz not null default now()
+);
+
+alter table public.agent_runs
+  add column if not exists context_snapshot_id uuid references public.context_snapshots(id) on delete set null;
+
+create table if not exists public.knowledge_sources (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  project_id uuid references public.projects(id) on delete set null,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  source_type text not null check (source_type in ('file', 'text', 'url', 'brief')),
+  title text not null,
+  raw_text text,
+  file_path text,
+  source_url text,
+  status text not null default 'ready' check (status in ('draft', 'ready', 'archived', 'error')),
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.knowledge_chunks (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  project_id uuid references public.projects(id) on delete set null,
+  source_id uuid not null references public.knowledge_sources(id) on delete cascade,
+  chunk_index integer not null,
+  content text not null,
+  token_estimate integer,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  unique (source_id, chunk_index)
+);
+
+create table if not exists public.workspace_memory_entries (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  entry_type text not null default 'note',
+  title text not null,
+  content text not null,
+  priority integer not null default 0,
+  is_active boolean not null default true,
+  created_by uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.project_knowledge_entries (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  project_id uuid not null references public.projects(id) on delete cascade,
+  source_id uuid references public.knowledge_sources(id) on delete set null,
+  entry_type text not null default 'note',
+  title text not null,
+  content text not null,
+  metadata jsonb not null default '{}'::jsonb,
+  created_by uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.run_context_sources (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  agent_run_id uuid not null references public.agent_runs(id) on delete cascade,
+  context_snapshot_id uuid not null references public.context_snapshots(id) on delete cascade,
+  source_id uuid references public.knowledge_sources(id) on delete set null,
+  chunk_id uuid references public.knowledge_chunks(id) on delete set null,
+  saved_output_id uuid references public.saved_outputs(id) on delete set null,
+  project_item_id uuid references public.project_items(id) on delete set null,
+  role text not null,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.saved_outputs (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
@@ -185,6 +270,15 @@ create index if not exists idx_agent_runs_agent_type on public.agent_runs(agent_
 create index if not exists idx_saved_outputs_workspace on public.saved_outputs(workspace_id, created_at desc);
 create index if not exists idx_saved_outputs_agent_run on public.saved_outputs(agent_run_id);
 create index if not exists idx_saved_outputs_project on public.saved_outputs(project_id, created_at desc);
+
+create index if not exists idx_context_snapshots_workspace on public.context_snapshots(workspace_id, created_at desc);
+create index if not exists idx_agent_runs_context_snapshot on public.agent_runs(context_snapshot_id);
+create index if not exists idx_knowledge_sources_workspace on public.knowledge_sources(workspace_id, created_at desc);
+create index if not exists idx_knowledge_sources_project on public.knowledge_sources(project_id, created_at desc);
+create index if not exists idx_knowledge_chunks_source on public.knowledge_chunks(source_id, chunk_index);
+create index if not exists idx_workspace_memory_workspace on public.workspace_memory_entries(workspace_id, is_active, priority desc, created_at desc);
+create index if not exists idx_project_knowledge_project on public.project_knowledge_entries(project_id, created_at desc);
+create index if not exists idx_run_context_sources_run on public.run_context_sources(agent_run_id, created_at asc);
 create index if not exists idx_usage_metering_workspace on public.usage_metering(workspace_id, created_at desc);
 
 -- ---------------------------------------------------------
@@ -256,6 +350,12 @@ alter table public.projects enable row level security;
 alter table public.project_items enable row level security;
 alter table public.agent_runs enable row level security;
 alter table public.saved_outputs enable row level security;
+alter table public.context_snapshots enable row level security;
+alter table public.knowledge_sources enable row level security;
+alter table public.knowledge_chunks enable row level security;
+alter table public.workspace_memory_entries enable row level security;
+alter table public.project_knowledge_entries enable row level security;
+alter table public.run_context_sources enable row level security;
 alter table public.subscriptions enable row level security;
 alter table public.usage_counters enable row level security;
 alter table public.usage_metering enable row level security;
@@ -276,6 +376,12 @@ drop policy if exists projects_member_all on public.projects;
 drop policy if exists project_items_member_all on public.project_items;
 drop policy if exists agent_runs_member_all on public.agent_runs;
 drop policy if exists saved_outputs_member_all on public.saved_outputs;
+drop policy if exists context_snapshots_member_all on public.context_snapshots;
+drop policy if exists knowledge_sources_member_all on public.knowledge_sources;
+drop policy if exists knowledge_chunks_member_all on public.knowledge_chunks;
+drop policy if exists workspace_memory_member_all on public.workspace_memory_entries;
+drop policy if exists project_knowledge_member_all on public.project_knowledge_entries;
+drop policy if exists run_context_sources_member_all on public.run_context_sources;
 drop policy if exists subscriptions_member_read on public.subscriptions;
 drop policy if exists subscriptions_owner_manage on public.subscriptions;
 drop policy if exists usage_counters_member_all on public.usage_counters;
@@ -339,6 +445,37 @@ using (public.is_workspace_member(workspace_id))
 with check (public.is_workspace_member(workspace_id));
 
 create policy saved_outputs_member_all on public.saved_outputs
+for all
+using (public.is_workspace_member(workspace_id))
+with check (public.is_workspace_member(workspace_id));
+
+
+create policy context_snapshots_member_all on public.context_snapshots
+for all
+using (public.is_workspace_member(workspace_id))
+with check (public.is_workspace_member(workspace_id));
+
+create policy knowledge_sources_member_all on public.knowledge_sources
+for all
+using (public.is_workspace_member(workspace_id))
+with check (public.is_workspace_member(workspace_id));
+
+create policy knowledge_chunks_member_all on public.knowledge_chunks
+for all
+using (public.is_workspace_member(workspace_id))
+with check (public.is_workspace_member(workspace_id));
+
+create policy workspace_memory_member_all on public.workspace_memory_entries
+for all
+using (public.is_workspace_member(workspace_id))
+with check (public.is_workspace_member(workspace_id));
+
+create policy project_knowledge_member_all on public.project_knowledge_entries
+for all
+using (public.is_workspace_member(workspace_id))
+with check (public.is_workspace_member(workspace_id));
+
+create policy run_context_sources_member_all on public.run_context_sources
 for all
 using (public.is_workspace_member(workspace_id))
 with check (public.is_workspace_member(workspace_id));
