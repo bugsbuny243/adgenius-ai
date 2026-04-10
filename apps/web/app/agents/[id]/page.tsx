@@ -10,6 +10,10 @@ type AgentDetailPageProps = {
   searchParams: Promise<{ run_id?: string; error?: string }>;
 };
 
+function asStringArray(raw: FormDataEntryValue[] | null | undefined) {
+  return (raw ?? []).map((value) => String(value).trim()).filter(Boolean);
+}
+
 export default async function AgentDetailPage({ params, searchParams }: AgentDetailPageProps) {
   const { id } = await params;
   const { run_id: runIdParam, error: errorParam } = await searchParams;
@@ -29,6 +33,10 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
     const prompt = String(formData.get('prompt') ?? '').trim();
     const projectIdRaw = String(formData.get('project_id') ?? '').trim();
     const selectedProjectId = projectIdRaw || null;
+    const selectedMemoryEntryIds = asStringArray(formData.getAll('workspace_memory_entry_ids'));
+    const selectedProjectKnowledgeIds = asStringArray(formData.getAll('project_knowledge_entry_ids'));
+    const selectedSourceIds = asStringArray(formData.getAll('source_ids'));
+    const selectedSavedOutputIds = asStringArray(formData.getAll('saved_output_ids'));
 
     if (!prompt) {
       redirect(`/agents/${id}?error=Prompt is required.`);
@@ -78,6 +86,12 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
         userInput: prompt,
         metadata: {
           source: 'agents-detail-page'
+        },
+        contextSelection: {
+          workspaceMemoryEntryIds: selectedMemoryEntryIds,
+          projectKnowledgeEntryIds: selectedProjectKnowledgeIds,
+          sourceIds: selectedSourceIds,
+          savedOutputIds: selectedSavedOutputIds
         },
         saveOutput: true
       }
@@ -194,7 +208,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
     redirect(`/agents/${id}?run_id=${runIdParam ?? ''}`);
   }
 
-  const [{ data: agent }, { data: projects }] = await Promise.all([
+  const [{ data: agent }, { data: projects }, { data: memoryEntries }, { data: recentSources }, { data: recentOutputs }] = await Promise.all([
     supabase
       .from('agent_types')
       .select('id, key, name, description, model_name, is_active')
@@ -206,14 +220,35 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
       .select('id, name')
       .eq('workspace_id', workspaceId)
       .eq('user_id', userId)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('workspace_memory_entries')
+      .select('id, title, entry_type')
+      .eq('workspace_id', workspaceId)
+      .eq('is_active', true)
+      .order('priority', { ascending: false })
       .order('created_at', { ascending: false })
+      .limit(20),
+    supabase
+      .from('knowledge_sources')
+      .select('id, title, source_type, project_id')
+      .eq('workspace_id', workspaceId)
+      .eq('status', 'ready')
+      .order('created_at', { ascending: false })
+      .limit(20),
+    supabase
+      .from('saved_outputs')
+      .select('id, title, project_id, created_at')
+      .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: false })
+      .limit(20)
   ]);
 
   if (!agent) notFound();
 
   const { data: latestRun } = await supabase
     .from('agent_runs')
-    .select('id, status, user_input, result_text, error_message, project_id, created_at')
+    .select('id, status, user_input, result_text, error_message, project_id, context_snapshot_id, created_at')
     .eq('workspace_id', workspaceId)
     .eq('user_id', userId)
     .eq('agent_type_id', id)
@@ -222,16 +257,32 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
     .limit(1)
     .maybeSingle();
 
-  const { data: savedOutput } = latestRun
-    ? await supabase
-        .from('saved_outputs')
-        .select('id, title, project_id, project_item_id, created_at')
-        .eq('agent_run_id', latestRun.id)
-        .eq('workspace_id', workspaceId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-    : { data: null };
+  const [{ data: savedOutput }, { data: latestRunContextLinks }, { data: projectKnowledge }] = await Promise.all([
+    latestRun
+      ? supabase
+          .from('saved_outputs')
+          .select('id, title, project_id, project_item_id, created_at')
+          .eq('agent_run_id', latestRun.id)
+          .eq('workspace_id', workspaceId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    latestRun
+      ? supabase
+          .from('run_context_sources')
+          .select('id, source_id, saved_output_id, project_item_id, role')
+          .eq('workspace_id', workspaceId)
+          .eq('agent_run_id', latestRun.id)
+          .order('created_at', { ascending: true })
+      : Promise.resolve({ data: [] }),
+    supabase
+      .from('project_knowledge_entries')
+      .select('id, title, project_id, entry_type')
+      .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: false })
+      .limit(20)
+  ]);
 
   return (
     <main>
@@ -274,6 +325,69 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
               Run agent
             </button>
           </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="text-sm">
+              <span className="mb-1 block text-white/70">Workspace memory</span>
+              <select
+                name="workspace_memory_entry_ids"
+                multiple
+                className="h-32 w-full rounded-lg border border-white/20 bg-black/30 px-2 py-2 text-sm outline-none focus:border-neon"
+              >
+                {memoryEntries?.map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {entry.title} ({entry.entry_type})
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="text-sm">
+              <span className="mb-1 block text-white/70">Project knowledge entries</span>
+              <select
+                name="project_knowledge_entry_ids"
+                multiple
+                className="h-32 w-full rounded-lg border border-white/20 bg-black/30 px-2 py-2 text-sm outline-none focus:border-neon"
+              >
+                {projectKnowledge?.map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {entry.title} ({entry.entry_type})
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="text-sm">
+              <span className="mb-1 block text-white/70">Sources</span>
+              <select
+                name="source_ids"
+                multiple
+                className="h-32 w-full rounded-lg border border-white/20 bg-black/30 px-2 py-2 text-sm outline-none focus:border-neon"
+              >
+                {recentSources?.map((source) => (
+                  <option key={source.id} value={source.id}>
+                    {source.title} ({source.source_type})
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="text-sm">
+              <span className="mb-1 block text-white/70">Saved outputs</span>
+              <select
+                name="saved_output_ids"
+                multiple
+                className="h-32 w-full rounded-lg border border-white/20 bg-black/30 px-2 py-2 text-sm outline-none focus:border-neon"
+              >
+                {recentOutputs?.map((output) => (
+                  <option key={output.id} value={output.id}>
+                    {(output.title || 'Saved output').slice(0, 70)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <p className="text-xs text-white/50">Tip: hold Ctrl/Cmd to select multiple context items.</p>
         </form>
 
         {errorParam ? <p className="mt-3 text-sm text-red-300">Error: {errorParam}</p> : null}
@@ -286,6 +400,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
             <p className="text-xs text-white/60">
               Run {latestRun.id} • {latestRun.status} • {new Date(latestRun.created_at).toLocaleString()}
             </p>
+            {latestRun.context_snapshot_id ? <p className="text-xs text-white/50">Context snapshot: {latestRun.context_snapshot_id}</p> : null}
             {latestRun.user_input ? (
               <div>
                 <p className="text-sm font-medium">Input</p>
@@ -302,6 +417,19 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
             ) : (
               <p className="text-sm text-red-300">{latestRun.error_message || 'Run did not return output.'}</p>
             )}
+
+            {latestRunContextLinks && latestRunContextLinks.length > 0 ? (
+              <div className="rounded-lg border border-white/10 px-3 py-3">
+                <p className="text-sm font-medium">Linked Context Sources</p>
+                <div className="mt-2 space-y-1 text-xs text-white/60">
+                  {latestRunContextLinks.map((link) => (
+                    <p key={link.id}>
+                      {link.role} • source:{link.source_id || '-'} • output:{link.saved_output_id || '-'} • item:{link.project_item_id || '-'}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
             {latestRun.status === 'completed' && latestRun.result_text ? (
               <div className="space-y-3 rounded-lg border border-white/10 px-3 py-3">

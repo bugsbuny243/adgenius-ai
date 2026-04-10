@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { Nav } from '@/components/nav';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getWorkspaceContext } from '@/lib/workspace';
+import { createKnowledgeSource } from '@/lib/knowledge';
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -47,6 +48,73 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     revalidatePath(`/projects/${id}`);
   }
 
+  async function addSource(formData: FormData) {
+    'use server';
+
+    const title = String(formData.get('title') ?? '').trim();
+    const sourceType = String(formData.get('source_type') ?? 'text').trim() as 'file' | 'text' | 'url' | 'brief';
+    const rawText = String(formData.get('raw_text') ?? '').trim();
+    const sourceUrl = String(formData.get('source_url') ?? '').trim();
+
+    if (!title || (!rawText && !sourceUrl)) return;
+
+    const serverSupabase = await createSupabaseServerClient();
+    const {
+      data: { user: currentUser }
+    } = await serverSupabase.auth.getUser();
+
+    if (!currentUser) redirect('/login');
+
+    const { workspaceId: currentWorkspaceId } = await getWorkspaceContext();
+
+    await createKnowledgeSource({
+      supabase: serverSupabase,
+      workspaceId: currentWorkspaceId,
+      projectId: id,
+      userId: currentUser.id,
+      sourceType,
+      title,
+      rawText: rawText || null,
+      sourceUrl: sourceUrl || null,
+      metadata: { source: 'project-page-form' }
+    });
+
+    revalidatePath(`/projects/${id}`);
+  }
+
+  async function addProjectKnowledge(formData: FormData) {
+    'use server';
+
+    const title = String(formData.get('title') ?? '').trim();
+    const content = String(formData.get('content') ?? '').trim();
+    const entryType = String(formData.get('entry_type') ?? 'note').trim();
+    const sourceIdRaw = String(formData.get('source_id') ?? '').trim();
+
+    if (!title || !content) return;
+
+    const serverSupabase = await createSupabaseServerClient();
+    const {
+      data: { user: currentUser }
+    } = await serverSupabase.auth.getUser();
+
+    if (!currentUser) redirect('/login');
+
+    const { workspaceId: currentWorkspaceId } = await getWorkspaceContext();
+
+    await serverSupabase.from('project_knowledge_entries').insert({
+      workspace_id: currentWorkspaceId,
+      project_id: id,
+      source_id: sourceIdRaw || null,
+      entry_type: entryType || 'note',
+      title,
+      content,
+      metadata: {},
+      created_by: currentUser.id
+    });
+
+    revalidatePath(`/projects/${id}`);
+  }
+
   const { data: project } = await supabase
     .from('projects')
     .select('id, name, description, status, created_at')
@@ -59,7 +127,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     notFound();
   }
 
-  const [{ data: items }, { data: outputs }] = await Promise.all([
+  const [{ data: items }, { data: outputs }, { data: knowledgeEntries }, { data: sources }] = await Promise.all([
     supabase
       .from('project_items')
       .select('id, item_type, title, status, payload, source_output_id, created_at')
@@ -71,6 +139,20 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       .select('id, title, content, created_at, agent_runs(status)')
       .eq('project_id', project.id)
       .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: false })
+      .limit(10),
+    supabase
+      .from('project_knowledge_entries')
+      .select('id, title, content, entry_type, source_id, created_at')
+      .eq('workspace_id', workspaceId)
+      .eq('project_id', project.id)
+      .order('created_at', { ascending: false })
+      .limit(10),
+    supabase
+      .from('knowledge_sources')
+      .select('id, title, source_type, status, created_at')
+      .eq('workspace_id', workspaceId)
+      .eq('project_id', project.id)
       .order('created_at', { ascending: false })
       .limit(10)
   ]);
@@ -144,6 +226,122 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             </div>
           ) : (
             <p className="text-sm text-white/70">No saved outputs linked to this project.</p>
+          )}
+        </article>
+      </section>
+
+      <section className="mt-4 grid gap-4 lg:grid-cols-2">
+        <article className="panel">
+          <h3 className="mb-3 text-lg font-semibold">Add Knowledge Source</h3>
+          <form action={addSource} className="space-y-2">
+            <input
+              name="title"
+              required
+              placeholder="Source title"
+              className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-neon"
+            />
+            <select
+              name="source_type"
+              defaultValue="text"
+              className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-neon"
+            >
+              <option value="text">text</option>
+              <option value="brief">brief</option>
+              <option value="url">url</option>
+              <option value="file">file</option>
+            </select>
+            <input
+              name="source_url"
+              placeholder="Source URL (optional)"
+              className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-neon"
+            />
+            <textarea
+              name="raw_text"
+              rows={4}
+              placeholder="Raw source text"
+              className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-neon"
+            />
+            <button type="submit" className="rounded-lg border border-white/20 px-3 py-2 text-sm hover:border-neon">
+              Save source
+            </button>
+          </form>
+        </article>
+
+        <article className="panel">
+          <h3 className="mb-3 text-lg font-semibold">Project Sources</h3>
+          {sources && sources.length > 0 ? (
+            <div className="space-y-2 text-sm">
+              {sources.map((source) => (
+                <div key={source.id} className="rounded-lg border border-white/10 px-3 py-2">
+                  <p className="font-medium">{source.title}</p>
+                  <p className="text-xs text-white/60">
+                    {source.source_type} • {source.status}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-white/70">No sources yet.</p>
+          )}
+        </article>
+      </section>
+
+      <section className="mt-4 grid gap-4 lg:grid-cols-2">
+        <article className="panel">
+          <h3 className="mb-3 text-lg font-semibold">Add Project Knowledge</h3>
+          <form action={addProjectKnowledge} className="space-y-2">
+            <input
+              name="title"
+              required
+              placeholder="Knowledge title"
+              className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-neon"
+            />
+            <textarea
+              name="content"
+              required
+              rows={4}
+              placeholder="Knowledge entry content"
+              className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-neon"
+            />
+            <input
+              name="entry_type"
+              defaultValue="note"
+              placeholder="Type (note, strategy, constraint...)"
+              className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-neon"
+            />
+            <select
+              name="source_id"
+              defaultValue=""
+              className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-neon"
+            >
+              <option value="">No source linkage</option>
+              {sources?.map((source) => (
+                <option key={source.id} value={source.id}>
+                  {source.title}
+                </option>
+              ))}
+            </select>
+            <button type="submit" className="rounded-lg border border-white/20 px-3 py-2 text-sm hover:border-neon">
+              Save project knowledge
+            </button>
+          </form>
+        </article>
+
+        <article className="panel">
+          <h3 className="mb-3 text-lg font-semibold">Project Knowledge Entries</h3>
+          {knowledgeEntries && knowledgeEntries.length > 0 ? (
+            <div className="space-y-2 text-sm">
+              {knowledgeEntries.map((entry) => (
+                <div key={entry.id} className="rounded-lg border border-white/10 px-3 py-2">
+                  <p className="font-medium">{entry.title}</p>
+                  <p className="text-xs text-white/60">{entry.entry_type}</p>
+                  <p className="text-white/75 line-clamp-3">{entry.content}</p>
+                  {entry.source_id ? <p className="text-xs text-white/50">Source: {entry.source_id}</p> : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-white/70">No project knowledge yet.</p>
           )}
         </article>
       </section>
