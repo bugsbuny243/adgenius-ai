@@ -4,6 +4,9 @@ import { Nav } from '@/components/nav';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getWorkspaceContext } from '@/lib/workspace';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default async function AgentsPage() {
   const supabase = await createSupabaseServerClient();
   const {

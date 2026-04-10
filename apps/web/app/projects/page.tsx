@@ -1,9 +1,12 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { revalidatePath } from 'next/cache';
 import { Nav } from '@/components/nav';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getWorkspaceContext } from '@/lib/workspace';
+import { createProjectAction } from './actions';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function ProjectsPage() {
   const supabase = await createSupabaseServerClient();
@@ -14,36 +17,6 @@ export default async function ProjectsPage() {
   if (!user) redirect('/login');
 
   const { workspaceId, userId } = await getWorkspaceContext();
-
-  async function createProject(formData: FormData) {
-    'use server';
-
-    const name = String(formData.get('name') ?? '').trim();
-    const description = String(formData.get('description') ?? '').trim();
-
-    if (!name) return;
-
-    const serverSupabase = await createSupabaseServerClient();
-    const {
-      data: { user: currentUser }
-    } = await serverSupabase.auth.getUser();
-
-    if (!currentUser) {
-      redirect('/login');
-    }
-
-    const { workspaceId: currentWorkspaceId } = await getWorkspaceContext();
-
-    await serverSupabase.from('projects').insert({
-      workspace_id: currentWorkspaceId,
-      user_id: currentUser.id,
-      name,
-      description: description || null
-    });
-
-    revalidatePath('/projects');
-    revalidatePath('/dashboard');
-  }
 
   const { data: projects, error } = await supabase
     .from('projects')
@@ -62,7 +35,7 @@ export default async function ProjectsPage() {
 
       <section className="panel mb-4">
         <h2 className="mb-4 text-2xl font-semibold">Projects</h2>
-        <form action={createProject} className="grid gap-3 md:grid-cols-[1fr_2fr_auto]">
+        <form action={createProjectAction} className="grid gap-3 md:grid-cols-[1fr_2fr_auto]">
           <input
             name="name"
             required

@@ -1,8 +1,11 @@
-import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { Nav } from '@/components/nav';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getWorkspaceContext } from '@/lib/workspace';
+import { addWorkspaceMemoryAction } from './actions';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function DashboardPage() {
   const supabase = await createSupabaseServerClient();
@@ -13,37 +16,6 @@ export default async function DashboardPage() {
   if (!user) redirect('/login');
 
   const { workspaceId, workspaceName } = await getWorkspaceContext();
-
-  async function addWorkspaceMemory(formData: FormData) {
-    'use server';
-
-    const title = String(formData.get('title') ?? '').trim();
-    const content = String(formData.get('content') ?? '').trim();
-    const entryType = String(formData.get('entry_type') ?? 'note').trim() || 'note';
-
-    if (!title || !content) return;
-
-    const serverSupabase = await createSupabaseServerClient();
-    const {
-      data: { user: currentUser }
-    } = await serverSupabase.auth.getUser();
-
-    if (!currentUser) redirect('/login');
-
-    const { workspaceId: currentWorkspaceId } = await getWorkspaceContext();
-
-    await serverSupabase.from('workspace_memory_entries').insert({
-      workspace_id: currentWorkspaceId,
-      entry_type: entryType,
-      title,
-      content,
-      priority: 0,
-      is_active: true,
-      created_by: currentUser.id
-    });
-
-    revalidatePath('/dashboard');
-  }
 
   const [
     { count: activeAgentsCount },
@@ -134,7 +106,7 @@ export default async function DashboardPage() {
       <section className="mt-4 grid gap-4 lg:grid-cols-2">
         <article className="panel">
           <h3 className="mb-3 text-lg font-semibold">Workspace Memory</h3>
-          <form action={addWorkspaceMemory} className="space-y-2">
+          <form action={addWorkspaceMemoryAction} className="space-y-2">
             <input
               name="title"
               required

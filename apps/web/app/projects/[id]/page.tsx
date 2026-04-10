@@ -1,10 +1,12 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
-import { revalidatePath } from 'next/cache';
 import { Nav } from '@/components/nav';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getWorkspaceContext } from '@/lib/workspace';
-import { createKnowledgeSource } from '@/lib/knowledge';
+import { addKnowledgeSourceAction, addProjectKnowledgeAction, createProjectItemAction } from './actions';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -18,102 +20,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
   const { workspaceId, userId } = await getWorkspaceContext();
 
-  async function createItem(formData: FormData) {
-    'use server';
-
-    const title = String(formData.get('title') ?? '').trim();
-    const details = String(formData.get('details') ?? '').trim();
-
-    if (!title) return;
-
-    const serverSupabase = await createSupabaseServerClient();
-    const {
-      data: { user: currentUser }
-    } = await serverSupabase.auth.getUser();
-
-    if (!currentUser) redirect('/login');
-
-    const { workspaceId: currentWorkspaceId } = await getWorkspaceContext();
-
-    await serverSupabase.from('project_items').insert({
-      workspace_id: currentWorkspaceId,
-      project_id: id,
-      user_id: currentUser.id,
-      item_type: 'note',
-      title,
-      status: 'open',
-      payload: details ? { details } : null
-    });
-
-    revalidatePath(`/projects/${id}`);
-  }
-
-  async function addSource(formData: FormData) {
-    'use server';
-
-    const title = String(formData.get('title') ?? '').trim();
-    const sourceType = String(formData.get('source_type') ?? 'text').trim() as 'file' | 'text' | 'url' | 'brief';
-    const rawText = String(formData.get('raw_text') ?? '').trim();
-    const sourceUrl = String(formData.get('source_url') ?? '').trim();
-
-    if (!title || (!rawText && !sourceUrl)) return;
-
-    const serverSupabase = await createSupabaseServerClient();
-    const {
-      data: { user: currentUser }
-    } = await serverSupabase.auth.getUser();
-
-    if (!currentUser) redirect('/login');
-
-    const { workspaceId: currentWorkspaceId } = await getWorkspaceContext();
-
-    await createKnowledgeSource({
-      supabase: serverSupabase,
-      workspaceId: currentWorkspaceId,
-      projectId: id,
-      userId: currentUser.id,
-      sourceType,
-      title,
-      rawText: rawText || null,
-      sourceUrl: sourceUrl || null,
-      metadata: { source: 'project-page-form' }
-    });
-
-    revalidatePath(`/projects/${id}`);
-  }
-
-  async function addProjectKnowledge(formData: FormData) {
-    'use server';
-
-    const title = String(formData.get('title') ?? '').trim();
-    const content = String(formData.get('content') ?? '').trim();
-    const entryType = String(formData.get('entry_type') ?? 'note').trim();
-    const sourceIdRaw = String(formData.get('source_id') ?? '').trim();
-
-    if (!title || !content) return;
-
-    const serverSupabase = await createSupabaseServerClient();
-    const {
-      data: { user: currentUser }
-    } = await serverSupabase.auth.getUser();
-
-    if (!currentUser) redirect('/login');
-
-    const { workspaceId: currentWorkspaceId } = await getWorkspaceContext();
-
-    await serverSupabase.from('project_knowledge_entries').insert({
-      workspace_id: currentWorkspaceId,
-      project_id: id,
-      source_id: sourceIdRaw || null,
-      entry_type: entryType || 'note',
-      title,
-      content,
-      metadata: {},
-      created_by: currentUser.id
-    });
-
-    revalidatePath(`/projects/${id}`);
-  }
+  const createItem = createProjectItemAction.bind(null, id);
+  const addSource = addKnowledgeSourceAction.bind(null, id);
+  const addProjectKnowledge = addProjectKnowledgeAction.bind(null, id);
 
   const { data: project } = await supabase
     .from('projects')

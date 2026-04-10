@@ -1,18 +1,17 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
-import { revalidatePath } from 'next/cache';
 import { Nav } from '@/components/nav';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getWorkspaceContext } from '@/lib/workspace';
+import { attachSavedOutputToProjectAction, createProjectItemFromOutputAction, runAgentAction, saveOutputAction } from './actions';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 type AgentDetailPageProps = {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ run_id?: string; error?: string }>;
 };
-
-function asStringArray(raw: FormDataEntryValue[] | null | undefined) {
-  return (raw ?? []).map((value) => String(value).trim()).filter(Boolean);
-}
 
 function previewText(value: string | null | undefined, max = 140) {
   if (!value) return '';
@@ -33,237 +32,11 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
 
   const { workspaceId, userId } = await getWorkspaceContext();
 
-  async function runAgent(formData: FormData) {
-    'use server';
-
-    const prompt = String(formData.get('prompt') ?? '').trim();
-    const projectIdRaw = String(formData.get('project_id') ?? '').trim();
-    const selectedProjectId = projectIdRaw || null;
-    const selectedMemoryEntryIds = asStringArray(formData.getAll('workspace_memory_entry_ids'));
-    const selectedProjectKnowledgeIds = asStringArray(formData.getAll('project_knowledge_entry_ids'));
-    const selectedSourceIds = asStringArray(formData.getAll('source_ids'));
-    const selectedSavedOutputIds = asStringArray(formData.getAll('saved_output_ids'));
-
-    if (!prompt) {
-      redirect(`/agents/${id}?error=Prompt is required.`);
-    }
-
-    const serverSupabase = await createSupabaseServerClient();
-    const {
-      data: { user: currentUser }
-    } = await serverSupabase.auth.getUser();
-
-    if (!currentUser) redirect('/login');
-
-    const { workspaceId: currentWorkspaceId, userId: currentUserId } = await getWorkspaceContext();
-
-    const { data: agent, error: agentError } = await serverSupabase
-      .from('agent_types')
-      .select('id')
-      .eq('id', id)
-      .or(`workspace_id.eq.${currentWorkspaceId},workspace_id.is.null`)
-      .eq('is_active', true)
-      .maybeSingle();
-
-    if (agentError || !agent) {
-      redirect(`/agents/${id}?error=Agent not found or unavailable.`);
-    }
-
-    if (selectedProjectId) {
-      const { data: project, error: projectError } = await serverSupabase
-        .from('projects')
-        .select('id')
-        .eq('id', selectedProjectId)
-        .eq('workspace_id', currentWorkspaceId)
-        .eq('user_id', currentUserId)
-        .maybeSingle();
-
-      if (projectError || !project) {
-        redirect(`/agents/${id}?error=Selected project is invalid for this workspace.`);
-      }
-    }
-
-    const { data, error } = await serverSupabase.functions.invoke('gemini-orchestrator', {
-      body: {
-        workspaceId: currentWorkspaceId,
-        userId: currentUser.id,
-        agentTypeId: id,
-        projectId: selectedProjectId,
-        userInput: prompt,
-        metadata: {
-          source: 'agents-detail-page'
-        },
-        contextSelection: {
-          workspaceMemoryEntryIds: selectedMemoryEntryIds,
-          projectKnowledgeEntryIds: selectedProjectKnowledgeIds,
-          sourceIds: selectedSourceIds,
-          savedOutputIds: selectedSavedOutputIds
-        },
-        saveOutput: true
-      }
-    });
-
-    if (error || !data?.ok || !data?.runId) {
-      const message = data?.error || error?.message || 'Failed to run agent.';
-      redirect(`/agents/${id}?error=${encodeURIComponent(message)}`);
-    }
-
-    revalidatePath('/dashboard');
-    revalidatePath('/projects');
-    if (selectedProjectId) {
-      revalidatePath(`/projects/${selectedProjectId}`);
-    }
-
-    redirect(`/agents/${id}?run_id=${data.runId}`);
-  }
-
-  async function saveOutput(formData: FormData) {
-    'use server';
-
-    const runId = String(formData.get('run_id') ?? '').trim();
-    if (!runId) return;
-
-    const serverSupabase = await createSupabaseServerClient();
-    const {
-      data: { user: currentUser }
-    } = await serverSupabase.auth.getUser();
-
-    if (!currentUser) redirect('/login');
-
-    const { workspaceId: currentWorkspaceId, userId: currentUserId } = await getWorkspaceContext();
-
-    const { data: run } = await serverSupabase
-      .from('agent_runs')
-      .select('id, result_text, project_id')
-      .eq('id', runId)
-      .eq('workspace_id', currentWorkspaceId)
-      .eq('user_id', currentUserId)
-      .eq('status', 'completed')
-      .maybeSingle();
-
-    if (!run?.result_text) {
-      redirect(`/agents/${id}?error=Run result is not available to save.`);
-    }
-
-    await serverSupabase.from('saved_outputs').insert({
-      workspace_id: currentWorkspaceId,
-      user_id: currentUser.id,
-      agent_run_id: run.id,
-      project_id: run.project_id,
-      title: 'Saved output',
-      content: run.result_text,
-      metadata: { source: 'manual-save' }
-    });
-
-    if (run.project_id) {
-      revalidatePath(`/projects/${run.project_id}`);
-    }
-    revalidatePath('/dashboard');
-    redirect(`/agents/${id}?run_id=${runId}`);
-  }
-
-  async function createProjectItem(formData: FormData) {
-    'use server';
-
-    const outputId = String(formData.get('output_id') ?? '').trim();
-    const title = String(formData.get('title') ?? '').trim();
-
-    if (!outputId || !title) return;
-
-    const serverSupabase = await createSupabaseServerClient();
-    const {
-      data: { user: currentUser }
-    } = await serverSupabase.auth.getUser();
-
-    if (!currentUser) redirect('/login');
-
-    const { workspaceId: currentWorkspaceId, userId: currentUserId } = await getWorkspaceContext();
-
-    const { data: output } = await serverSupabase
-      .from('saved_outputs')
-      .select('id, project_id, content')
-      .eq('id', outputId)
-      .eq('workspace_id', currentWorkspaceId)
-      .eq('user_id', currentUserId)
-      .maybeSingle();
-
-    if (!output?.project_id) {
-      redirect(`/agents/${id}?error=Pick a project before converting to a project item.`);
-    }
-
-    const { data: item } = await serverSupabase
-      .from('project_items')
-      .insert({
-        workspace_id: currentWorkspaceId,
-        project_id: output.project_id,
-        user_id: currentUser.id,
-        source_output_id: output.id,
-        item_type: 'agent_output',
-        title,
-        status: 'open',
-        payload: { excerpt: output.content.slice(0, 400) }
-      })
-      .select('id, project_id')
-      .single();
-
-    if (item) {
-      await serverSupabase.from('saved_outputs').update({ project_item_id: item.id }).eq('id', output.id);
-      revalidatePath(`/projects/${item.project_id}`);
-    }
-
-    redirect(`/agents/${id}?run_id=${runIdParam ?? ''}`);
-  }
-
-  async function attachSavedOutputToProject(formData: FormData) {
-    'use server';
-
-    const outputId = String(formData.get('output_id') ?? '').trim();
-    const projectId = String(formData.get('project_id') ?? '').trim();
-
-    if (!outputId || !projectId) {
-      redirect(`/agents/${id}?error=Select a project to attach this output.`);
-    }
-
-    const serverSupabase = await createSupabaseServerClient();
-    const {
-      data: { user: currentUser }
-    } = await serverSupabase.auth.getUser();
-
-    if (!currentUser) redirect('/login');
-
-    const { workspaceId: currentWorkspaceId, userId: currentUserId } = await getWorkspaceContext();
-
-    const [{ data: output }, { data: project }] = await Promise.all([
-      serverSupabase
-        .from('saved_outputs')
-        .select('id, project_id')
-        .eq('id', outputId)
-        .eq('workspace_id', currentWorkspaceId)
-        .eq('user_id', currentUserId)
-        .maybeSingle(),
-      serverSupabase
-        .from('projects')
-        .select('id')
-        .eq('id', projectId)
-        .eq('workspace_id', currentWorkspaceId)
-        .eq('user_id', currentUserId)
-        .maybeSingle()
-    ]);
-
-    if (!output || !project) {
-      redirect(`/agents/${id}?error=Output or project is not valid for this workspace.`);
-    }
-
-    if (output.project_id && output.project_id !== projectId) {
-      redirect(`/agents/${id}?error=This output is already linked to a different project.`);
-    }
-
-    await serverSupabase.from('saved_outputs').update({ project_id: projectId }).eq('id', outputId);
-
-    revalidatePath('/projects');
-    revalidatePath(`/projects/${projectId}`);
-    redirect(`/agents/${id}?run_id=${runIdParam ?? ''}`);
-  }
+  const safeRunId = runIdParam ?? '';
+  const runAgent = runAgentAction.bind(null, id);
+  const saveOutput = saveOutputAction.bind(null, id);
+  const createProjectItem = createProjectItemFromOutputAction.bind(null, id, safeRunId);
+  const attachSavedOutputToProject = attachSavedOutputToProjectAction.bind(null, id, safeRunId);
 
   const [{ data: agent }, { data: projects }, { data: memoryEntries }, { data: recentSources }, { data: recentOutputs }] = await Promise.all([
     supabase
