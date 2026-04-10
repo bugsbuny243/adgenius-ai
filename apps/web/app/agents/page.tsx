@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { Nav } from '@/components/nav';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getWorkspaceContext } from '@/lib/workspace';
@@ -42,6 +43,11 @@ export default async function AgentsPage() {
                   <span className="rounded-md border border-white/10 px-2 py-1 text-xs uppercase text-white/70">
                     {agent.is_active ? 'active' : 'inactive'}
                   </span>
+                </div>
+                <div className="mt-3">
+                  <Link href={`/agents/${agent.id}`} className="rounded-lg border border-white/20 px-3 py-1.5 text-sm hover:border-neon">
+                    Run agent
+                  </Link>
                 </div>
               </div>
             ))}

@@ -73,22 +73,11 @@ create table if not exists public.project_items (
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
   project_id uuid not null references public.projects(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
+  source_output_id uuid,
+  item_type text not null default 'note',
   title text not null,
-  content text,
-  status text not null default 'open' check (status in ('open', 'done')),
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table if not exists public.project_items (
-  id uuid primary key default gen_random_uuid(),
-  workspace_id uuid not null references public.workspaces(id) on delete cascade,
-  project_id uuid not null references public.projects(id) on delete cascade,
-  user_id uuid not null references auth.users(id) on delete cascade,
-  item_type text not null,
-  title text,
-  status text not null default 'draft',
-  payload jsonb not null default '{}'::jsonb,
+  status text not null default 'draft' check (status in ('draft', 'open', 'done')),
+  payload jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -123,6 +112,20 @@ create table if not exists public.saved_outputs (
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'project_items_source_output_id_fkey'
+      and conrelid = 'public.project_items'::regclass
+  ) then
+    alter table public.project_items
+      add constraint project_items_source_output_id_fkey
+      foreign key (source_output_id) references public.saved_outputs(id) on delete set null;
+  end if;
+end $$;
 
 -- ---------------------------------------------------------
 -- Usage + subscription awareness
@@ -175,10 +178,13 @@ create index if not exists idx_workspace_members_workspace_user on public.worksp
 create index if not exists idx_workspace_users_workspace_user on public.workspace_users(workspace_id, user_id);
 create index if not exists idx_agent_types_workspace_active on public.agent_types(workspace_id, is_active);
 create index if not exists idx_projects_workspace on public.projects(workspace_id, created_at desc);
-create index if not exists idx_project_items_project on public.project_items(project_id, created_at desc);
+create index if not exists idx_project_items_workspace_project on public.project_items(workspace_id, project_id, created_at desc);
+create index if not exists idx_project_items_source_output on public.project_items(source_output_id);
 create index if not exists idx_agent_runs_workspace on public.agent_runs(workspace_id, created_at desc);
 create index if not exists idx_agent_runs_agent_type on public.agent_runs(agent_type_id, created_at desc);
 create index if not exists idx_saved_outputs_workspace on public.saved_outputs(workspace_id, created_at desc);
+create index if not exists idx_saved_outputs_agent_run on public.saved_outputs(agent_run_id);
+create index if not exists idx_saved_outputs_project on public.saved_outputs(project_id, created_at desc);
 create index if not exists idx_usage_metering_workspace on public.usage_metering(workspace_id, created_at desc);
 
 -- ---------------------------------------------------------
