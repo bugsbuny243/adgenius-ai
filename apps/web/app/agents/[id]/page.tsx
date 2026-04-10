@@ -14,6 +14,12 @@ function asStringArray(raw: FormDataEntryValue[] | null | undefined) {
   return (raw ?? []).map((value) => String(value).trim()).filter(Boolean);
 }
 
+function previewText(value: string | null | undefined, max = 140) {
+  if (!value) return '';
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  return normalized.length > max ? `${normalized.slice(0, max)}…` : normalized;
+}
+
 export default async function AgentDetailPage({ params, searchParams }: AgentDetailPageProps) {
   const { id } = await params;
   const { run_id: runIdParam, error: errorParam } = await searchParams;
@@ -208,6 +214,57 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
     redirect(`/agents/${id}?run_id=${runIdParam ?? ''}`);
   }
 
+  async function attachSavedOutputToProject(formData: FormData) {
+    'use server';
+
+    const outputId = String(formData.get('output_id') ?? '').trim();
+    const projectId = String(formData.get('project_id') ?? '').trim();
+
+    if (!outputId || !projectId) {
+      redirect(`/agents/${id}?error=Select a project to attach this output.`);
+    }
+
+    const serverSupabase = await createSupabaseServerClient();
+    const {
+      data: { user: currentUser }
+    } = await serverSupabase.auth.getUser();
+
+    if (!currentUser) redirect('/login');
+
+    const { workspaceId: currentWorkspaceId, userId: currentUserId } = await getWorkspaceContext();
+
+    const [{ data: output }, { data: project }] = await Promise.all([
+      serverSupabase
+        .from('saved_outputs')
+        .select('id, project_id')
+        .eq('id', outputId)
+        .eq('workspace_id', currentWorkspaceId)
+        .eq('user_id', currentUserId)
+        .maybeSingle(),
+      serverSupabase
+        .from('projects')
+        .select('id')
+        .eq('id', projectId)
+        .eq('workspace_id', currentWorkspaceId)
+        .eq('user_id', currentUserId)
+        .maybeSingle()
+    ]);
+
+    if (!output || !project) {
+      redirect(`/agents/${id}?error=Output or project is not valid for this workspace.`);
+    }
+
+    if (output.project_id && output.project_id !== projectId) {
+      redirect(`/agents/${id}?error=This output is already linked to a different project.`);
+    }
+
+    await serverSupabase.from('saved_outputs').update({ project_id: projectId }).eq('id', outputId);
+
+    revalidatePath('/projects');
+    revalidatePath(`/projects/${projectId}`);
+    redirect(`/agents/${id}?run_id=${runIdParam ?? ''}`);
+  }
+
   const [{ data: agent }, { data: projects }, { data: memoryEntries }, { data: recentSources }, { data: recentOutputs }] = await Promise.all([
     supabase
       .from('agent_types')
@@ -246,18 +303,18 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
 
   if (!agent) notFound();
 
-  const { data: latestRun } = await supabase
+  const latestRunQuery = supabase
     .from('agent_runs')
     .select('id, status, user_input, result_text, error_message, project_id, context_snapshot_id, created_at')
     .eq('workspace_id', workspaceId)
     .eq('user_id', userId)
     .eq('agent_type_id', id)
-    .eq(runIdParam ? 'id' : 'status', runIdParam || 'completed')
     .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(1);
 
-  const [{ data: savedOutput }, { data: latestRunContextLinks }, { data: projectKnowledge }] = await Promise.all([
+  const { data: latestRun } = runIdParam ? await latestRunQuery.eq('id', runIdParam).maybeSingle() : await latestRunQuery.maybeSingle();
+
+  const [{ data: savedOutput }, { data: latestRunContextLinks }, { data: projectKnowledge }, { data: recentRuns }] = await Promise.all([
     latestRun
       ? supabase
           .from('saved_outputs')
@@ -281,8 +338,31 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
       .select('id, title, project_id, entry_type')
       .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: false })
-      .limit(20)
+      .limit(20),
+    supabase
+      .from('agent_runs')
+      .select('id, status, user_input, result_text, error_message, created_at, project_id')
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', userId)
+      .eq('agent_type_id', id)
+      .order('created_at', { ascending: false })
+      .limit(12)
   ]);
+
+  const recentRunIds = (recentRuns ?? []).map((run) => run.id);
+  const [{ data: recentRunOutputs }, { data: workspaceProjects }] = await Promise.all([
+    recentRunIds.length
+      ? supabase
+          .from('saved_outputs')
+          .select('id, agent_run_id, project_id')
+          .eq('workspace_id', workspaceId)
+          .in('agent_run_id', recentRunIds)
+      : Promise.resolve({ data: [] }),
+    supabase.from('projects').select('id, name').eq('workspace_id', workspaceId).eq('user_id', userId)
+  ]);
+
+  const outputByRunId = new Map((recentRunOutputs ?? []).map((output) => [output.agent_run_id, output]));
+  const projectNameById = new Map((workspaceProjects ?? []).map((project) => [project.id, project.name]));
 
   return (
     <main>
@@ -327,8 +407,11 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
-            <label className="text-sm">
-              <span className="mb-1 block text-white/70">Workspace memory</span>
+            <label className="rounded-lg border border-white/10 bg-white/[0.02] p-3 text-sm">
+              <span className="mb-1 block text-sm font-medium text-white">Workspace Memory</span>
+              <span className="mb-2 block text-xs text-white/60">
+                Reusable workspace-level facts and preferences. {memoryEntries?.length ?? 0} available.
+              </span>
               <select
                 name="workspace_memory_entry_ids"
                 multiple
@@ -340,10 +423,14 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
                   </option>
                 ))}
               </select>
+              {!memoryEntries?.length ? <span className="mt-2 block text-xs text-white/50">No workspace memory entries yet.</span> : null}
             </label>
 
-            <label className="text-sm">
-              <span className="mb-1 block text-white/70">Project knowledge entries</span>
+            <label className="rounded-lg border border-white/10 bg-white/[0.02] p-3 text-sm">
+              <span className="mb-1 block text-sm font-medium text-white">Project Knowledge</span>
+              <span className="mb-2 block text-xs text-white/60">
+                Structured notes and extracted knowledge. {projectKnowledge?.length ?? 0} available.
+              </span>
               <select
                 name="project_knowledge_entry_ids"
                 multiple
@@ -355,10 +442,14 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
                   </option>
                 ))}
               </select>
+              {!projectKnowledge?.length ? <span className="mt-2 block text-xs text-white/50">No project knowledge entries found.</span> : null}
             </label>
 
-            <label className="text-sm">
-              <span className="mb-1 block text-white/70">Sources</span>
+            <label className="rounded-lg border border-white/10 bg-white/[0.02] p-3 text-sm">
+              <span className="mb-1 block text-sm font-medium text-white">Sources</span>
+              <span className="mb-2 block text-xs text-white/60">
+                Ready source docs and URLs for retrieval. {recentSources?.length ?? 0} available.
+              </span>
               <select
                 name="source_ids"
                 multiple
@@ -370,10 +461,14 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
                   </option>
                 ))}
               </select>
+              {!recentSources?.length ? <span className="mt-2 block text-xs text-white/50">No ready sources available yet.</span> : null}
             </label>
 
-            <label className="text-sm">
-              <span className="mb-1 block text-white/70">Saved outputs</span>
+            <label className="rounded-lg border border-white/10 bg-white/[0.02] p-3 text-sm">
+              <span className="mb-1 block text-sm font-medium text-white">Previous Outputs</span>
+              <span className="mb-2 block text-xs text-white/60">
+                Reuse earlier saved outputs as context. {recentOutputs?.length ?? 0} available.
+              </span>
               <select
                 name="saved_output_ids"
                 multiple
@@ -385,6 +480,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
                   </option>
                 ))}
               </select>
+              {!recentOutputs?.length ? <span className="mt-2 block text-xs text-white/50">No saved outputs in this workspace yet.</span> : null}
             </label>
           </div>
           <p className="text-xs text-white/50">Tip: hold Ctrl/Cmd to select multiple context items.</p>
@@ -394,6 +490,48 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
       </section>
 
       <section className="panel">
+        <h3 className="mb-3 text-lg font-semibold">Recent Runs</h3>
+        {recentRuns && recentRuns.length > 0 ? (
+          <div className="space-y-2">
+            {recentRuns.map((run) => {
+              const linkedOutput = outputByRunId.get(run.id);
+              const linkedProjectTitle = run.project_id ? projectNameById.get(run.project_id) || run.project_id : null;
+              const outputProjectTitle = linkedOutput?.project_id ? projectNameById.get(linkedOutput.project_id) || linkedOutput.project_id : null;
+              const active = latestRun?.id === run.id;
+
+              return (
+                <div key={run.id} className={`rounded-lg border px-3 py-3 ${active ? 'border-neon/80 bg-neon/5' : 'border-white/10'}`}>
+                  <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs text-white/60">
+                      {new Date(run.created_at).toLocaleString()} • {run.status}
+                    </p>
+                    {active ? (
+                      <span className="rounded border border-neon/60 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neon">Viewing</span>
+                    ) : (
+                      <Link href={`/agents/${id}?run_id=${run.id}`} className="text-xs text-neon hover:underline">
+                        View run
+                      </Link>
+                    )}
+                  </div>
+                  <p className="text-sm text-white/80">
+                    <span className="text-white/60">Input:</span> {previewText(run.user_input) || '—'}
+                  </p>
+                  <p className="mt-1 text-sm text-white/80">
+                    <span className="text-white/60">{run.result_text ? 'Result:' : 'Error:'}</span> {previewText(run.result_text || run.error_message) || '—'}
+                  </p>
+                  <p className="mt-1 text-xs text-white/55">
+                    Saved output: {linkedOutput ? 'yes' : 'no'} • Project: {linkedProjectTitle || outputProjectTitle || 'none'}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-sm text-white/70">No recent runs yet for this agent.</p>
+        )}
+      </section>
+
+      <section className="panel mt-4">
         <h3 className="mb-3 text-lg font-semibold">Latest Result</h3>
         {latestRun ? (
           <div className="space-y-3">
@@ -449,6 +587,27 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
                     ) : (
                       <p className="text-xs text-yellow-200">This output is not linked to a project yet.</p>
                     )}
+                    {!savedOutput.project_id ? (
+                      <form action={attachSavedOutputToProject} className="flex flex-wrap items-center gap-2">
+                        <input type="hidden" name="output_id" value={savedOutput.id} />
+                        <select
+                          name="project_id"
+                          defaultValue=""
+                          required
+                          className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-neon"
+                        >
+                          <option value="">Attach to project…</option>
+                          {projects?.map((project) => (
+                            <option key={project.id} value={project.id}>
+                              {project.name}
+                            </option>
+                          ))}
+                        </select>
+                        <button type="submit" className="rounded-lg border border-white/20 px-3 py-2 text-sm hover:border-neon">
+                          Attach output to project
+                        </button>
+                      </form>
+                    ) : null}
                     {savedOutput.project_id ? (
                       <form action={createProjectItem} className="flex flex-wrap items-center gap-2">
                         <input type="hidden" name="output_id" value={savedOutput.id} />
