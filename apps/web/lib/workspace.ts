@@ -33,9 +33,9 @@ export async function getWorkspaceContext(): Promise<WorkspaceContext> {
     throw new Error('No workspace membership found for current user.');
   }
 
+  const workspaces = membership.workspaces as { name?: string } | Array<{ name?: string }> | null;
   const workspaceName =
-    (Array.isArray(membership.workspaces) ? membership.workspaces[0]?.name : membership.workspaces?.name) ??
-    'Workspace';
+    (Array.isArray(workspaces) ? workspaces[0]?.name : workspaces?.name) ?? 'Workspace';
 
   return {
     userId: user.id,
