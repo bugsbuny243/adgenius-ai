@@ -1,10 +1,11 @@
 import Link from 'next/link';
+import type { Route } from 'next';
 
 const links = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/agents', label: 'Agents' },
-  { href: '/projects', label: 'Projects' }
-];
+  { href: '/projects', label: 'Projects' },
+] as const satisfies ReadonlyArray<{ href: Route; label: string }>;
 
 export function Nav() {
   return (
@@ -13,6 +14,7 @@ export function Nav() {
         <p className="text-xs uppercase tracking-[0.2em] text-lilac">Koschei AI</p>
         <h1 className="text-2xl font-semibold">Command Center</h1>
       </div>
+
       <div className="flex gap-2">
         {links.map((link) => (
           <Link
