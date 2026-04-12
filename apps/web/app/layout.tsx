@@ -4,9 +4,8 @@ import Script from 'next/script';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Koschei AI Command Center',
-  description:
-    'Koschei AI helps teams manage projects and AI agents from a single, secure command center.'
+  title: 'Koschei İçerik Platformu',
+  description: 'Koschei, ekiplerin içerik üretim süreçlerini tek merkezden yönetmesini sağlar.'
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -25,13 +24,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <footer className="mt-12 border-t border-white/10 pt-6 text-sm text-white/70">
             <nav className="flex flex-wrap gap-4">
               <Link href="/about" className="transition hover:text-neon">
-                About
+                Hakkında
               </Link>
               <Link href="/contact" className="transition hover:text-neon">
-                Contact
+                İletişim
               </Link>
               <Link href="/privacy-policy" className="transition hover:text-neon">
-                Privacy Policy
+                Gizlilik
               </Link>
             </nav>
           </footer>

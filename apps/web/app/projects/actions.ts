@@ -17,7 +17,7 @@ export async function createProjectAction(formData: FormData) {
   } = await serverSupabase.auth.getUser();
 
   if (!currentUser) {
-    redirect('/login');
+    redirect('/signin');
   }
 
   const { workspaceId: currentWorkspaceId } = await getWorkspaceContext();

@@ -17,7 +17,7 @@ export async function createProjectItemAction(projectId: string, formData: FormD
     data: { user: currentUser }
   } = await serverSupabase.auth.getUser();
 
-  if (!currentUser) redirect('/login');
+  if (!currentUser) redirect('/signin');
 
   const { workspaceId: currentWorkspaceId } = await getWorkspaceContext();
 
@@ -47,7 +47,7 @@ export async function addKnowledgeSourceAction(projectId: string, formData: Form
     data: { user: currentUser }
   } = await serverSupabase.auth.getUser();
 
-  if (!currentUser) redirect('/login');
+  if (!currentUser) redirect('/signin');
 
   const { workspaceId: currentWorkspaceId } = await getWorkspaceContext();
 
@@ -79,7 +79,7 @@ export async function addProjectKnowledgeAction(projectId: string, formData: For
     data: { user: currentUser }
   } = await serverSupabase.auth.getUser();
 
-  if (!currentUser) redirect('/login');
+  if (!currentUser) redirect('/signin');
 
   const { workspaceId: currentWorkspaceId } = await getWorkspaceContext();
 

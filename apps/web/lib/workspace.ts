@@ -72,8 +72,27 @@ export async function bootstrapWorkspaceForUser(userId: string, email?: string |
   }
 
   const service = createClient(url, serviceRoleKey);
+  const { data: existingMembership } = await service
+    .from('workspace_members')
+    .select('workspace_id, workspaces(name)')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingMembership?.workspace_id) {
+    const workspaces = existingMembership.workspaces as { name?: string } | Array<{ name?: string }> | null;
+    const workspaceName = (Array.isArray(workspaces) ? workspaces[0]?.name : workspaces?.name) ?? 'Workspace';
+
+    return {
+      userId,
+      workspaceId: existingMembership.workspace_id,
+      workspaceName
+    };
+  }
+
   const emailName = email?.split('@')[0] ?? 'User';
-  const workspaceName = `${emailName}'s Workspace`;
+  const workspaceName = `${emailName} Workspace`;
   const slugBase = slugifyWorkspaceName(workspaceName) || 'workspace';
   const workspaceSlug = `${slugBase}-${userId.slice(0, 8)}`;
 
