@@ -6,39 +6,12 @@ import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 
 const MAGIC_LINK_TIMEOUT_MS = 15_000;
 
-function mapSupabaseErrorToMessage(errorMessage: string): string {
-  const normalized = errorMessage.toLowerCase();
-
-  if (normalized.includes('rate limit')) {
-    return 'Çok sık deneme yapıldı. Lütfen kısa bir süre sonra tekrar deneyin.';
-  }
-
-  if (normalized.includes('invalid email')) {
-    return 'Geçerli bir e-posta adresi girin.';
-  }
-
-  if (normalized.includes('email not confirmed')) {
-    return 'E-posta doğrulaması tamamlanmamış görünüyor. Gelen kutunuzu kontrol edin.';
-  }
-
-  if (normalized.includes('network') || normalized.includes('failed to fetch')) {
-    return 'Ağ bağlantısı nedeniyle istek gönderilemedi. İnternet bağlantınızı kontrol edip tekrar deneyin.';
-  }
-
-  return 'Magic link gönderilirken bir hata oluştu. Lütfen tekrar deneyin.';
+function resolveEmailRedirectTo(): string {
+  return `${window.location.origin}/auth/callback`;
 }
 
-function resolveEmailRedirectTo(): string {
-  const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-  const baseUrl = configuredSiteUrl && configuredSiteUrl.length > 0 ? configuredSiteUrl : window.location.origin;
-
-  try {
-    const redirectUrl = new URL('/auth/callback', baseUrl);
-    return redirectUrl.toString();
-  } catch (error: unknown) {
-    console.error('Invalid redirect URL configuration for magic-link callback.', error);
-    return `${window.location.origin}/auth/callback`;
-  }
+function toErrorDetail(error: { message: string; status?: number }): string {
+  return error.status ? `${error.message} (status: ${error.status})` : error.message;
 }
 
 export default function LoginPage() {
@@ -78,15 +51,19 @@ function LoginPageContent() {
 
       if (error) {
         console.error('Supabase signInWithOtp returned an error.', error);
-        setMessage(mapSupabaseErrorToMessage(error.message));
+        setMessage(`Magic link gönderimi başarısız: ${toErrorDetail(error)}`);
         return;
       }
 
       setMessage('Magic link gönderildi, e-postanı kontrol et.');
     } catch (error: unknown) {
       console.error('Magic-link submit flow failed.', error);
-      const fallbackMessage = error instanceof Error ? mapSupabaseErrorToMessage(error.message) : mapSupabaseErrorToMessage('');
-      setMessage(fallbackMessage);
+      if (error instanceof Error) {
+        setMessage(`Magic link gönderimi başarısız: ${error.message}`);
+        return;
+      }
+
+      setMessage('Magic link gönderimi başarısız: bilinmeyen hata.');
     } finally {
       setLoading(false);
     }
