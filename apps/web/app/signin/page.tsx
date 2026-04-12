@@ -4,6 +4,43 @@ import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 
+const MAGIC_LINK_TIMEOUT_MS = 15_000;
+
+function mapSupabaseErrorToMessage(errorMessage: string): string {
+  const normalized = errorMessage.toLowerCase();
+
+  if (normalized.includes('rate limit')) {
+    return 'Çok sık deneme yapıldı. Lütfen kısa bir süre sonra tekrar deneyin.';
+  }
+
+  if (normalized.includes('invalid email')) {
+    return 'Geçerli bir e-posta adresi girin.';
+  }
+
+  if (normalized.includes('email not confirmed')) {
+    return 'E-posta doğrulaması tamamlanmamış görünüyor. Gelen kutunuzu kontrol edin.';
+  }
+
+  if (normalized.includes('network') || normalized.includes('failed to fetch')) {
+    return 'Ağ bağlantısı nedeniyle istek gönderilemedi. İnternet bağlantınızı kontrol edip tekrar deneyin.';
+  }
+
+  return 'Magic link gönderilirken bir hata oluştu. Lütfen tekrar deneyin.';
+}
+
+function resolveEmailRedirectTo(): string {
+  const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  const baseUrl = configuredSiteUrl && configuredSiteUrl.length > 0 ? configuredSiteUrl : window.location.origin;
+
+  try {
+    const redirectUrl = new URL('/auth/callback', baseUrl);
+    return redirectUrl.toString();
+  } catch (error: unknown) {
+    console.error('Invalid redirect URL configuration for magic-link callback.', error);
+    return `${window.location.origin}/auth/callback`;
+  }
+}
+
 export default function LoginPage() {
   return (
     <Suspense fallback={<main className="mx-auto max-w-xl panel" />}>
@@ -23,21 +60,36 @@ function LoginPageContent() {
     setLoading(true);
     setMessage(null);
 
-    const supabase = createSupabaseBrowserClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const emailRedirectTo = resolveEmailRedirectTo();
+      const signInRequest = supabase.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo }
+      });
+
+      const timeoutRequest = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('Magic link request timed out after 15 seconds.'));
+        }, MAGIC_LINK_TIMEOUT_MS);
+      });
+
+      const { error } = await Promise.race([signInRequest, timeoutRequest]);
+
+      if (error) {
+        console.error('Supabase signInWithOtp returned an error.', error);
+        setMessage(mapSupabaseErrorToMessage(error.message));
+        return;
       }
-    });
 
-    if (error) {
-      setMessage(error.message);
-    } else {
-      setMessage('Magic link e-posta adresinize gönderildi. Linke tıklayıp devam edin.');
+      setMessage('Magic link gönderildi, e-postanı kontrol et.');
+    } catch (error: unknown) {
+      console.error('Magic-link submit flow failed.', error);
+      const fallbackMessage = error instanceof Error ? mapSupabaseErrorToMessage(error.message) : mapSupabaseErrorToMessage('');
+      setMessage(fallbackMessage);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }
 
   const loginError = searchParams.get('error');
