@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createSupabaseServerClient, isSupabaseServerConfigured } from '@/lib/supabase-server';
-import { bootstrapWorkspaceForUser, getWorkspaceContextOrNull, type WorkspaceContext } from '@/lib/workspace';
+import { getWorkspaceContextOrNull, type WorkspaceContext } from '@/lib/workspace';
 
 export type AppContext = {
   userId: string;
@@ -22,13 +22,10 @@ export async function getAppContextOrRedirect(): Promise<AppContext> {
     redirect('/signin');
   }
 
-  let workspace = await getWorkspaceContextOrNull();
-  if (!workspace) {
-    workspace = await bootstrapWorkspaceForUser(user.id, user.email);
-  }
+  const workspace = await getWorkspaceContextOrNull();
 
   if (!workspace) {
-    throw new Error('Workspace bootstrap failed.');
+    throw new Error('Çalışma alanı bulunamadı.');
   }
 
   return { userId: user.id, workspace, supabase };
