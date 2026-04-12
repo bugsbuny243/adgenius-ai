@@ -10,7 +10,7 @@ export default function HomePage() {
         work organized in one place.
       </p>
       <div className="flex gap-3">
-        <Link href="/login" className="rounded-xl bg-neon px-5 py-3 font-semibold text-ink">
+        <Link href="/signin" className="rounded-xl bg-neon px-5 py-3 font-semibold text-ink">
           Log In
         </Link>
         <Link href="/dashboard" className="rounded-xl border border-white/20 px-5 py-3">

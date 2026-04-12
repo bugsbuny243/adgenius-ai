@@ -17,14 +17,14 @@ export async function GET(request: Request) {
   const next = requestUrl.searchParams.get('next') || '/dashboard';
 
   if (!code) {
-    return NextResponse.redirect(new URL('/login?error=missing_code', request.url));
+    return NextResponse.redirect(new URL('/signin?error=missing_code', request.url));
   }
 
   const supabase = await createSupabaseServerClient();
   const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
   if (exchangeError) {
-    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(exchangeError.message)}`, request.url));
+    return NextResponse.redirect(new URL(`/signin?error=${encodeURIComponent(exchangeError.message)}`, request.url));
   }
 
   const {
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.redirect(new URL('/login?error=missing_user', request.url));
+    return NextResponse.redirect(new URL('/signin?error=missing_user', request.url));
   }
 
   const service = createClient(getEnv('NEXT_PUBLIC_SUPABASE_URL'), getEnv('SUPABASE_SERVICE_ROLE_KEY'));
@@ -66,7 +66,7 @@ export async function GET(request: Request) {
       .single();
 
     if (workspaceError || !workspace) {
-      return NextResponse.redirect(new URL('/login?error=workspace_bootstrap_failed', request.url));
+      return NextResponse.redirect(new URL('/signin?error=workspace_bootstrap_failed', request.url));
     }
 
     workspaceId = workspace.id;
