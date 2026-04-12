@@ -17,7 +17,7 @@ export async function addWorkspaceMemoryAction(formData: FormData) {
     data: { user: currentUser }
   } = await serverSupabase.auth.getUser();
 
-  if (!currentUser) redirect('/login');
+  if (!currentUser) redirect('/signin');
 
   const { workspaceId: currentWorkspaceId } = await getWorkspaceContext();
 

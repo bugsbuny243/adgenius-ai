@@ -35,35 +35,32 @@ function LoginPageContent() {
 
     try {
       const supabase = createSupabaseBrowserClient();
-      const emailRedirectTo = resolveEmailRedirectTo();
+      if (!supabase) {
+        setMessage('Supabase ayarları eksik. Lütfen sistem yöneticin ile iletişime geç.');
+        return;
+      }
+
       const signInRequest = supabase.auth.signInWithOtp({
         email,
-        options: { emailRedirectTo }
+        options: { emailRedirectTo: resolveEmailRedirectTo() }
       });
 
       const timeoutRequest = new Promise<never>((_, reject) => {
         setTimeout(() => {
-          reject(new Error('Magic link request timed out after 15 seconds.'));
+          reject(new Error('Magic link isteği 15 saniye içinde yanıt vermedi.'));
         }, MAGIC_LINK_TIMEOUT_MS);
       });
 
       const { error } = await Promise.race([signInRequest, timeoutRequest]);
 
       if (error) {
-        console.error('Supabase signInWithOtp returned an error.', error);
         setMessage(`Magic link gönderimi başarısız: ${toErrorDetail(error)}`);
         return;
       }
 
-      setMessage('Magic link gönderildi, e-postanı kontrol et.');
+      setMessage('Magic link gönderildi. E-posta kutunu kontrol et.');
     } catch (error: unknown) {
-      console.error('Magic-link submit flow failed.', error);
-      if (error instanceof Error) {
-        setMessage(`Magic link gönderimi başarısız: ${error.message}`);
-        return;
-      }
-
-      setMessage('Magic link gönderimi başarısız: bilinmeyen hata.');
+      setMessage(`Magic link gönderimi başarısız: ${error instanceof Error ? error.message : 'bilinmeyen hata'}`);
     } finally {
       setLoading(false);
     }
@@ -73,11 +70,11 @@ function LoginPageContent() {
 
   return (
     <main className="mx-auto max-w-xl panel">
-      <h1 className="mb-2 text-3xl font-semibold">Koschei AI Giriş</h1>
-      <p className="mb-6 text-sm text-white/70">Supabase magic-link ile güvenli giriş.</p>
+      <h1 className="mb-2 text-3xl font-semibold">Koschei Giriş</h1>
+      <p className="mb-6 text-sm text-white/70">Magic link ile güvenli giriş.</p>
       <form className="space-y-4" onSubmit={handleLogin}>
         <label className="block text-sm">
-          Email
+          E-posta
           <input
             required
             type="email"

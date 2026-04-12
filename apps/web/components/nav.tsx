@@ -2,20 +2,23 @@ import Link from 'next/link';
 import type { Route } from 'next';
 
 const links = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/agents', label: 'Agents' },
-  { href: '/projects', label: 'Projects' },
+  { href: '/dashboard', label: 'Gösterge' },
+  { href: '/projects', label: 'Projeler' },
+  { href: '/composer', label: 'İçerik Üret' },
+  { href: '/runs', label: 'Çalıştırmalar' },
+  { href: '/saved', label: 'Kaydedilenler' },
+  { href: '/connections', label: 'Bağlantılar' }
 ] as const satisfies ReadonlyArray<{ href: Route; label: string }>;
 
 export function Nav() {
   return (
     <nav className="mb-8 flex flex-wrap items-center justify-between gap-3">
       <div>
-        <p className="text-xs uppercase tracking-[0.2em] text-lilac">Koschei AI</p>
-        <h1 className="text-2xl font-semibold">Command Center</h1>
+        <p className="text-xs uppercase tracking-[0.2em] text-lilac">Koschei</p>
+        <h1 className="text-2xl font-semibold">İçerik Komuta Merkezi</h1>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {links.map((link) => (
           <Link
             key={link.href}
