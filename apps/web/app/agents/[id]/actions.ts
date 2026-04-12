@@ -1,25 +1,22 @@
 'use server';
 
+import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getWorkspaceContext } from '@/lib/workspace';
 
-function asStringArray(raw: FormDataEntryValue[] | null | undefined) {
-  return (raw ?? []).map((value) => String(value).trim()).filter(Boolean);
+function buildInternalUrl(pathname: string, headerList: Headers): string {
+  const protocol = headerList.get('x-forwarded-proto') ?? 'http';
+  const host = headerList.get('x-forwarded-host') ?? headerList.get('host') ?? 'localhost:3000';
+  return `${protocol}://${host}${pathname}`;
 }
 
 export async function runAgentAction(agentId: string, formData: FormData) {
   const prompt = String(formData.get('prompt') ?? '').trim();
-  const projectIdRaw = String(formData.get('project_id') ?? '').trim();
-  const selectedProjectId = projectIdRaw || null;
-  const selectedMemoryEntryIds = asStringArray(formData.getAll('workspace_memory_entry_ids'));
-  const selectedProjectKnowledgeIds = asStringArray(formData.getAll('project_knowledge_entry_ids'));
-  const selectedSourceIds = asStringArray(formData.getAll('source_ids'));
-  const selectedSavedOutputIds = asStringArray(formData.getAll('saved_output_ids'));
 
   if (!prompt) {
-    redirect(`/agents/${agentId}?error=Prompt is required.`);
+    redirect(`/agents/${agentId}?error=İstem gerekli.`);
   }
 
   const serverSupabase = await createSupabaseServerClient();
@@ -27,86 +24,95 @@ export async function runAgentAction(agentId: string, formData: FormData) {
     data: { user: currentUser }
   } = await serverSupabase.auth.getUser();
 
-  if (!currentUser) redirect('/login');
+  if (!currentUser) {
+    redirect('/signin');
+  }
+
+  const {
+    data: { session }
+  } = await serverSupabase.auth.getSession();
+
+  const accessToken = session?.access_token;
+  if (!accessToken) {
+    redirect(`/agents/${agentId}?error=Oturum doğrulanamadı.`);
+  }
 
   const { workspaceId: currentWorkspaceId, userId: currentUserId } = await getWorkspaceContext();
 
-  const { data: agent, error: agentError } = await serverSupabase
+  const { data: agent } = await serverSupabase
     .from('agent_types')
     .select('id')
     .eq('id', agentId)
-    .or(`workspace_id.eq.${currentWorkspaceId},workspace_id.is.null`)
     .eq('is_active', true)
     .maybeSingle();
 
-  if (agentError || !agent) {
-    redirect(`/agents/${agentId}?error=Agent not found or unavailable.`);
+  if (!agent) {
+    redirect(`/agents/${agentId}?error=Agent bulunamadı.`);
   }
 
-  if (selectedProjectId) {
-    const { data: project, error: projectError } = await serverSupabase
-      .from('projects')
-      .select('id')
-      .eq('id', selectedProjectId)
-      .eq('workspace_id', currentWorkspaceId)
-      .eq('user_id', currentUserId)
-      .maybeSingle();
+  const { data: run, error: runInsertError } = await serverSupabase
+    .from('agent_runs')
+    .insert({
+      workspace_id: currentWorkspaceId,
+      user_id: currentUserId,
+      agent_type_id: agentId,
+      user_input: prompt,
+      status: 'pending'
+    })
+    .select('id')
+    .single();
 
-    if (projectError || !project) {
-      redirect(`/agents/${agentId}?error=Selected project is invalid for this workspace.`);
-    }
+  if (runInsertError || !run) {
+    redirect(`/agents/${agentId}?error=Çalıştırma başlatılamadı.`);
   }
 
-  const { data, error } = await serverSupabase.functions.invoke('gemini-orchestrator', {
-    body: {
-      workspaceId: currentWorkspaceId,
-      userId: currentUser.id,
+  const requestHeaders = await headers();
+  const runResponse = await fetch(buildInternalUrl('/api/agents/run', requestHeaders), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`
+    },
+    body: JSON.stringify({
+      runId: run.id,
       agentTypeId: agentId,
-      projectId: selectedProjectId,
-      userInput: prompt,
-      metadata: {
-        source: 'agents-detail-page'
-      },
-      contextSelection: {
-        workspaceMemoryEntryIds: selectedMemoryEntryIds,
-        projectKnowledgeEntryIds: selectedProjectKnowledgeIds,
-        sourceIds: selectedSourceIds,
-        savedOutputIds: selectedSavedOutputIds
-      },
-      saveOutput: true
-    }
+      userInput: prompt
+    })
   });
 
-  if (error || !data?.ok || !data?.runId) {
-    const message = data?.error || error?.message || 'Failed to run agent.';
+  if (!runResponse.ok) {
+    const payload = (await runResponse.json().catch(() => null)) as { error?: string } | null;
+    const message = payload?.error ?? 'Çalıştırma sırasında hata oluştu.';
     redirect(`/agents/${agentId}?error=${encodeURIComponent(message)}`);
   }
 
   revalidatePath('/dashboard');
-  revalidatePath('/projects');
-  if (selectedProjectId) {
-    revalidatePath(`/projects/${selectedProjectId}`);
-  }
-
-  redirect(`/agents/${agentId}?run_id=${data.runId}`);
+  revalidatePath(`/agents/${agentId}`);
+  redirect(`/agents/${agentId}?run_id=${run.id}`);
 }
 
 export async function saveOutputAction(agentId: string, formData: FormData) {
   const runId = String(formData.get('run_id') ?? '').trim();
-  if (!runId) return;
+  const title = String(formData.get('title') ?? 'Kaydedilen çıktı').trim() || 'Kaydedilen çıktı';
+
+  if (!runId) {
+    redirect(`/agents/${agentId}?error=Çalıştırma kimliği eksik.`);
+  }
 
   const serverSupabase = await createSupabaseServerClient();
   const {
     data: { user: currentUser }
   } = await serverSupabase.auth.getUser();
 
-  if (!currentUser) redirect('/login');
+  if (!currentUser) {
+    redirect('/signin');
+  }
 
   const { workspaceId: currentWorkspaceId, userId: currentUserId } = await getWorkspaceContext();
 
   const { data: run } = await serverSupabase
     .from('agent_runs')
-    .select('id, result_text, project_id')
+    .select('id, result_text')
     .eq('id', runId)
     .eq('workspace_id', currentWorkspaceId)
     .eq('user_id', currentUserId)
@@ -114,82 +120,74 @@ export async function saveOutputAction(agentId: string, formData: FormData) {
     .maybeSingle();
 
   if (!run?.result_text) {
-    redirect(`/agents/${agentId}?error=Run result is not available to save.`);
+    redirect(`/agents/${agentId}?error=Kaydedilecek sonuç bulunamadı.`);
   }
 
   await serverSupabase.from('saved_outputs').insert({
     workspace_id: currentWorkspaceId,
-    user_id: currentUser.id,
+    user_id: currentUserId,
     agent_run_id: run.id,
-    project_id: run.project_id,
-    title: 'Saved output',
-    content: run.result_text,
-    metadata: { source: 'manual-save' }
+    title,
+    content: run.result_text
   });
 
-  if (run.project_id) {
-    revalidatePath(`/projects/${run.project_id}`);
-  }
-  revalidatePath('/dashboard');
+  revalidatePath('/saved');
   redirect(`/agents/${agentId}?run_id=${runId}`);
 }
 
 export async function createProjectItemFromOutputAction(agentId: string, runIdParam: string, formData: FormData) {
   const outputId = String(formData.get('output_id') ?? '').trim();
+  const projectId = String(formData.get('project_id') ?? '').trim();
   const title = String(formData.get('title') ?? '').trim();
 
-  if (!outputId || !title) return;
+  if (!outputId || !projectId || !title) {
+    redirect(`/agents/${agentId}?error=Proje öğesi için tüm alanları doldurun.`);
+  }
 
   const serverSupabase = await createSupabaseServerClient();
   const {
     data: { user: currentUser }
   } = await serverSupabase.auth.getUser();
 
-  if (!currentUser) redirect('/login');
+  if (!currentUser) {
+    redirect('/signin');
+  }
 
   const { workspaceId: currentWorkspaceId, userId: currentUserId } = await getWorkspaceContext();
 
   const { data: output } = await serverSupabase
     .from('saved_outputs')
-    .select('id, project_id, content')
+    .select('id, content')
     .eq('id', outputId)
     .eq('workspace_id', currentWorkspaceId)
     .eq('user_id', currentUserId)
     .maybeSingle();
 
-  if (!output?.project_id) {
-    redirect(`/agents/${agentId}?error=Pick a project before converting to a project item.`);
+  if (!output) {
+    redirect(`/agents/${agentId}?error=Kaydedilen çıktı bulunamadı.`);
   }
 
-  const { data: item } = await serverSupabase
-    .from('project_items')
-    .insert({
-      workspace_id: currentWorkspaceId,
-      project_id: output.project_id,
-      user_id: currentUser.id,
-      source_output_id: output.id,
-      item_type: 'agent_output',
-      title,
-      status: 'open',
-      payload: { excerpt: output.content.slice(0, 400) }
-    })
-    .select('id, project_id')
-    .single();
+  await serverSupabase.from('project_items').insert({
+    workspace_id: currentWorkspaceId,
+    project_id: projectId,
+    user_id: currentUserId,
+    saved_output_id: output.id,
+    title,
+    content: output.content,
+    item_type: 'agent_output'
+  });
 
-  if (item) {
-    await serverSupabase.from('saved_outputs').update({ project_item_id: item.id }).eq('id', output.id);
-    revalidatePath(`/projects/${item.project_id}`);
-  }
-
+  revalidatePath(`/projects/${projectId}`);
   redirect(`/agents/${agentId}?run_id=${runIdParam}`);
 }
 
 export async function attachSavedOutputToProjectAction(agentId: string, runIdParam: string, formData: FormData) {
-  const outputId = String(formData.get('output_id') ?? '').trim();
+  const runId = String(formData.get('run_id') ?? '').trim();
   const projectId = String(formData.get('project_id') ?? '').trim();
+  const title = String(formData.get('title') ?? 'Agent Çıktısı').trim() || 'Agent Çıktısı';
 
-  if (!outputId || !projectId) {
-    redirect(`/agents/${agentId}?error=Select a project to attach this output.`);
+  if (!runId || !projectId) {
+    redirect(`/agents/${agentId}?error=Proje seçimi zorunludur.`);
   }
 
   const serverSupabase = await createSupabaseServerClient();
@@ -197,17 +195,20 @@ export async function attachSavedOutputToProjectAction(agentId: string, runIdPar
     data: { user: currentUser }
   } = await serverSupabase.auth.getUser();
 
-  if (!currentUser) redirect('/login');
+  if (!currentUser) {
+    redirect('/signin');
+  }
 
   const { workspaceId: currentWorkspaceId, userId: currentUserId } = await getWorkspaceContext();
 
-  const [{ data: output }, { data: project }] = await Promise.all([
+  const [{ data: run }, { data: project }] = await Promise.all([
     serverSupabase
-      .from('saved_outputs')
-      .select('id, project_id')
-      .eq('id', outputId)
+      .from('agent_runs')
+      .select('id, result_text')
+      .eq('id', runId)
       .eq('workspace_id', currentWorkspaceId)
       .eq('user_id', currentUserId)
+      .eq('status', 'completed')
       .maybeSingle(),
     serverSupabase
       .from('projects')
@@ -218,17 +219,19 @@ export async function attachSavedOutputToProjectAction(agentId: string, runIdPar
       .maybeSingle()
   ]);
 
-  if (!output || !project) {
-    redirect(`/agents/${agentId}?error=Output or project is not valid for this workspace.`);
+  if (!run?.result_text || !project) {
+    redirect(`/agents/${agentId}?error=Run veya proje doğrulanamadı.`);
   }
 
-  if (output.project_id && output.project_id !== projectId) {
-    redirect(`/agents/${agentId}?error=This output is already linked to a different project.`);
-  }
+  await serverSupabase.from('saved_outputs').insert({
+    workspace_id: currentWorkspaceId,
+    user_id: currentUserId,
+    agent_run_id: run.id,
+    title,
+    content: run.result_text
+  });
 
-  await serverSupabase.from('saved_outputs').update({ project_id: projectId }).eq('id', outputId);
-
-  revalidatePath('/projects');
+  revalidatePath('/saved');
   revalidatePath(`/projects/${projectId}`);
   redirect(`/agents/${agentId}?run_id=${runIdParam}`);
 }

@@ -1,13 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { FormEvent, Suspense, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { FormEvent, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 
-function SignInContent() {
+export default function SignupPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,21 +24,27 @@ function SignInContent() {
         return;
       }
 
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error || !data.session?.access_token) {
-        setErrorMessage('Giriş başarısız. E-posta veya şifreyi kontrol edin.');
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) {
+        setErrorMessage('Kayıt başarısız. Bilgileri kontrol edip tekrar deneyin.');
+        return;
+      }
+
+      const accessToken = data.session?.access_token;
+      if (!accessToken) {
+        router.push('/confirm-email');
         return;
       }
 
       const bootstrapResponse = await fetch('/api/bootstrap', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${data.session.access_token}`
+          Authorization: `Bearer ${accessToken}`
         }
       });
 
       if (!bootstrapResponse.ok) {
-        setErrorMessage('Çalışma alanı hazırlanamadı. Lütfen tekrar deneyin.');
+        setErrorMessage('Hesap oluşturuldu ancak çalışma alanı hazırlanamadı. Lütfen giriş yapın.');
         return;
       }
 
@@ -51,12 +56,10 @@ function SignInContent() {
     }
   }
 
-  const urlError = searchParams.get('error');
-
   return (
     <main className="mx-auto max-w-xl panel">
-      <h1 className="mb-2 text-3xl font-semibold">Koschei AI Giriş</h1>
-      <p className="mb-6 text-sm text-white/70">E-posta ve şifren ile hesabına güvenle giriş yap.</p>
+      <h1 className="mb-2 text-3xl font-semibold">Koschei AI Kayıt</h1>
+      <p className="mb-6 text-sm text-white/70">Yeni hesabını oluştur ve agentlarını hemen kullanmaya başla.</p>
 
       <form className="space-y-4" onSubmit={handleSubmit}>
         <label className="block text-sm">
@@ -80,7 +83,7 @@ function SignInContent() {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             className="mt-2 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 outline-none focus:border-neon"
-            placeholder="••••••••"
+            placeholder="En az 6 karakter"
           />
         </label>
 
@@ -89,34 +92,18 @@ function SignInContent() {
           type="submit"
           className="w-full rounded-lg bg-neon px-4 py-2 font-semibold text-ink disabled:opacity-50"
         >
-          {loading ? 'Giriş yapılıyor...' : 'Giriş yap'}
+          {loading ? 'Kayıt oluşturuluyor...' : 'Kayıt ol'}
         </button>
       </form>
 
       {errorMessage ? <p className="mt-4 text-sm text-red-300">{errorMessage}</p> : null}
-      {urlError ? <p className="mt-2 text-sm text-red-300">Hata: {urlError}</p> : null}
 
-      <div className="mt-6 space-y-2 text-sm text-white/80">
-        <p>
-          Hesabın yok mu?{' '}
-          <Link href="/signup" className="text-lilac underline underline-offset-4 hover:text-neon">
-            Kayıt ol
-          </Link>
-        </p>
-        <p>
-          <Link href="/reset-password" className="text-lilac underline underline-offset-4 hover:text-neon">
-            Şifreni mi unuttun?
-          </Link>
-        </p>
-      </div>
+      <p className="mt-6 text-sm text-white/80">
+        Zaten hesabın var mı?{' '}
+        <Link href="/signin" className="text-lilac underline underline-offset-4 hover:text-neon">
+          Giriş yap
+        </Link>
+      </p>
     </main>
-  );
-}
-
-export default function SignInPage() {
-  return (
-    <Suspense fallback={<main className="mx-auto max-w-xl panel" />}>
-      <SignInContent />
-    </Suspense>
   );
 }
