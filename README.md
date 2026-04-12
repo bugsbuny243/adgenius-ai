@@ -40,6 +40,12 @@ SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY
 GEMINI_API_KEY=YOUR_GEMINI_KEY
 ```
 
+
+## Railway deployment (monorepo note)
+
+Repo root'unda `package.json` olmadığı için Railway/Nixpacks paket yöneticisini otomatik çıkaramayabilir.
+Bu repo, kökteki `nixpacks.toml` ile install/build/start adımlarını `apps/web` için açıkça tanımlar.
+
 ## Run web app
 
 ```bash
