@@ -2,6 +2,8 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 const PROTECTED_ROUTES = ['/dashboard', '/agents', '/projects'];
+const AUTH_ROUTES = ['/signin', '/login'];
+const SIGN_IN_ROUTE = '/signin';
 
 export async function middleware(request: NextRequest) {
   type CookieToSet = {
@@ -16,10 +18,31 @@ export async function middleware(request: NextRequest) {
     }
   });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  const isProtectedRoute = PROTECTED_ROUTES.some((route) => request.nextUrl.pathname.startsWith(route));
+  const isAuthRoute = AUTH_ROUTES.some((route) => request.nextUrl.pathname.startsWith(route));
+  const isLoginRoute = request.nextUrl.pathname === '/login';
+
+  if (isLoginRoute) {
+    const url = request.nextUrl.clone();
+    url.pathname = SIGN_IN_ROUTE;
+    return NextResponse.redirect(url);
+  }
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    if (isProtectedRoute) {
+      const url = request.nextUrl.clone();
+      url.pathname = SIGN_IN_ROUTE;
+      return NextResponse.redirect(url);
+    }
+
+    return response;
+  }
+
+  try {
+    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -31,30 +54,39 @@ export async function middleware(request: NextRequest) {
           });
         }
       }
+    });
+
+    const {
+      data: { user }
+    } = await supabase.auth.getUser();
+
+    if (isProtectedRoute && !user) {
+      const url = request.nextUrl.clone();
+      url.pathname = SIGN_IN_ROUTE;
+      return NextResponse.redirect(url);
     }
-  );
 
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
+    if (isAuthRoute && user) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/dashboard';
+      return NextResponse.redirect(url);
+    }
+  } catch (error) {
+    console.error('[middleware] auth guard failed', {
+      pathname: request.nextUrl.pathname,
+      error
+    });
 
-  const isProtectedRoute = PROTECTED_ROUTES.some((route) => request.nextUrl.pathname.startsWith(route));
-
-  if (isProtectedRoute && !user) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/login';
-    return NextResponse.redirect(url);
-  }
-
-  if (request.nextUrl.pathname === '/login' && user) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
-    return NextResponse.redirect(url);
+    if (isProtectedRoute) {
+      const url = request.nextUrl.clone();
+      url.pathname = SIGN_IN_ROUTE;
+      return NextResponse.redirect(url);
+    }
   }
 
   return response;
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/agents/:path*', '/projects/:path*', '/login']
+  matcher: ['/dashboard/:path*', '/agents/:path*', '/projects/:path*', '/login', '/signin']
 };
