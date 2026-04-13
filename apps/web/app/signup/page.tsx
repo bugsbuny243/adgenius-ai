@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
-import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { createSupabaseBrowserClient, getMissingPublicSupabaseConfig } from '@/lib/supabase-browser';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -20,7 +20,9 @@ export default function SignupPage() {
     try {
       const supabase = createSupabaseBrowserClient();
       if (!supabase) {
-        setErrorMessage('Uygulama yapılandırması tamamlanmamış. Lütfen daha sonra tekrar deneyin.');
+        const { missingKeys } = getMissingPublicSupabaseConfig();
+        const detail = missingKeys.length ? ` Eksik değişkenler: ${missingKeys.join(', ')}` : '';
+        setErrorMessage(`Uygulama yapılandırması tamamlanmamış.${detail}`);
         return;
       }
 

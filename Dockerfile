@@ -7,13 +7,13 @@ ENV NEXT_TELEMETRY_DISABLED=1
 FROM base AS deps
 COPY apps/web/package.json ./apps/web/
 WORKDIR /app/apps/web
-RUN npm install
+RUN env -u NPM_CONFIG_PRODUCTION -u npm_config_production npm install
 
 FROM base AS build
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY apps/web ./apps/web
 WORKDIR /app/apps/web
-RUN npm run build
+RUN env -u NPM_CONFIG_PRODUCTION -u npm_config_production npm run build
 
 FROM node:20-alpine AS runner
 WORKDIR /app
