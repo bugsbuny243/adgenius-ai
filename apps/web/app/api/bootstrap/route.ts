@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getServerEnv } from '@/lib/env';
 
 function getTokenFromHeader(request: Request): string | null {
   const header = request.headers.get('authorization');
@@ -23,10 +24,10 @@ function randomSuffix() {
 }
 
 export async function POST(request: Request) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const { SUPABASE_URL: url, SUPABASE_ANON_KEY: anonKey } = getServerEnv();
 
   if (!url || !anonKey) {
+    console.error('[bootstrap] Supabase server configuration is missing.');
     return NextResponse.json({ ok: false, error: 'supabase_not_configured' }, { status: 500 });
   }
 

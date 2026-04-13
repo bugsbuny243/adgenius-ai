@@ -3,52 +3,58 @@
 Workspace tabanlı bir **AI command center foundation**:
 - Next.js App Router + TypeScript + Tailwind
 - Supabase Auth + Postgres + RLS
-- Gemini-only orchestration (Supabase Edge Function)
-
-## Current product scope
-
-Bu repo artık demo shell olmaktan çıkarılıp şu temel akışlara hizalandı:
-- Magic-link login + auth callback bootstrap
-- Workspace, membership, profile foundation
-- Real dashboard metrics (workspace verisine dayalı)
-- Agent registry (Supabase `agent_types`)
-- Project list + project detail + project item creation
-- Agent run logging + saved outputs
-- Minimal subscription / usage awareness
+- Gemini-only orchestration
 
 ## Tech stack
 
 - `apps/web`: Next.js 16, React 19, TypeScript, Tailwind
 - `supabase/schema.sql`: workspace-centric SQL foundation + RLS
-- `supabase/functions/gemini-orchestrator/index.ts`: Gemini orchestrator
 
-## Required environment variables
+## Environment variables
 
-`apps/web/.env.local`:
+Railway (Production) için aşağıdaki değişkenleri **service level** olarak tanımlayın:
 
-```bash
-NEXT_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY
-```
+### Public (build-time + client)
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-Supabase Edge Function secrets:
+### Server (runtime)
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `GEMINI_API_KEY`
 
-```bash
-SUPABASE_URL=https://YOUR-PROJECT.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY
-GEMINI_API_KEY=YOUR_GEMINI_KEY
-```
+> Not: `NEXT_PUBLIC_*` değişkenleri build-time’da bundle’a gömülür. Bu değerler değişirse **rebuild + redeploy** zorunludur.
 
+## Railway deployment contract (single source of truth)
 
-## Railway deployment (monorepo note)
+Bu repo artık Railway’de **yalnızca root-level Dockerfile** ile deploy edilir.
 
-Repo root'unda `package.json` olmadığı için Railway/Nixpacks paket yöneticisini otomatik çıkaramayabilir.
-Bu repo, kökteki `nixpacks.toml` ile install/build/start adımlarını `apps/web` için açıkça tanımlar.
+- Root directory: `/` (repo root)
+- Builder: Dockerfile
+- Runtime start: `node apps/web/.next/standalone/server.js`
+- Nixpacks ve panel command override kullanılmamalı
 
-`nixpacks.toml` komutları hem repo root'tan hem de çalışma dizini zaten `apps/web` ise sorunsuz çalışacak şekilde yazılmıştır.
+`railway.json` bu davranışı standardize eder.
 
-## Run web app
+## Railway setup steps
+
+1. Railway service root’unu repo root (`/`) bırakın.
+2. Service config’te builder Dockerfile olacak şekilde bırakın (repo `railway.json` ile gelir).
+3. Tüm env değişkenlerini girin (yukarıdaki liste).
+4. Deploy edin.
+5. Health endpoint kontrol edin:
+   - `GET /api/health`
+
+## Cache / stale build notu
+
+Aşağıdaki durumlarda clean rebuild yapın:
+- `NEXT_PUBLIC_*` değerleri değiştiyse
+- önceki yanlış root/build config ile artifact cache oluştuysa
+
+Railway’de yeni deploy sırasında cache’i temizleyip yeniden build alın.
+
+## Local run
 
 ```bash
 cd apps/web
@@ -56,62 +62,14 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+Open: `http://localhost:3000`
 
-## Auth + bootstrap flow
+## Healthcheck response (safe)
 
-1. `/login` magic-link request gönderir.
-2. Magic-link `/auth/callback` route'una döner.
-3. Callback:
-   - session exchange yapar,
-   - `profiles` upsert eder,
-   - kullanıcıda workspace yoksa default workspace + owner membership + workspace user oluşturur,
-   - `subscriptions` ve `usage_counters` için default kayıt açar.
-4. User `/dashboard` içinde workspace-backed state görür.
+`/api/health` sadece status/boolean döner:
+- app up/down
+- public env ready/missingCount
+- server env ready/missingCount
+- supabase ready/not ready
 
-## Main app routes
-
-- `/login`
-- `/dashboard`
-- `/agents`
-- `/projects`
-- `/projects/[id]`
-
-## Database notes
-
-`supabase/schema.sql` şu tabloları içerir:
-- `workspaces`
-- `workspace_members`
-- `workspace_users`
-- `profiles`
-- `agent_types`
-- `projects`
-- `project_items`
-- `agent_runs`
-- `saved_outputs`
-- `subscriptions`
-- `usage_counters`
-- `usage_metering`
-
-Legacy/out-of-scope `ad_events` kaldırılmıştır.
-
-## Gemini orchestrator payload (breaking update)
-
-POST body (minimum):
-
-```json
-{
-  "workspaceId": "uuid",
-  "userId": "uuid",
-  "agentTypeId": "uuid",
-  "userInput": "your prompt"
-}
-```
-
-Optional fields:
-- `projectId`
-- `modelName`
-- `metadata`
-- `saveOutput` (default `true`)
-
-Response includes `runId`, generated `resultText`, and token usage.
+Secret değerler response içinde asla dönülmez.
