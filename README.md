@@ -46,6 +46,8 @@ GEMINI_API_KEY=YOUR_GEMINI_KEY
 Repo root'unda `package.json` olmadığı için Railway/Nixpacks paket yöneticisini otomatik çıkaramayabilir.
 Bu repo, kökteki `nixpacks.toml` ile install/build/start adımlarını `apps/web` için açıkça tanımlar.
 
+`nixpacks.toml` komutları hem repo root'tan hem de çalışma dizini zaten `apps/web` ise sorunsuz çalışacak şekilde yazılmıştır.
+
 ## Run web app
 
 ```bash
