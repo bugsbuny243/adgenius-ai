@@ -21,7 +21,7 @@ function SignInContent() {
     try {
       const supabase = createSupabaseBrowserClient();
       if (!supabase) {
-        setErrorMessage('Sistem ayarları eksik. Lütfen daha sonra tekrar deneyin.');
+        setErrorMessage('Uygulama yapılandırması tamamlanmamış. Lütfen daha sonra tekrar deneyin.');
         return;
       }
 

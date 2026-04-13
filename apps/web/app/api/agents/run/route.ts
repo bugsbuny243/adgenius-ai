@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
+import { getServerEnv } from '@/lib/env';
 
 type RunRequestBody = {
   runId?: string;
@@ -18,11 +19,10 @@ function getAccessToken(request: Request): string | null {
 }
 
 export async function POST(request: Request) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const modelApiKey = process.env.GEMINI_API_KEY;
+  const { SUPABASE_URL: url, SUPABASE_ANON_KEY: anonKey, GEMINI_API_KEY: modelApiKey } = getServerEnv();
 
   if (!url || !anonKey || !modelApiKey) {
+    console.error('[agents/run] Required server environment is missing.');
     return NextResponse.json({ ok: false, error: 'missing_environment' }, { status: 500 });
   }
 
