@@ -7,8 +7,27 @@ Workspace tabanlı bir **AI command center foundation**:
 
 ## Tech stack
 
-- `apps/web`: Next.js 16, React 19, TypeScript, Tailwind
-- `supabase/schema.sql`: workspace-centric SQL foundation + RLS
+- `frontend`: Next.js 16, React 19, TypeScript, Tailwind
+- `backend/supabase/migrations/*`: workspace-centric SQL foundation + RLS
+
+## Project structure
+
+```
+project-root/
+├── backend/
+│   └── supabase/
+│       ├── functions/
+│       └── migrations/
+├── frontend/
+│   ├── app/
+│   ├── components/
+│   ├── lib/
+│   ├── public/
+│   └── scripts/
+├── Dockerfile
+├── railway.json
+└── README.md
+```
 
 ## Environment variables
 
@@ -32,7 +51,7 @@ Bu repo artık Railway’de **yalnızca root-level Dockerfile** ile deploy edili
 
 - Root directory: `/` (repo root)
 - Builder: Dockerfile
-- Runtime start: `node apps/web/.next/standalone/server.js`
+- Runtime start: `node frontend/.next/standalone/server.js`
 - Nixpacks ve panel command override kullanılmamalı
 
 `railway.json` bu davranışı standardize eder.
@@ -57,7 +76,7 @@ Railway’de yeni deploy sırasında cache’i temizleyip yeniden build alın.
 ## Local run
 
 ```bash
-cd apps/web
+cd frontend
 npm install
 npm run dev
 ```
