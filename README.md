@@ -24,8 +24,6 @@ project-root/
 │   ├── lib/
 │   ├── public/
 │   └── scripts/
-├── Dockerfile
-├── railway.json
 └── README.md
 ```
 
@@ -45,24 +43,22 @@ Railway (Production) için aşağıdaki değişkenleri **service level** olarak 
 
 > Not: `NEXT_PUBLIC_*` değişkenleri build-time’da bundle’a gömülür. Bu değerler değişirse **rebuild + redeploy** zorunludur.
 
-## Railway deployment contract (single source of truth)
+## Railway deployment (normal Next.js)
 
-Bu repo artık Railway’de **yalnızca root-level Dockerfile** ile deploy edilir.
+- Root Directory: `/frontend`
+- Build Command: `npm install && npm run build`
+- Start Command: `npx next start -H 0.0.0.0 -p $PORT`
 
-- Root directory: `/` (repo root)
-- Builder: Dockerfile
-- Runtime start: `node frontend/.next/standalone/server.js`
-- Nixpacks ve panel command override kullanılmamalı
-
-`railway.json` bu davranışı standardize eder.
+Docker / standalone / static export kullanılmaz.
 
 ## Railway setup steps
 
-1. Railway service root’unu repo root (`/`) bırakın.
-2. Service config’te builder Dockerfile olacak şekilde bırakın (repo `railway.json` ile gelir).
-3. Tüm env değişkenlerini girin (yukarıdaki liste).
-4. Deploy edin.
-5. Health endpoint kontrol edin:
+1. Railway service root’unu `/frontend` olarak ayarlayın.
+2. Build Command’i `npm install && npm run build` yapın.
+3. Start Command’i `npx next start -H 0.0.0.0 -p $PORT` yapın.
+4. Tüm env değişkenlerini girin (yukarıdaki liste).
+5. Deploy edin.
+6. Health endpoint kontrol edin:
    - `GET /api/health`
 
 ## Cache / stale build notu
