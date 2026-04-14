@@ -5,9 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "node .next/standalone/server.js",
+    "start": "next start",
     "lint": "next lint",
-    "start:validated": "node scripts/validate-runtime-env.mjs && node .next/standalone/server.js"
+    "start:validated": "node scripts/validate-runtime-env.mjs && next start"
   },
   "dependencies": {
     "@google/genai": "^0.14.0",
