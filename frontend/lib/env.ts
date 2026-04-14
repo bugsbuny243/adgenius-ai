@@ -8,33 +8,37 @@ function hasValue(value: string | undefined): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
-function readEnv(name: string): string | null {
+function readServerEnv(name: ServerEnvKey): string | null {
   const value = process.env[name];
   return hasValue(value) ? value : null;
 }
 
 export function getPublicEnv(): Record<PublicEnvKey, string | null> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
   return {
-    NEXT_PUBLIC_SUPABASE_URL: readEnv('NEXT_PUBLIC_SUPABASE_URL'),
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: readEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+    NEXT_PUBLIC_SUPABASE_URL: hasValue(supabaseUrl) ? supabaseUrl : null,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: hasValue(supabaseAnonKey) ? supabaseAnonKey : null
   };
 }
 
 export function getServerEnv(): Record<ServerEnvKey, string | null> {
   return {
-    SUPABASE_URL: readEnv('SUPABASE_URL'),
-    SUPABASE_ANON_KEY: readEnv('SUPABASE_ANON_KEY'),
-    SUPABASE_SERVICE_ROLE_KEY: readEnv('SUPABASE_SERVICE_ROLE_KEY'),
-    GEMINI_API_KEY: readEnv('GEMINI_API_KEY')
+    SUPABASE_URL: readServerEnv('SUPABASE_URL'),
+    SUPABASE_ANON_KEY: readServerEnv('SUPABASE_ANON_KEY'),
+    SUPABASE_SERVICE_ROLE_KEY: readServerEnv('SUPABASE_SERVICE_ROLE_KEY'),
+    GEMINI_API_KEY: readServerEnv('GEMINI_API_KEY')
   };
 }
 
 export function getEnvDiagnostics() {
+  const isServerRuntime = typeof window === 'undefined';
   const publicEnv = getPublicEnv();
   const serverEnv = getServerEnv();
 
   const missingPublicEnv = PUBLIC_ENV_KEYS.filter((key) => !publicEnv[key]);
-  const missingServerEnv = SERVER_ENV_KEYS.filter((key) => !serverEnv[key]);
+  const missingServerEnv = isServerRuntime ? SERVER_ENV_KEYS.filter((key) => !serverEnv[key]) : [];
 
   return {
     publicEnv,
@@ -42,6 +46,6 @@ export function getEnvDiagnostics() {
     missingPublicEnv,
     missingServerEnv,
     publicReady: missingPublicEnv.length === 0,
-    serverReady: missingServerEnv.length === 0
+    serverReady: isServerRuntime ? missingServerEnv.length === 0 : true
   };
 }
