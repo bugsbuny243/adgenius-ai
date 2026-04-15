@@ -7,6 +7,7 @@ type RunRequestBody = {
   runId?: string;
   agentTypeId?: string;
   userInput?: string;
+  metadata?: Record<string, unknown>;
 };
 
 function getAccessToken(request: Request): string | null {
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
   const runId = body?.runId?.trim();
   const agentTypeId = body?.agentTypeId?.trim();
   const userInput = body?.userInput?.trim();
+  const requestMetadata = body?.metadata ?? null;
 
   if (!runId || !agentTypeId || !userInput) {
     return NextResponse.json({ ok: false, error: 'invalid_payload' }, { status: 400 });
@@ -74,7 +76,7 @@ export async function POST(request: Request) {
 
   const { data: run } = await supabase
     .from('agent_runs')
-    .select('id, workspace_id, user_id, agent_type_id')
+    .select('id, workspace_id, user_id, agent_type_id, metadata')
     .eq('id', runId)
     .eq('workspace_id', membership.workspace_id)
     .eq('user_id', user.id)
@@ -122,7 +124,12 @@ export async function POST(request: Request) {
         status: 'completed',
         error_message: null,
         tokens_input: usage?.promptTokenCount ?? null,
-        tokens_output: usage?.candidatesTokenCount ?? null
+        tokens_output: usage?.candidatesTokenCount ?? null,
+        metadata: {
+          ...(run.metadata ?? {}),
+          ...(requestMetadata ?? {}),
+          ai_engine: 'Varsayılan AI motoru'
+        }
       })
       .eq('id', runId)
       .eq('workspace_id', membership.workspace_id);
@@ -135,7 +142,12 @@ export async function POST(request: Request) {
       .from('agent_runs')
       .update({
         status: 'failed',
-        error_message: message
+        error_message: message,
+        metadata: {
+          ...(run.metadata ?? {}),
+          ...(requestMetadata ?? {}),
+          ai_engine: 'Varsayılan AI motoru'
+        }
       })
       .eq('id', runId)
       .eq('workspace_id', membership.workspace_id);
