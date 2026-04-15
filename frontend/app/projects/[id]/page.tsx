@@ -26,7 +26,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
   const { data: project } = await supabase
     .from('projects')
-    .select('id, name, description, status, created_at')
+    .select('id, name, description, created_at')
     .eq('id', id)
     .eq('workspace_id', workspaceId)
     .eq('user_id', userId)

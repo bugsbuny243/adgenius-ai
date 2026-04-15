@@ -19,9 +19,14 @@ function getAccessToken(request: Request): string | null {
 }
 
 export async function POST(request: Request) {
-  const { SUPABASE_URL: url, SUPABASE_ANON_KEY: anonKey, GEMINI_API_KEY: modelApiKey } = getServerEnv();
+  const {
+    SUPABASE_URL: url,
+    SUPABASE_ANON_KEY: anonKey,
+    SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
+    GEMINI_API_KEY: modelApiKey
+  } = getServerEnv();
 
-  if (!url || !anonKey || !modelApiKey) {
+  if (!url || !anonKey || !serviceRoleKey || !modelApiKey) {
     console.error('[agents/run] Required server environment is missing.');
     return NextResponse.json({ ok: false, error: 'missing_environment' }, { status: 500 });
   }
@@ -46,6 +51,12 @@ export async function POST(request: Request) {
         Authorization: `Bearer ${accessToken}`
       }
     },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    }
+  });
+  const serviceSupabase = createClient(url, serviceRoleKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false
@@ -93,10 +104,11 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (!agentType) {
-    await supabase
+    await serviceSupabase
       .from('agent_runs')
       .update({ status: 'failed', error_message: 'Agent bulunamadı.' })
       .eq('id', runId)
+      .eq('user_id', user.id)
       .eq('workspace_id', membership.workspace_id);
 
     return NextResponse.json({ ok: false, error: 'agent_not_found' }, { status: 404 });
@@ -115,29 +127,36 @@ export async function POST(request: Request) {
     const resultText = response.text ?? '';
     const usage = response.usageMetadata;
 
-    await supabase
+    const { error: updateError } = await serviceSupabase
       .from('agent_runs')
       .update({
         result_text: resultText,
         status: 'completed',
         error_message: null,
+        model_name: 'default',
         tokens_input: usage?.promptTokenCount ?? null,
         tokens_output: usage?.candidatesTokenCount ?? null
       })
       .eq('id', runId)
+      .eq('user_id', user.id)
       .eq('workspace_id', membership.workspace_id);
+
+    if (updateError) {
+      throw new Error(`run_update_failed:${updateError.message}`);
+    }
 
     return NextResponse.json({ ok: true, runId, result: resultText });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'unknown_error';
 
-    await supabase
+    await serviceSupabase
       .from('agent_runs')
       .update({
         status: 'failed',
         error_message: message
       })
       .eq('id', runId)
+      .eq('user_id', user.id)
       .eq('workspace_id', membership.workspace_id);
 
     return NextResponse.json({ ok: false, error: message }, { status: 500 });

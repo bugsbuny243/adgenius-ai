@@ -6,9 +6,14 @@ type RunItem = {
   id: string;
   status: string;
   model_name: string | null;
-  prompt: string | null;
+  user_input: string | null;
   created_at: string;
 };
+
+function toDisplayModel(modelName: string | null): string {
+  if (!modelName) return 'Varsayılan model';
+  return 'Varsayılan model';
+}
 
 export function RunsList({ runs }: { runs: RunItem[] }) {
   const [status, setStatus] = useState('all');
@@ -31,7 +36,7 @@ export function RunsList({ runs }: { runs: RunItem[] }) {
       {filtered.map((run) => (
         <div key={run.id} className="rounded-lg border border-white/10 p-3">
           <p>Durum: {run.status}</p>
-          <p className="text-white/70">Model: {run.model_name ?? '-'}</p>
+          <p className="text-white/70">Çalışma motoru: {toDisplayModel(run.model_name)}</p>
           <p className="text-white/70">{new Date(run.created_at).toLocaleString('tr-TR')}</p>
           <button onClick={() => setActive(run)} className="mt-2 rounded border border-white/20 px-2 py-1">
             Detay
@@ -44,7 +49,7 @@ export function RunsList({ runs }: { runs: RunItem[] }) {
           <h4 className="mb-2 text-lg">Run Detayı</h4>
           <p className="mb-2 text-xs text-white/60">ID: {active.id}</p>
           <p className="text-sm">Prompt:</p>
-          <pre className="whitespace-pre-wrap text-sm text-white/80">{active.prompt ?? '-'}</pre>
+          <pre className="whitespace-pre-wrap text-sm text-white/80">{active.user_input ?? '-'}</pre>
           <button onClick={() => setActive(null)} className="mt-3 rounded border border-white/20 px-3 py-1">
             Kapat
           </button>

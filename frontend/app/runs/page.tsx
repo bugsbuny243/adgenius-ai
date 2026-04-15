@@ -8,7 +8,7 @@ export default async function RunsPage() {
   const { supabase, workspace } = await getAppContextOrRedirect();
   const { data, error } = await supabase
     .from('agent_runs')
-    .select('id, status, model_name, prompt, created_at')
+    .select('id, status, model_name, user_input, created_at')
     .eq('workspace_id', workspace.workspaceId)
     .order('created_at', { ascending: false })
     .limit(100);
