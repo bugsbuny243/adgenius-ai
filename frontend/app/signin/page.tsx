@@ -45,7 +45,7 @@ function SignInContent() {
         return;
       }
 
-      router.push('/dashboard');
+      window.location.assign('/dashboard');
     } catch {
       setErrorMessage('Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.');
     } finally {
