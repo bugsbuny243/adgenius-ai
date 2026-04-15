@@ -13,7 +13,12 @@ function buildInternalUrl(pathname: string, headerList: Headers): string {
 }
 
 export async function runAgentAction(agentId: string, formData: FormData) {
-  const prompt = String(formData.get('prompt') ?? '').trim();
+  const rawPrompt = String(formData.get('prompt') ?? '').trim();
+  const derivedPrompt = String(formData.get('derived_prompt') ?? '').trim();
+  const freeNotes = String(formData.get('free_notes') ?? '').trim();
+  const editorStateRaw = String(formData.get('editor_state') ?? '').trim();
+
+  const prompt = derivedPrompt || rawPrompt;
 
   if (!prompt) {
     redirect(`/agents/${agentId}?error=İstem gerekli.`);
@@ -50,6 +55,18 @@ export async function runAgentAction(agentId: string, formData: FormData) {
     redirect(`/agents/${agentId}?error=Agent bulunamadı.`);
   }
 
+  let parsedEditorState: Record<string, unknown> = {};
+  if (editorStateRaw) {
+    try {
+      const payload = JSON.parse(editorStateRaw) as Record<string, unknown>;
+      if (payload && typeof payload === 'object') {
+        parsedEditorState = payload;
+      }
+    } catch {
+      parsedEditorState = {};
+    }
+  }
+
   const { data: run, error: runInsertError } = await serverSupabase
     .from('agent_runs')
     .insert({
@@ -57,6 +74,12 @@ export async function runAgentAction(agentId: string, formData: FormData) {
       user_id: currentUserId,
       agent_type_id: agentId,
       user_input: prompt,
+      metadata: {
+        editor_state: parsedEditorState,
+        derived_prompt: derivedPrompt || prompt,
+        free_notes: freeNotes,
+        input_mode: 'agent-live-editor-v1'
+      },
       status: 'pending'
     })
     .select('id')
@@ -76,7 +99,12 @@ export async function runAgentAction(agentId: string, formData: FormData) {
     body: JSON.stringify({
       runId: run.id,
       agentTypeId: agentId,
-      userInput: prompt
+      userInput: prompt,
+      metadata: {
+        editor_state: parsedEditorState,
+        derived_prompt: derivedPrompt || prompt,
+        free_notes: freeNotes
+      }
     })
   });
 
