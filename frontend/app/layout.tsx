@@ -23,14 +23,29 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
           <footer className="mt-12 border-t border-white/10 pt-6 text-sm text-white/70">
             <nav className="flex flex-wrap gap-4">
+              <Link href="/" className="transition hover:text-neon">
+                Ana Sayfa
+              </Link>
               <Link href="/about" className="transition hover:text-neon">
-                Hakkında
+                Hakkımızda
               </Link>
               <Link href="/contact" className="transition hover:text-neon">
                 İletişim
               </Link>
+              <Link href="/articles" className="transition hover:text-neon">
+                Yazılar
+              </Link>
               <Link href="/privacy-policy" className="transition hover:text-neon">
-                Gizlilik
+                Gizlilik Politikası
+              </Link>
+              <Link href="/terms" className="transition hover:text-neon">
+                Kullanım Koşulları
+              </Link>
+              <Link href="/cookies" className="transition hover:text-neon">
+                Çerez Politikası
+              </Link>
+              <Link href="/login" className="transition hover:text-neon">
+                Giriş
               </Link>
             </nav>
           </footer>
