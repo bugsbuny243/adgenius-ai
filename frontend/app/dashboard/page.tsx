@@ -4,6 +4,11 @@ import { getAppContextOrRedirect } from '@/lib/app-context';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+function toDisplayModel(modelName: string | null): string {
+  if (!modelName) return 'Varsayılan model';
+  return 'Varsayılan model';
+}
+
 export default async function DashboardPage() {
   try {
     const { supabase, workspace } = await getAppContextOrRedirect();
@@ -66,7 +71,7 @@ export default async function DashboardPage() {
                 {recentRunsRes.data.map((run) => (
                   <div key={run.id} className="rounded-lg border border-white/10 px-3 py-2">
                     <p>Durum: {run.status}</p>
-                    <p className="text-white/70">Model: {run.model_name}</p>
+                    <p className="text-white/70">Çalışma motoru: {toDisplayModel(run.model_name)}</p>
                     <p className="text-white/70">{new Date(run.created_at).toLocaleString('tr-TR')}</p>
                   </div>
                 ))}

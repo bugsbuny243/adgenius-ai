@@ -167,7 +167,7 @@ Deno.serve(async (req) => {
     return jsonResponse(403, { ok: false, error: 'Agent type is unavailable for workspace' });
   }
 
-  const modelName = agentType.model_name?.trim() || 'gemini-2.5-pro';
+  const modelName = agentType.model_name?.trim() || 'default';
 
   const [memoryResult, knowledgeResult, sourceResult, outputResult] = await Promise.all([
     workspaceMemoryEntryIds.length
@@ -358,14 +358,14 @@ Deno.serve(async (req) => {
   const totalTokens = payload?.usageMetadata?.totalTokenCount ?? tokensInput + tokensOutput;
 
   if (!geminiResponse.ok || !resultText) {
-    const errorMessage = payload?.error?.message ?? 'Gemini request failed';
+    const errorMessage = payload?.error?.message ?? 'AI request failed';
 
     await supabase
       .from('agent_runs')
       .update({
         status: 'failed',
         error_message: errorMessage,
-        metadata: { ...metadata, gemini_error: payload },
+        metadata: { ...metadata, ai_error: payload },
         updated_at: new Date().toISOString()
       })
       .eq('id', run.id);
@@ -380,7 +380,7 @@ Deno.serve(async (req) => {
       result_text: resultText,
       tokens_input: tokensInput,
       tokens_output: tokensOutput,
-      metadata: { ...metadata, gemini_usage: payload?.usageMetadata ?? null, context_snapshot_id: snapshot.id },
+      metadata: { ...metadata, ai_usage: payload?.usageMetadata ?? null, context_snapshot_id: snapshot.id },
       updated_at: new Date().toISOString()
     })
     .eq('id', run.id);
@@ -391,9 +391,9 @@ Deno.serve(async (req) => {
       user_id: authenticatedUser.id,
       agent_run_id: run.id,
       project_id: projectId,
-      title: 'Gemini Output',
+      title: 'AI Output',
       content: resultText,
-      metadata: { source: 'gemini-orchestrator', context_snapshot_id: snapshot.id }
+      metadata: { source: 'ai-orchestrator', context_snapshot_id: snapshot.id }
     });
   }
 

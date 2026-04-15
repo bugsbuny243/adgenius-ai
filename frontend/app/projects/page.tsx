@@ -10,7 +10,7 @@ export default async function ProjectsPage() {
 
   const { data: projects, error } = await supabase
     .from('projects')
-    .select('id, name, description, status, created_at')
+    .select('id, name, description, created_at')
     .eq('workspace_id', workspace.workspaceId)
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
@@ -39,7 +39,6 @@ export default async function ProjectsPage() {
               <Link key={project.id} href={`/projects/${project.id}`} className="block rounded-xl border border-white/10 px-4 py-3">
                 <p className="font-medium">{project.name}</p>
                 <p className="text-sm text-white/60">{project.description || 'Açıklama yok.'}</p>
-                <p className="text-xs text-white/50">Durum: {project.status}</p>
               </Link>
             ))}
           </div>
