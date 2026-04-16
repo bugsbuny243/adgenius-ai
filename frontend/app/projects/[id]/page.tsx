@@ -36,13 +36,14 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     notFound();
   }
 
-  const [{ data: items }, { data: outputs }, { data: knowledgeEntries }, { data: sources }] = await Promise.all([
-    supabase
-      .from('project_items')
-      .select('id, item_type, title, status, payload, source_output_id, created_at')
-      .eq('project_id', project.id)
-      .eq('workspace_id', workspaceId)
-      .order('created_at', { ascending: false }),
+  const [{ data: itemsWithStatus, error: itemsWithStatusError }, { data: outputs }, { data: knowledgeEntries }, { data: sourcesWithStatus, error: sourcesWithStatusError }] =
+    await Promise.all([
+      supabase
+        .from('project_items')
+        .select('id, item_type, title, status, payload, source_output_id, saved_output_id, created_at')
+        .eq('project_id', project.id)
+        .eq('workspace_id', workspaceId)
+        .order('created_at', { ascending: false }),
     supabase
       .from('saved_outputs')
       .select('id, title, content, created_at, agent_runs(status)')
@@ -65,6 +66,28 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       .order('created_at', { ascending: false })
       .limit(10)
   ]);
+
+  const { data: itemsWithoutStatus } = itemsWithStatusError
+    ? await supabase
+        .from('project_items')
+        .select('id, item_type, title, payload, source_output_id, saved_output_id, created_at')
+        .eq('project_id', project.id)
+        .eq('workspace_id', workspaceId)
+        .order('created_at', { ascending: false })
+    : { data: null };
+
+  const { data: sourcesWithoutStatus } = sourcesWithStatusError
+    ? await supabase
+        .from('knowledge_sources')
+        .select('id, title, source_type, created_at')
+        .eq('workspace_id', workspaceId)
+        .eq('project_id', project.id)
+        .order('created_at', { ascending: false })
+        .limit(10)
+    : { data: null };
+
+  const items = (itemsWithStatusError ? itemsWithoutStatus : itemsWithStatus) ?? [];
+  const sources = (sourcesWithStatusError ? sourcesWithoutStatus : sourcesWithStatus) ?? [];
 
   return (
     <main>
@@ -112,8 +135,12 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                       : '') || 'No details.'}
                   </p>
                   <p className="text-xs text-white/50">Type: {item.item_type}</p>
-                  <p className="text-xs text-white/50">Status: {item.status}</p>
-                  {item.source_output_id ? <p className="text-xs text-white/50">From output: {item.source_output_id}</p> : null}
+                  <p className="text-xs text-white/50">
+                    Status: {'status' in item && typeof item.status === 'string' ? item.status : 'active'}
+                  </p>
+                  {item.source_output_id || item.saved_output_id ? (
+                    <p className="text-xs text-white/50">From output: {item.source_output_id ?? item.saved_output_id}</p>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -184,7 +211,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                 <div key={source.id} className="rounded-lg border border-white/10 px-3 py-2">
                   <p className="font-medium">{source.title}</p>
                   <p className="text-xs text-white/60">
-                    {source.source_type} • {source.status}
+                    {source.source_type}{' '}
+                    {'status' in source && typeof source.status === 'string' ? `• ${source.status}` : '• ready'}
                   </p>
                 </div>
               ))}

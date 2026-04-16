@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { Nav } from '@/components/nav';
 import { AgentEditorShell } from '@/components/agent-editor/AgentEditorShell';
+import { RunStatusPoller } from '@/components/agent-editor/RunStatusPoller';
 import { buildFormSummary, getAgentEditorConfig, parseEditorMetadata } from '@/lib/agent-editor';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getWorkspaceContext } from '@/lib/workspace';
@@ -49,7 +50,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
 
   const runQuery = supabase
     .from('agent_runs')
-    .select('id, user_input, result_text, status, error_message, created_at, metadata')
+    .select('id, user_input, result_text, status, error_message, created_at, updated_at, completed_at, metadata')
     .eq('workspace_id', workspaceId)
     .eq('user_id', userId)
     .eq('agent_type_id', id)
@@ -107,7 +108,14 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
         <h3 className="mb-3 text-lg font-semibold">Sonuç</h3>
         {activeRun ? (
           <div className="space-y-3">
-            <p className="text-xs text-white/60">Durum: {activeRun.status}</p>
+            <RunStatusPoller status={activeRun.status} />
+            <p className="text-xs text-white/60">
+              Durum: <span className="font-medium text-white/85">{activeRun.status}</span>
+            </p>
+            <p className="text-xs text-white/50">
+              Oluşturulma: {new Date(activeRun.created_at).toLocaleString('tr-TR')}
+              {activeRun.completed_at ? ` • Tamamlanma: ${new Date(activeRun.completed_at).toLocaleString('tr-TR')}` : ''}
+            </p>
 
             <div className="rounded-lg border border-white/10 bg-black/20 p-3">
               <p className="mb-2 text-xs uppercase tracking-wide text-white/50">Form Özeti</p>
@@ -132,7 +140,9 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
 
             <div className="rounded-lg border border-white/10 bg-black/20 p-3">
               <p className="mb-2 text-xs uppercase tracking-wide text-white/50">Üretilen Çalışma</p>
-              <p className="text-sm text-white/80 whitespace-pre-wrap">{activeRun.result_text || activeRun.error_message || 'Sonuç hazırlanıyor...'}</p>
+              <p className="text-sm text-white/80 whitespace-pre-wrap">
+                {activeRun.result_text || activeRun.error_message || 'Sonuç hazırlanıyor. Sayfa otomatik güncellenecek...'}
+              </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
@@ -216,6 +226,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
           {recentRuns?.map((run) => (
             <Link key={run.id} href={`/agents/${id}?run_id=${run.id}`} className="block rounded-lg border border-white/10 p-3 text-sm hover:border-neon">
               <p className="text-white/70">{new Date(run.created_at).toLocaleString('tr-TR')}</p>
+              <p className="text-xs text-white/50">Durum: {run.status}</p>
               <p className="mt-1 text-white/90">{run.user_input.slice(0, 100) || 'İstem yok'}</p>
             </Link>
           ))}

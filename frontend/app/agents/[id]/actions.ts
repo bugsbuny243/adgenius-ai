@@ -89,28 +89,60 @@ export async function runAgentAction(agentId: string, formData: FormData) {
     redirect(`/agents/${agentId}?error=Çalıştırma başlatılamadı.`);
   }
 
-  const requestHeaders = await headers();
-  const runResponse = await fetch(buildInternalUrl('/api/agents/run', requestHeaders), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`
-    },
-    body: JSON.stringify({
-      runId: run.id,
-      agentTypeId: agentId,
-      userInput: prompt,
-      metadata: {
-        editor_state: parsedEditorState,
-        derived_prompt: derivedPrompt || prompt,
-        free_notes: freeNotes
-      }
-    })
-  });
+  try {
+    const requestHeaders = await headers();
+    const runResponse = await fetch(buildInternalUrl('/api/agents/run', requestHeaders), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({
+        runId: run.id,
+        agentTypeId: agentId,
+        userInput: prompt,
+        metadata: {
+          editor_state: parsedEditorState,
+          derived_prompt: derivedPrompt || prompt,
+          free_notes: freeNotes
+        }
+      }),
+      signal: AbortSignal.timeout(45_000)
+    });
 
-  if (!runResponse.ok) {
-    const payload = (await runResponse.json().catch(() => null)) as { error?: string } | null;
-    const message = payload?.error ?? 'Çalıştırma sırasında hata oluştu.';
+    if (!runResponse.ok) {
+      const payload = (await runResponse.json().catch(() => null)) as { error?: string } | null;
+      const message = payload?.error ?? 'Çalıştırma sırasında hata oluştu.';
+
+      await serverSupabase
+        .from('agent_runs')
+        .update({
+          status: 'failed',
+          error_message: message,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', run.id)
+        .eq('workspace_id', currentWorkspaceId)
+        .eq('user_id', currentUserId)
+        .eq('status', 'pending');
+
+      redirect(`/agents/${agentId}?error=${encodeURIComponent(message)}`);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Çalıştırma zaman aşımına uğradı.';
+
+    await serverSupabase
+      .from('agent_runs')
+      .update({
+        status: 'failed',
+        error_message: message,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', run.id)
+      .eq('workspace_id', currentWorkspaceId)
+      .eq('user_id', currentUserId)
+      .eq('status', 'pending');
+
     redirect(`/agents/${agentId}?error=${encodeURIComponent(message)}`);
   }
 
@@ -195,15 +227,26 @@ export async function createProjectItemFromOutputAction(agentId: string, runIdPa
     redirect(`/agents/${agentId}?error=Kaydedilen çıktı bulunamadı.`);
   }
 
-  await serverSupabase.from('project_items').insert({
+  const baseItem = {
     workspace_id: currentWorkspaceId,
     project_id: projectId,
     user_id: currentUserId,
-    saved_output_id: output.id,
     title,
     content: output.content,
     item_type: 'agent_output'
+  };
+
+  const { error: withSavedOutputError } = await serverSupabase.from('project_items').insert({
+    ...baseItem,
+    saved_output_id: output.id
   });
+
+  if (withSavedOutputError) {
+    await serverSupabase.from('project_items').insert({
+      ...baseItem,
+      source_output_id: output.id
+    });
+  }
 
   revalidatePath(`/projects/${projectId}`);
   redirect(`/agents/${agentId}?run_id=${runIdParam}`);
