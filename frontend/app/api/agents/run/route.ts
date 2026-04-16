@@ -10,6 +10,8 @@ type RunRequestBody = {
   metadata?: Record<string, unknown>;
 };
 
+const RUN_TIMEOUT_MS = 40_000;
+
 function getAccessToken(request: Request): string | null {
   const authorization = request.headers.get('authorization');
   if (!authorization || !authorization.startsWith('Bearer ')) {
@@ -118,13 +120,18 @@ export async function POST(request: Request) {
 
   try {
     const client = new GoogleGenAI({ apiKey: modelApiKey });
-    const response = await client.models.generateContent({
-      model: 'gemini-2.5-flash',
-      config: {
-        systemInstruction: agentType.system_prompt
-      },
-      contents: userInput
-    });
+    const response = await Promise.race([
+      client.models.generateContent({
+        model: 'gemini-2.5-flash',
+        config: {
+          systemInstruction: agentType.system_prompt
+        },
+        contents: userInput
+      }),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('run_timeout')), RUN_TIMEOUT_MS);
+      })
+    ]);
 
     const resultText = response.text ?? '';
     const usage = response.usageMetadata;
@@ -135,6 +142,8 @@ export async function POST(request: Request) {
         result_text: resultText,
         status: 'completed',
         error_message: null,
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
         model_name: 'default',
         tokens_input: usage?.promptTokenCount ?? null,
         tokens_output: usage?.candidatesTokenCount ?? null,
@@ -161,6 +170,7 @@ export async function POST(request: Request) {
       .update({
         status: 'failed',
         error_message: message,
+        updated_at: new Date().toISOString(),
         metadata: {
           ...(run.metadata ?? {}),
           ...(requestMetadata ?? {}),

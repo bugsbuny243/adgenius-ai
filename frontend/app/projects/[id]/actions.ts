@@ -21,15 +21,23 @@ export async function createProjectItemAction(projectId: string, formData: FormD
 
   const { workspaceId: currentWorkspaceId } = await getWorkspaceContext();
 
-  await serverSupabase.from('project_items').insert({
+  const basePayload = {
     workspace_id: currentWorkspaceId,
     project_id: projectId,
     user_id: currentUser.id,
     item_type: 'note',
     title,
-    status: 'open',
     payload: details ? { details } : null
+  };
+
+  const { error: insertWithStatusError } = await serverSupabase.from('project_items').insert({
+    ...basePayload,
+    status: 'open'
   });
+
+  if (insertWithStatusError) {
+    await serverSupabase.from('project_items').insert(basePayload);
+  }
 
   revalidatePath(`/projects/${projectId}`);
 }

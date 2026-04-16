@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import {
   buildDerivedPrompt,
   buildPreviewBlocks,
@@ -22,6 +22,38 @@ export function AgentEditorShell({ agentSlug, projects, runAction, initialMetada
   const config = useMemo(() => getAgentEditorConfig(agentSlug), [agentSlug]);
   const [editorState, setEditorState] = useState<EditorState>(initialMetadata?.editorState ?? {});
   const [freeNotes, setFreeNotes] = useState(initialMetadata?.freeNotes ?? '');
+  const [isPending, startTransition] = useTransition();
+
+  const storageKey = `agent-editor-v2:${agentSlug}`;
+
+  useEffect(() => {
+    if (initialMetadata) return;
+
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return;
+
+    try {
+      const parsed = JSON.parse(raw) as { editorState?: EditorState; freeNotes?: string };
+      if (parsed.editorState && typeof parsed.editorState === 'object') {
+        setEditorState(parsed.editorState);
+      }
+      if (typeof parsed.freeNotes === 'string') {
+        setFreeNotes(parsed.freeNotes);
+      }
+    } catch {
+      window.localStorage.removeItem(storageKey);
+    }
+  }, [initialMetadata, storageKey]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        editorState,
+        freeNotes
+      })
+    );
+  }, [editorState, freeNotes, storageKey]);
 
   const derivedPrompt = useMemo(() => buildDerivedPrompt(config, editorState, freeNotes), [config, editorState, freeNotes]);
   const previewBlocks = useMemo(() => buildPreviewBlocks(config, editorState, freeNotes), [config, editorState, freeNotes]);
@@ -31,7 +63,12 @@ export function AgentEditorShell({ agentSlug, projects, runAction, initialMetada
   };
 
   return (
-    <form action={runAction} className="space-y-4">
+    <form
+      action={(formData) => {
+        startTransition(() => runAction(formData));
+      }}
+      className="space-y-4"
+    >
       <div className="rounded-xl border border-white/10 bg-black/20 p-4">
         <h3 className="text-lg font-semibold">{config.title}</h3>
         <p className="mt-1 text-sm text-white/70">{config.shortHelp}</p>
@@ -69,8 +106,8 @@ export function AgentEditorShell({ agentSlug, projects, runAction, initialMetada
                 </option>
               ))}
             </select>
-            <button type="submit" className="rounded-lg bg-neon px-4 py-2 font-semibold text-ink">
-              Çalıştır
+            <button type="submit" disabled={isPending} className="rounded-lg bg-neon px-4 py-2 font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-70">
+              {isPending ? 'Çalıştırılıyor...' : 'Çalıştır'}
             </button>
           </div>
         </div>
