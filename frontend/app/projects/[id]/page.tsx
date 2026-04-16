@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { Nav } from '@/components/nav';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getWorkspaceContext } from '@/lib/workspace';
-import { addKnowledgeSourceAction, addProjectKnowledgeAction, createProjectItemAction } from './actions';
+import { addProjectKnowledgeAction, createProjectItemAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -21,7 +21,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const { workspaceId, userId } = await getWorkspaceContext();
 
   const createItem = createProjectItemAction.bind(null, id);
-  const addSource = addKnowledgeSourceAction.bind(null, id);
   const addProjectKnowledge = addProjectKnowledgeAction.bind(null, id);
 
   const { data: project } = await supabase
@@ -36,14 +35,13 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     notFound();
   }
 
-  const [{ data: itemsWithStatus, error: itemsWithStatusError }, { data: outputs }, { data: knowledgeEntries }, { data: sourcesWithStatus, error: sourcesWithStatusError }] =
-    await Promise.all([
-      supabase
-        .from('project_items')
-        .select('id, item_type, title, status, payload, source_output_id, saved_output_id, created_at')
-        .eq('project_id', project.id)
-        .eq('workspace_id', workspaceId)
-        .order('created_at', { ascending: false }),
+  const [{ data: items }, { data: outputs }, { data: knowledgeEntries }] = await Promise.all([
+    supabase
+      .from('project_items')
+      .select('id, item_type, title, payload, source_output_id, saved_output_id, created_at')
+      .eq('project_id', project.id)
+      .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: false }),
     supabase
       .from('saved_outputs')
       .select('id, title, content, created_at, agent_runs(status)')
@@ -53,41 +51,12 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       .limit(10),
     supabase
       .from('project_knowledge_entries')
-      .select('id, title, content, entry_type, source_id, created_at')
-      .eq('workspace_id', workspaceId)
-      .eq('project_id', project.id)
-      .order('created_at', { ascending: false })
-      .limit(10),
-    supabase
-      .from('knowledge_sources')
-      .select('id, title, source_type, status, created_at')
+      .select('id, title, content, entry_type, created_at')
       .eq('workspace_id', workspaceId)
       .eq('project_id', project.id)
       .order('created_at', { ascending: false })
       .limit(10)
   ]);
-
-  const { data: itemsWithoutStatus } = itemsWithStatusError
-    ? await supabase
-        .from('project_items')
-        .select('id, item_type, title, payload, source_output_id, saved_output_id, created_at')
-        .eq('project_id', project.id)
-        .eq('workspace_id', workspaceId)
-        .order('created_at', { ascending: false })
-    : { data: null };
-
-  const { data: sourcesWithoutStatus } = sourcesWithStatusError
-    ? await supabase
-        .from('knowledge_sources')
-        .select('id, title, source_type, created_at')
-        .eq('workspace_id', workspaceId)
-        .eq('project_id', project.id)
-        .order('created_at', { ascending: false })
-        .limit(10)
-    : { data: null };
-
-  const items = (itemsWithStatusError ? itemsWithoutStatus : itemsWithStatus) ?? [];
-  const sources = (sourcesWithStatusError ? sourcesWithoutStatus : sourcesWithStatus) ?? [];
 
   return (
     <main>
@@ -135,9 +104,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                       : '') || 'No details.'}
                   </p>
                   <p className="text-xs text-white/50">Type: {item.item_type}</p>
-                  <p className="text-xs text-white/50">
-                    Status: {'status' in item && typeof item.status === 'string' ? item.status : 'active'}
-                  </p>
                   {item.source_output_id || item.saved_output_id ? (
                     <p className="text-xs text-white/50">From output: {item.source_output_id ?? item.saved_output_id}</p>
                   ) : null}
@@ -167,64 +133,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       </section>
 
       <section className="mt-4 grid gap-4 lg:grid-cols-2">
-        <article className="panel">
-          <h3 className="mb-3 text-lg font-semibold">Add Knowledge Source</h3>
-          <form action={addSource} className="space-y-2">
-            <input
-              name="title"
-              required
-              placeholder="Source title"
-              className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-neon"
-            />
-            <select
-              name="source_type"
-              defaultValue="text"
-              className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-neon"
-            >
-              <option value="text">text</option>
-              <option value="brief">brief</option>
-              <option value="url">url</option>
-              <option value="file">file</option>
-            </select>
-            <input
-              name="source_url"
-              placeholder="Source URL (optional)"
-              className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-neon"
-            />
-            <textarea
-              name="raw_text"
-              rows={4}
-              placeholder="Raw source text"
-              className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-neon"
-            />
-            <button type="submit" className="rounded-lg border border-white/20 px-3 py-2 text-sm hover:border-neon">
-              Save source
-            </button>
-          </form>
-        </article>
-
-        <article className="panel">
-          <h3 className="mb-3 text-lg font-semibold">Project Sources</h3>
-          {sources && sources.length > 0 ? (
-            <div className="space-y-2 text-sm">
-              {sources.map((source) => (
-                <div key={source.id} className="rounded-lg border border-white/10 px-3 py-2">
-                  <p className="font-medium">{source.title}</p>
-                  <p className="text-xs text-white/60">
-                    {source.source_type}{' '}
-                    {'status' in source && typeof source.status === 'string' ? `• ${source.status}` : '• ready'}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-white/70">No sources yet.</p>
-          )}
-        </article>
-      </section>
-
-      <section className="mt-4 grid gap-4 lg:grid-cols-2">
-        <article className="panel">
+        <article className="panel lg:col-span-2">
           <h3 className="mb-3 text-lg font-semibold">Add Project Knowledge</h3>
           <form action={addProjectKnowledge} className="space-y-2">
             <input
@@ -246,34 +155,21 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               placeholder="Type (note, strategy, constraint...)"
               className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-neon"
             />
-            <select
-              name="source_id"
-              defaultValue=""
-              className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-neon"
-            >
-              <option value="">No source linkage</option>
-              {sources?.map((source) => (
-                <option key={source.id} value={source.id}>
-                  {source.title}
-                </option>
-              ))}
-            </select>
             <button type="submit" className="rounded-lg border border-white/20 px-3 py-2 text-sm hover:border-neon">
-              Save project knowledge
+              Save knowledge
             </button>
           </form>
         </article>
 
-        <article className="panel">
-          <h3 className="mb-3 text-lg font-semibold">Project Knowledge Entries</h3>
+        <article className="panel lg:col-span-2">
+          <h3 className="mb-3 text-lg font-semibold">Project Knowledge</h3>
           {knowledgeEntries && knowledgeEntries.length > 0 ? (
             <div className="space-y-2 text-sm">
               {knowledgeEntries.map((entry) => (
                 <div key={entry.id} className="rounded-lg border border-white/10 px-3 py-2">
                   <p className="font-medium">{entry.title}</p>
+                  <p className="text-white/70">{entry.content}</p>
                   <p className="text-xs text-white/60">{entry.entry_type}</p>
-                  <p className="text-white/75 line-clamp-3">{entry.content}</p>
-                  {entry.source_id ? <p className="text-xs text-white/50">Source: {entry.source_id}</p> : null}
                 </div>
               ))}
             </div>
