@@ -104,7 +104,6 @@ Deno.serve(async (req) => {
   const saveOutput = body.saveOutput ?? true;
   const workspaceMemoryEntryIds = normalizeIds(body.contextSelection?.workspaceMemoryEntryIds);
   const projectKnowledgeEntryIds = normalizeIds(body.contextSelection?.projectKnowledgeEntryIds);
-  const sourceIds = normalizeIds(body.contextSelection?.sourceIds);
   const savedOutputIds = normalizeIds(body.contextSelection?.savedOutputIds);
 
   if (!workspaceId || !agentTypeId || !userInput) {
@@ -169,7 +168,7 @@ Deno.serve(async (req) => {
 
   const modelName = agentType.model_name?.trim() || 'default';
 
-  const [memoryResult, knowledgeResult, sourceResult, outputResult] = await Promise.all([
+  const [memoryResult, knowledgeResult, outputResult] = await Promise.all([
     workspaceMemoryEntryIds.length
       ? supabase
           .from('workspace_memory_entries')
@@ -185,13 +184,6 @@ Deno.serve(async (req) => {
           .eq('workspace_id', workspaceId)
           .in('id', projectKnowledgeEntryIds)
       : Promise.resolve({ data: [], error: null }),
-    sourceIds.length
-      ? supabase
-          .from('knowledge_sources')
-          .select('id, title, raw_text, source_type, source_url, project_id')
-          .eq('workspace_id', workspaceId)
-          .in('id', sourceIds)
-      : Promise.resolve({ data: [], error: null }),
     savedOutputIds.length
       ? supabase
           .from('saved_outputs')
@@ -201,19 +193,18 @@ Deno.serve(async (req) => {
       : Promise.resolve({ data: [], error: null })
   ]);
 
-  if (memoryResult.error || knowledgeResult.error || sourceResult.error || outputResult.error) {
+  if (memoryResult.error || knowledgeResult.error || outputResult.error) {
     return jsonResponse(500, { ok: false, error: 'Failed to load selected context.' });
   }
 
   const memoryEntries = memoryResult.data ?? [];
   const knowledgeEntries = knowledgeResult.data ?? [];
-  const selectedSources = sourceResult.data ?? [];
+  const selectedSources: Array<{ id: string; title: string; source_type: string; source_url: string | null; raw_text: string | null }> = [];
   const selectedOutputs = outputResult.data ?? [];
 
   if (
     memoryEntries.length !== workspaceMemoryEntryIds.length ||
     knowledgeEntries.length !== projectKnowledgeEntryIds.length ||
-    selectedSources.length !== sourceIds.length ||
     selectedOutputs.length !== savedOutputIds.length
   ) {
     return jsonResponse(403, { ok: false, error: 'One or more selected context records are invalid for this workspace' });
@@ -262,7 +253,7 @@ Deno.serve(async (req) => {
       project_id: projectId,
       context_snapshot_id: snapshot.id,
       model_name: modelName,
-      status: 'running',
+      status: 'processing',
       user_input: userInput,
       metadata,
       tokens_input: 0,

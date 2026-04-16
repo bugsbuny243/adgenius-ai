@@ -36,8 +36,9 @@ export async function createContentJobAction(formData: FormData) {
       user_id: userId,
       status: 'completed',
       model_name: 'koschei-core',
-      prompt: brief,
-      result: variants
+      user_input: brief,
+      result_text: JSON.stringify(variants, null, 2),
+      completed_at: new Date().toISOString()
     })
     .select('id')
     .single();
@@ -54,7 +55,7 @@ export async function createContentJobAction(formData: FormData) {
       workspace_id: workspace.workspaceId,
       project_id: projectId,
       user_id: userId,
-      run_id: run.id,
+      agent_run_id: run.id,
       title,
       content: JSON.stringify(variants, null, 2)
     })
@@ -65,25 +66,33 @@ export async function createContentJobAction(formData: FormData) {
     throw new Error(`Kaydedilen çıktı oluşturulamadı: ${savedError?.message ?? 'bilinmeyen hata'}`);
   }
 
-  await supabase.from('content_items').insert({
-    workspace_id: workspace.workspaceId,
-    project_id: projectId,
-    user_id: userId,
-    brief,
-    platforms: selectedPlatforms,
-    youtube_title: variants.youtubeTitle,
-    youtube_description: variants.youtubeDescription,
-    instagram_caption: variants.instagramCaption,
-    tiktok_caption: variants.tiktokCaption,
-    run_id: run.id,
-    saved_output_id: saved.id,
-    status: 'draft'
-  });
+  const { data: contentItem, error: contentItemError } = await supabase
+    .from('content_items')
+    .insert({
+      workspace_id: workspace.workspaceId,
+      project_id: projectId,
+      user_id: userId,
+      brief,
+      platforms: selectedPlatforms,
+      youtube_title: variants.youtubeTitle,
+      youtube_description: variants.youtubeDescription,
+      instagram_caption: variants.instagramCaption,
+      tiktok_caption: variants.tiktokCaption,
+      run_id: run.id,
+      saved_output_id: saved.id,
+      status: 'draft'
+    })
+    .select('id')
+    .single();
+
+  if (contentItemError || !contentItem) {
+    throw new Error(`İçerik kaydı oluşturulamadı: ${contentItemError?.message ?? 'bilinmeyen hata'}`);
+  }
 
   await supabase.from('publish_jobs').insert({
     workspace_id: workspace.workspaceId,
     project_id: projectId,
-    content_output_id: saved.id,
+    content_output_id: contentItem.id,
     target_platform: selectedPlatforms[0],
     status: 'draft',
     payload: variants
@@ -99,7 +108,7 @@ export async function updatePublishStatusAction(formData: FormData) {
   const jobId = String(formData.get('job_id') ?? '').trim();
   const status = String(formData.get('status') ?? '').trim();
 
-  if (!jobId || !['draft', 'ready', 'queued'].includes(status)) {
+  if (!jobId || !['draft', 'queued', 'processing', 'published', 'failed', 'cancelled'].includes(status)) {
     return;
   }
 
@@ -109,7 +118,8 @@ export async function updatePublishStatusAction(formData: FormData) {
     .from('publish_jobs')
     .update({
       status,
-      queued_at: status === 'queued' ? new Date().toISOString() : null
+      last_attempt_at: status === 'processing' ? new Date().toISOString() : null,
+      published_at: status === 'published' ? new Date().toISOString() : null
     })
     .eq('workspace_id', workspace.workspaceId)
     .eq('id', jobId);
