@@ -33,11 +33,13 @@ export async function createContentJobAction(formData: FormData) {
     .from('agent_runs')
     .insert({
       workspace_id: workspace.workspaceId,
-      project_id: projectId,
       user_id: userId,
       status: 'completed',
       model_name: 'default',
       user_input: brief,
+      metadata: {
+        project_id: projectId
+      },
       result_text: JSON.stringify(variants, null, 2),
       completed_at: new Date().toISOString()
     })

@@ -104,7 +104,7 @@ export async function POST(request: Request) {
 
   const { data: run } = await supabase
     .from('agent_runs')
-    .select('id, workspace_id, user_id, agent_type_id, project_id, metadata')
+    .select('id, workspace_id, user_id, agent_type_id, metadata')
     .eq('id', runId)
     .eq('workspace_id', membership.workspace_id)
     .eq('user_id', user.id)
@@ -223,12 +223,18 @@ export async function POST(request: Request) {
         tiktok_caption: resultText.slice(0, 300)
       };
 
+      const runProjectId =
+        run.metadata && typeof run.metadata === 'object' && 'project_id' in run.metadata && typeof run.metadata.project_id === 'string'
+          ? run.metadata.project_id
+          : null;
+      const resolvedProjectId = runProjectId ?? projectId;
+
       const { data: savedOutput } = await serviceSupabase
         .from('saved_outputs')
         .insert({
           workspace_id: membership.workspace_id,
           user_id: user.id,
-          project_id: run.project_id ?? projectId,
+          project_id: resolvedProjectId,
           agent_run_id: runId,
           title: 'Sosyal medya çıktısı',
           content: resultText
@@ -241,7 +247,7 @@ export async function POST(request: Request) {
         .insert({
           workspace_id: membership.workspace_id,
           user_id: user.id,
-          project_id: run.project_id ?? projectId,
+          project_id: resolvedProjectId,
           run_id: runId,
           saved_output_id: savedOutput?.id ?? null,
           status: 'draft',
@@ -255,7 +261,7 @@ export async function POST(request: Request) {
           platforms.map((platform) =>
             serviceSupabase.from('publish_jobs').insert({
               workspace_id: membership.workspace_id,
-              project_id: run.project_id ?? projectId,
+              project_id: resolvedProjectId,
               content_output_id: contentItem.id,
               target_platform: platform,
               status: 'queued',
