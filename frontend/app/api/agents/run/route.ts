@@ -12,6 +12,19 @@ type RunRequestBody = {
 };
 
 const RUN_TIMEOUT_MS = 40_000;
+const FALLBACK_ENGINE_NAME = 'AI motoru';
+
+function normalizePlatforms(value: unknown): Array<'youtube' | 'instagram' | 'tiktok'> {
+  if (!Array.isArray(value)) {
+    return ['youtube', 'instagram', 'tiktok'];
+  }
+
+  const normalized = value
+    .map((entry) => String(entry).toLowerCase().trim())
+    .filter((entry): entry is 'youtube' | 'instagram' | 'tiktok' => ['youtube', 'instagram', 'tiktok'].includes(entry));
+
+  return normalized.length ? Array.from(new Set(normalized)) : ['youtube', 'instagram', 'tiktok'];
+}
 
 function getAccessToken(request: Request): string | null {
   const authorization = request.headers.get('authorization');
@@ -112,7 +125,12 @@ export async function POST(request: Request) {
   if (!agentType) {
     await serviceSupabase
       .from('agent_runs')
-      .update({ status: 'failed', error_message: 'Agent bulunamadı.' })
+      .update({
+        status: 'failed',
+        error_message: 'Agent bulunamadı.',
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
       .eq('id', runId)
       .eq('user_id', user.id)
       .eq('workspace_id', membership.workspace_id);
@@ -130,7 +148,7 @@ export async function POST(request: Request) {
         metadata: {
           ...(run.metadata ?? {}),
           ...(requestMetadata ?? {}),
-          ai_engine: 'AI motoru'
+          ai_engine: FALLBACK_ENGINE_NAME
         }
       })
       .eq('id', runId)
@@ -162,7 +180,7 @@ export async function POST(request: Request) {
     const normalizedMetadata = {
       ...(run.metadata ?? {}),
       ...(requestMetadata ?? {}),
-      ai_engine: 'AI motoru'
+      ai_engine: FALLBACK_ENGINE_NAME
     };
 
     const { error: updateError } = await serviceSupabase
@@ -187,9 +205,18 @@ export async function POST(request: Request) {
     }
 
     if (agentType.slug === 'sosyal') {
+      const requestEditorState =
+        requestMetadata && typeof requestMetadata === 'object' && 'editor_state' in requestMetadata
+          ? (requestMetadata.editor_state as Record<string, unknown>)
+          : null;
+      const preferredPlatform = requestEditorState && typeof requestEditorState.platform === 'string'
+        ? requestEditorState.platform.toLowerCase()
+        : null;
+      const platforms = preferredPlatform ? normalizePlatforms([preferredPlatform]) : ['youtube', 'instagram', 'tiktok'];
+
       const variants = {
         brief: userInput,
-        platforms: ['youtube', 'instagram', 'tiktok'],
+        platforms,
         youtube_title: resultText.slice(0, 90),
         youtube_description: resultText,
         instagram_caption: resultText.slice(0, 2200),
@@ -224,14 +251,22 @@ export async function POST(request: Request) {
         .maybeSingle();
 
       if (contentItem?.id) {
-        await serviceSupabase.from('publish_jobs').insert({
-          workspace_id: membership.workspace_id,
-          project_id: run.project_id ?? projectId,
-          content_output_id: contentItem.id,
-          target_platform: 'instagram',
-          status: 'queued',
-          payload: variants
-        });
+        await Promise.all(
+          platforms.map((platform) =>
+            serviceSupabase.from('publish_jobs').insert({
+              workspace_id: membership.workspace_id,
+              project_id: run.project_id ?? projectId,
+              content_output_id: contentItem.id,
+              target_platform: platform,
+              status: 'queued',
+              payload: {
+                brief: userInput,
+                platform,
+                variants
+              }
+            })
+          )
+        );
       }
     }
 
@@ -249,7 +284,7 @@ export async function POST(request: Request) {
         metadata: {
           ...(run.metadata ?? {}),
           ...(requestMetadata ?? {}),
-          ai_engine: 'AI motoru'
+          ai_engine: FALLBACK_ENGINE_NAME
         }
       })
       .eq('id', runId)

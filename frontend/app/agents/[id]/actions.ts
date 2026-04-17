@@ -142,12 +142,25 @@ export async function runAgentAction(agentId: string, formData: FormData) {
         .eq('id', run.id)
         .eq('workspace_id', currentWorkspaceId)
         .eq('user_id', currentUserId)
-        .eq('status', 'pending');
+        .in('status', ['pending', 'processing']);
 
       redirect(`/agents/${agentId}?error=${encodeURIComponent(message)}`);
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Çalıştırma zaman aşımına uğradı.';
+    const message = error instanceof Error ? error.message : 'Çalıştırma başlatma hatası.';
+    const isTimeout = message.toLowerCase().includes('timeout') || message.toLowerCase().includes('aborted');
+
+    const { data: latestRun } = await serverSupabase
+      .from('agent_runs')
+      .select('status')
+      .eq('id', run.id)
+      .eq('workspace_id', currentWorkspaceId)
+      .eq('user_id', currentUserId)
+      .maybeSingle();
+
+    if (latestRun?.status === 'processing' && isTimeout) {
+      redirect(`/agents/${agentId}?run_id=${run.id}&error=${encodeURIComponent('Çalıştırma arka planda devam ediyor. Sonuç alanı otomatik güncellenecek.')}`);
+    }
 
     await serverSupabase
       .from('agent_runs')
@@ -160,7 +173,7 @@ export async function runAgentAction(agentId: string, formData: FormData) {
       .eq('id', run.id)
       .eq('workspace_id', currentWorkspaceId)
       .eq('user_id', currentUserId)
-      .eq('status', 'pending');
+      .in('status', ['pending', 'processing']);
 
     redirect(`/agents/${agentId}?error=${encodeURIComponent(message)}`);
   }

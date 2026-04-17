@@ -29,7 +29,9 @@ export default async function ProjectsPage() {
 
     acc[item.project_id].count += 1;
     acc[item.project_id].types.add(item.item_type);
-    acc[item.project_id].lastItemAt = item.created_at;
+    const currentLast = acc[item.project_id].lastItemAt;
+    acc[item.project_id].lastItemAt =
+      !currentLast || new Date(item.created_at).getTime() > new Date(currentLast).getTime() ? item.created_at : currentLast;
     return acc;
   }, {});
 

@@ -11,8 +11,8 @@ type RunItem = {
 };
 
 function toDisplayModel(modelName: string | null): string {
-  if (!modelName) return 'Varsayılan model';
-  return 'Varsayılan model';
+  if (!modelName) return 'Varsayılan AI motoru';
+  return 'Varsayılan AI motoru';
 }
 
 export function RunsList({ runs }: { runs: RunItem[] }) {

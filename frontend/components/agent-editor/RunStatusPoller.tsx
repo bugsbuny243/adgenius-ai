@@ -12,13 +12,15 @@ type RunStatusPollerProps = {
 export function RunStatusPoller({ status, intervalMs = 2500, maxPollCount = 18 }: RunStatusPollerProps) {
   const router = useRouter();
   const pollCountRef = useRef(0);
+  const isPollingStatus = status === 'pending' || status === 'processing';
 
   useEffect(() => {
-    if (status !== 'pending') {
+    if (!isPollingStatus) {
       pollCountRef.current = 0;
       return;
     }
 
+    router.refresh();
     const timer = window.setInterval(() => {
       pollCountRef.current += 1;
       router.refresh();
@@ -29,7 +31,7 @@ export function RunStatusPoller({ status, intervalMs = 2500, maxPollCount = 18 }
     }, intervalMs);
 
     return () => window.clearInterval(timer);
-  }, [status, intervalMs, maxPollCount, router]);
+  }, [isPollingStatus, intervalMs, maxPollCount, router]);
 
   return null;
 }

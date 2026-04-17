@@ -9,9 +9,9 @@ function buildVariants(brief: string, platforms: Platform[]) {
   const cleanBrief = brief.trim();
   return {
     youtubeTitle: `🎯 ${cleanBrief.slice(0, 58)}`,
-    youtubeDescription: `${cleanBrief}\n\nBu video Koschei ile planlandı. #koschei`,
-    instagramCaption: `${cleanBrief}\n\n#koschei #icerik #instagram`,
-    tiktokCaption: `${cleanBrief.slice(0, 120)} #koschei #tiktok`,
+    youtubeDescription: `${cleanBrief}\n\nBu içerik AI motoru ile planlandı. #icerik`,
+    instagramCaption: `${cleanBrief}\n\n#icerik #instagram`,
+    tiktokCaption: `${cleanBrief.slice(0, 120)} #icerik #tiktok`,
     platforms
   };
 }
