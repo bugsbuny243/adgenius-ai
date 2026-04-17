@@ -250,12 +250,14 @@ Deno.serve(async (req) => {
       workspace_id: workspaceId,
       user_id: authenticatedUser.id,
       agent_type_id: agentTypeId,
-      project_id: projectId,
-      context_snapshot_id: snapshot.id,
       model_name: modelName,
       status: 'processing',
       user_input: userInput,
-      metadata,
+      metadata: {
+        ...metadata,
+        project_id: projectId,
+        context_snapshot_id: snapshot.id
+      },
       tokens_input: 0,
       tokens_output: 0
     })
