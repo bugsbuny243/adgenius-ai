@@ -3,10 +3,17 @@ import { notFound, redirect } from 'next/navigation';
 import { Nav } from '@/components/nav';
 import { AgentEditorShell } from '@/components/agent-editor/AgentEditorShell';
 import { RunStatusPoller } from '@/components/agent-editor/RunStatusPoller';
+import { ResultPanel } from '@/components/agent-editor/ResultPanel';
 import { buildFormSummary, getAgentEditorConfig, parseEditorMetadata } from '@/lib/agent-editor';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getWorkspaceContext } from '@/lib/workspace';
-import { attachSavedOutputToProjectAction, createProjectItemFromOutputAction, runAgentAction, saveOutputAction } from './actions';
+import {
+  attachSavedOutputToProjectAction,
+  createProjectItemFromOutputAction,
+  rerunAgentAction,
+  runAgentAction,
+  saveOutputAction
+} from './actions';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -41,6 +48,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
 
   const runAgent = runAgentAction.bind(null, id);
   const saveOutput = saveOutputAction.bind(null, id);
+  const rerunAgent = rerunAgentAction.bind(null, id);
   const createProjectItem = createProjectItemFromOutputAction.bind(null, id, runIdParam ?? '');
   const attachOutput = attachSavedOutputToProjectAction.bind(null, id, runIdParam ?? '');
 
@@ -169,14 +177,13 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
               <p className="text-sm whitespace-pre-wrap text-white/80">{activeMetadata?.freeNotes || 'Ek not girilmedi.'}</p>
             </div>
 
-            <div className="rounded-lg border border-white/10 bg-black/20 p-3">
-              <p className="mb-2 text-xs uppercase tracking-wide text-white/50">Üretilen Çalışma</p>
-              <p className="text-sm text-white/80 whitespace-pre-wrap">
-                {activeRun.result_text ||
-                  (activeRun.status === 'failed' ? activeRun.error_message || 'Çalıştırma hata ile sonlandı.' : null) ||
-                  'Sonuç hazırlanıyor. Sayfa otomatik güncellenecek...'}
-              </p>
-            </div>
+            <ResultPanel
+              text={
+                activeRun.result_text ||
+                (activeRun.status === 'failed' ? activeRun.error_message || 'Çalıştırma hata ile sonlandı.' : '') ||
+                'Sonuç hazırlanıyor. Sayfa otomatik güncellenecek...'
+              }
+            />
 
             <div className="flex flex-wrap items-center gap-3">
               <Link
@@ -185,6 +192,10 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
               >
                 Bu sonucu düzenle
               </Link>
+              <form action={rerunAgent}>
+                <input type="hidden" name="source_run_id" value={activeRun.id} />
+                <button className="rounded-lg border border-white/20 px-3 py-2 text-sm hover:border-neon">Aynı girdiyle tekrar çalıştır</button>
+              </form>
             </div>
 
             {activeRun.status === 'completed' ? (
