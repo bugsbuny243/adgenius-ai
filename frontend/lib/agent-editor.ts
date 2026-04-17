@@ -41,6 +41,13 @@ export type AgentEditorConfig = {
 
 export type EditorState = Record<string, string | boolean>;
 
+export type EditorStarterPack = {
+  label: string;
+  description: string;
+  state: EditorState;
+  freeNotes: string;
+};
+
 const DEFAULT_AGENT_SLUG: AgentEditorSlug = 'icerik';
 
 export const agentEditorConfigs: Record<AgentEditorSlug, AgentEditorConfig> = {
@@ -257,9 +264,54 @@ export const agentEditorConfigs: Record<AgentEditorSlug, AgentEditorConfig> = {
   }
 };
 
+const starterPackRegistry: Partial<Record<AgentEditorSlug, EditorStarterPack[]>> = {
+  yazilim: [
+    {
+      label: 'Bug Fix',
+      description: 'Canlı bir hatayı teşhis edip çözüm planı üretir.',
+      state: {
+        gorev_tipi: 'bug fix',
+        teknoloji_yigini: 'Next.js + TypeScript + Supabase',
+        beklenen_cikti: 'Kök neden analizi, patch önerisi ve test checklisti'
+      },
+      freeNotes: 'Auth ve deploy akışına dokunmadan çözüm öner.'
+    }
+  ],
+  sosyal: [
+    {
+      label: 'Haftalık Plan',
+      description: '7 günlük içerik akışı ve CTA önerileri üretir.',
+      state: {
+        platform: 'Instagram',
+        format: 'reel',
+        icerik_amaci: 'Etkileşim artırma',
+        ton: 'Samimi ve enerjik'
+      },
+      freeNotes: 'Her içerik için hook + CTA + 1 alternatif başlık da üret.'
+    }
+  ],
+  eposta: [
+    {
+      label: 'Takip Maili',
+      description: 'Demo / teklif sonrası dönüş odaklı takip mesajı oluşturur.',
+      state: {
+        eposta_turu: 'Takip',
+        ton: 'Profesyonel ve sıcak',
+        amac: 'Toplantı teyidi almak'
+      },
+      freeNotes: 'Kısa, net ve spam filtresine takılmayacak bir dil kullan.'
+    }
+  ]
+};
+
 export function getAgentEditorConfig(slug?: string | null): AgentEditorConfig {
   if (!slug) return agentEditorConfigs[DEFAULT_AGENT_SLUG];
   return agentEditorConfigs[(slug as AgentEditorSlug)] ?? agentEditorConfigs[DEFAULT_AGENT_SLUG];
+}
+
+export function getAgentStarterPacks(slug?: string | null): EditorStarterPack[] {
+  const config = getAgentEditorConfig(slug);
+  return starterPackRegistry[config.slug] ?? [];
 }
 
 export function buildDerivedPrompt(config: AgentEditorConfig, state: EditorState, freeNotes: string): string {

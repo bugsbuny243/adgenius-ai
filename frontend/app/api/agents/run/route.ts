@@ -11,17 +11,19 @@ type RunRequestBody = {
   metadata?: Record<string, unknown>;
 };
 
+type Platform = 'youtube' | 'instagram' | 'tiktok';
+
 const RUN_TIMEOUT_MS = 40_000;
 const FALLBACK_ENGINE_NAME = 'AI motoru';
 
-function normalizePlatforms(value: unknown): Array<'youtube' | 'instagram' | 'tiktok'> {
+function normalizePlatforms(value: unknown): Platform[] {
   if (!Array.isArray(value)) {
     return ['youtube', 'instagram', 'tiktok'];
   }
 
   const normalized = value
     .map((entry) => String(entry).toLowerCase().trim())
-    .filter((entry): entry is 'youtube' | 'instagram' | 'tiktok' => ['youtube', 'instagram', 'tiktok'].includes(entry));
+    .filter((entry): entry is Platform => ['youtube', 'instagram', 'tiktok'].includes(entry));
 
   return normalized.length ? Array.from(new Set(normalized)) : ['youtube', 'instagram', 'tiktok'];
 }
@@ -33,6 +35,120 @@ function getAccessToken(request: Request): string | null {
   }
 
   return authorization.slice('Bearer '.length).trim() || null;
+}
+
+async function insertContentItemWithFallbacks(
+  serviceSupabase: any,
+  payload: {
+    workspaceId: string;
+    userId: string;
+    runId: string;
+    projectId: string | null;
+    savedOutputId: string | null;
+    brief: string;
+    platforms: Platform[];
+    resultText: string;
+  }
+): Promise<string | null> {
+  const candidates = [
+    {
+      workspace_id: payload.workspaceId,
+      user_id: payload.userId,
+      project_id: payload.projectId,
+      run_id: payload.runId,
+      saved_output_id: payload.savedOutputId,
+      status: 'draft',
+      brief: payload.brief,
+      platforms: payload.platforms,
+      youtube_title: payload.resultText.slice(0, 90),
+      youtube_description: payload.resultText,
+      instagram_caption: payload.resultText.slice(0, 2200),
+      tiktok_caption: payload.resultText.slice(0, 300)
+    },
+    {
+      workspace_id: payload.workspaceId,
+      user_id: payload.userId,
+      project_id: payload.projectId,
+      run_id: payload.runId,
+      saved_output_id: payload.savedOutputId,
+      brief: payload.brief,
+      platforms: payload.platforms,
+      youtube_title: payload.resultText.slice(0, 90),
+      youtube_description: payload.resultText,
+      instagram_caption: payload.resultText.slice(0, 2200),
+      tiktok_caption: payload.resultText.slice(0, 300)
+    },
+    {
+      workspace_id: payload.workspaceId,
+      user_id: payload.userId,
+      project_id: payload.projectId,
+      source_run_id: payload.runId,
+      source_output_id: payload.savedOutputId,
+      brief: payload.brief,
+      youtube_title: payload.resultText.slice(0, 90),
+      youtube_description: payload.resultText,
+      instagram_caption: payload.resultText.slice(0, 2200),
+      tiktok_caption: payload.resultText.slice(0, 300)
+    }
+  ];
+
+  for (const candidate of candidates) {
+    const { data, error } = await (serviceSupabase.from('content_items') as any).insert(candidate).select('id').maybeSingle();
+    if (!error && data?.id) {
+      return data.id;
+    }
+  }
+
+  return null;
+}
+
+async function insertPublishJobsWithFallbacks(
+  serviceSupabase: any,
+  payload: {
+    workspaceId: string;
+    projectId: string | null;
+    contentItemId: string;
+    brief: string;
+    platforms: Platform[];
+    resultText: string;
+  }
+) {
+  for (const platform of payload.platforms) {
+    const candidates = [
+      {
+        workspace_id: payload.workspaceId,
+        project_id: payload.projectId,
+        content_output_id: payload.contentItemId,
+        target_platform: platform,
+        status: 'queued',
+        payload: {
+          brief: payload.brief,
+          platform,
+          text: payload.resultText
+        }
+      },
+      {
+        workspace_id: payload.workspaceId,
+        project_id: payload.projectId,
+        content_output_id: payload.contentItemId,
+        target_platform: platform,
+        status: 'draft',
+        queued_at: new Date().toISOString(),
+        payload: {
+          brief: payload.brief,
+          platform,
+          text: payload.resultText
+        }
+      }
+    ];
+
+    for (const candidate of candidates) {
+      const { error } = await (serviceSupabase.from('publish_jobs') as any).insert(candidate);
+      if (!error) {
+        break;
+      }
+    }
+  }
 }
 
 export async function POST(request: Request) {
@@ -104,7 +220,7 @@ export async function POST(request: Request) {
 
   const { data: run } = await supabase
     .from('agent_runs')
-    .select('id, workspace_id, user_id, agent_type_id, project_id, metadata')
+    .select('id, workspace_id, user_id, agent_type_id, project_id, metadata, status, result_text, error_message')
     .eq('id', runId)
     .eq('workspace_id', membership.workspace_id)
     .eq('user_id', user.id)
@@ -113,6 +229,14 @@ export async function POST(request: Request) {
 
   if (!run) {
     return NextResponse.json({ ok: false, error: 'run_not_found' }, { status: 404 });
+  }
+
+  if (run.status === 'completed' && run.result_text) {
+    return NextResponse.json({ ok: true, runId, result: run.result_text, fromCache: true });
+  }
+
+  if (run.status === 'failed' && run.error_message) {
+    return NextResponse.json({ ok: false, error: run.error_message }, { status: 409 });
   }
 
   const { data: agentType } = await supabase
@@ -209,19 +333,9 @@ export async function POST(request: Request) {
         requestMetadata && typeof requestMetadata === 'object' && 'editor_state' in requestMetadata
           ? (requestMetadata.editor_state as Record<string, unknown>)
           : null;
-      const preferredPlatform = requestEditorState && typeof requestEditorState.platform === 'string'
-        ? requestEditorState.platform.toLowerCase()
-        : null;
-      const platforms = preferredPlatform ? normalizePlatforms([preferredPlatform]) : ['youtube', 'instagram', 'tiktok'];
-
-      const variants = {
-        brief: userInput,
-        platforms,
-        youtube_title: resultText.slice(0, 90),
-        youtube_description: resultText,
-        instagram_caption: resultText.slice(0, 2200),
-        tiktok_caption: resultText.slice(0, 300)
-      };
+      const preferredPlatform =
+        requestEditorState && typeof requestEditorState.platform === 'string' ? requestEditorState.platform.toLowerCase() : null;
+      const platforms: Platform[] = preferredPlatform ? normalizePlatforms([preferredPlatform]) : ['youtube', 'instagram', 'tiktok'];
 
       const { data: savedOutput } = await serviceSupabase
         .from('saved_outputs')
@@ -236,37 +350,26 @@ export async function POST(request: Request) {
         .select('id')
         .maybeSingle();
 
-      const { data: contentItem } = await serviceSupabase
-        .from('content_items')
-        .insert({
-          workspace_id: membership.workspace_id,
-          user_id: user.id,
-          project_id: run.project_id ?? projectId,
-          run_id: runId,
-          saved_output_id: savedOutput?.id ?? null,
-          status: 'draft',
-          ...variants
-        })
-        .select('id')
-        .maybeSingle();
+      const contentItemId = await insertContentItemWithFallbacks(serviceSupabase, {
+        workspaceId: membership.workspace_id,
+        userId: user.id,
+        runId,
+        projectId: run.project_id ?? projectId,
+        savedOutputId: savedOutput?.id ?? null,
+        brief: userInput,
+        platforms,
+        resultText
+      });
 
-      if (contentItem?.id) {
-        await Promise.all(
-          platforms.map((platform) =>
-            serviceSupabase.from('publish_jobs').insert({
-              workspace_id: membership.workspace_id,
-              project_id: run.project_id ?? projectId,
-              content_output_id: contentItem.id,
-              target_platform: platform,
-              status: 'queued',
-              payload: {
-                brief: userInput,
-                platform,
-                variants
-              }
-            })
-          )
-        );
+      if (contentItemId) {
+        await insertPublishJobsWithFallbacks(serviceSupabase, {
+          workspaceId: membership.workspace_id,
+          projectId: run.project_id ?? projectId,
+          contentItemId,
+          brief: userInput,
+          platforms,
+          resultText
+        });
       }
     }
 

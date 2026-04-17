@@ -12,6 +12,19 @@ function buildInternalUrl(pathname: string, headerList: Headers): string {
   return `${protocol}://${host}${pathname}`;
 }
 
+function parseRunMetadata(source: unknown): { editorState: Record<string, unknown>; freeNotes: string; derivedPrompt: string } {
+  if (!source || typeof source !== 'object') {
+    return { editorState: {}, freeNotes: '', derivedPrompt: '' };
+  }
+
+  const metadata = source as Record<string, unknown>;
+  return {
+    editorState: metadata.editor_state && typeof metadata.editor_state === 'object' ? (metadata.editor_state as Record<string, unknown>) : {},
+    freeNotes: typeof metadata.free_notes === 'string' ? metadata.free_notes : '',
+    derivedPrompt: typeof metadata.derived_prompt === 'string' ? metadata.derived_prompt : ''
+  };
+}
+
 export async function runAgentAction(agentId: string, formData: FormData) {
   const rawPrompt = String(formData.get('prompt') ?? '').trim();
   const derivedPrompt = String(formData.get('derived_prompt') ?? '').trim();
@@ -94,7 +107,7 @@ export async function runAgentAction(agentId: string, formData: FormData) {
         editor_state: parsedEditorState,
         derived_prompt: derivedPrompt || prompt,
         free_notes: freeNotes,
-        input_mode: 'agent-live-editor-v1'
+        input_mode: 'agent-live-editor-v2'
       },
       status: 'pending'
     })
@@ -183,6 +196,50 @@ export async function runAgentAction(agentId: string, formData: FormData) {
   redirect(`/agents/${agentId}?run_id=${run.id}`);
 }
 
+export async function rerunAgentAction(agentId: string, formData: FormData) {
+  const sourceRunId = String(formData.get('source_run_id') ?? '').trim();
+
+  if (!sourceRunId) {
+    redirect(`/agents/${agentId}?error=Yeniden çalıştırma için kaynak run seçilemedi.`);
+  }
+
+  const serverSupabase = await createSupabaseServerClient();
+  const {
+    data: { user: currentUser }
+  } = await serverSupabase.auth.getUser();
+
+  if (!currentUser) {
+    redirect('/signin');
+  }
+
+  const { workspaceId: currentWorkspaceId, userId: currentUserId } = await getWorkspaceContext();
+
+  const { data: sourceRun } = await serverSupabase
+    .from('agent_runs')
+    .select('id, user_input, metadata, project_id')
+    .eq('id', sourceRunId)
+    .eq('workspace_id', currentWorkspaceId)
+    .eq('user_id', currentUserId)
+    .eq('agent_type_id', agentId)
+    .maybeSingle();
+
+  if (!sourceRun?.user_input) {
+    redirect(`/agents/${agentId}?error=Kaynak run bulunamadı.`);
+  }
+
+  const parsed = parseRunMetadata(sourceRun.metadata);
+  const runFormData = new FormData();
+  runFormData.set('prompt', sourceRun.user_input);
+  runFormData.set('derived_prompt', parsed.derivedPrompt || sourceRun.user_input);
+  runFormData.set('free_notes', parsed.freeNotes);
+  runFormData.set('editor_state', JSON.stringify(parsed.editorState));
+  if (sourceRun.project_id) {
+    runFormData.set('project_id', sourceRun.project_id);
+  }
+
+  await runAgentAction(agentId, runFormData);
+}
+
 export async function saveOutputAction(agentId: string, formData: FormData) {
   const runId = String(formData.get('run_id') ?? '').trim();
   const title = String(formData.get('title') ?? 'Kaydedilen çıktı').trim() || 'Kaydedilen çıktı';
@@ -215,13 +272,36 @@ export async function saveOutputAction(agentId: string, formData: FormData) {
     redirect(`/agents/${agentId}?error=Kaydedilecek sonuç bulunamadı.`);
   }
 
-  await serverSupabase.from('saved_outputs').insert({
-    workspace_id: currentWorkspaceId,
-    user_id: currentUserId,
-    agent_run_id: run.id,
-    title,
-    content: run.result_text
-  });
+  const { data: existingOutput } = await serverSupabase
+    .from('saved_outputs')
+    .select('id')
+    .eq('workspace_id', currentWorkspaceId)
+    .eq('user_id', currentUserId)
+    .eq('agent_run_id', run.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingOutput?.id) {
+    await serverSupabase
+      .from('saved_outputs')
+      .update({
+        title,
+        content: run.result_text,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', existingOutput.id)
+      .eq('workspace_id', currentWorkspaceId)
+      .eq('user_id', currentUserId);
+  } else {
+    await serverSupabase.from('saved_outputs').insert({
+      workspace_id: currentWorkspaceId,
+      user_id: currentUserId,
+      agent_run_id: run.id,
+      title,
+      content: run.result_text
+    });
+  }
 
   revalidatePath('/saved');
   redirect(`/agents/${agentId}?run_id=${runId}`);

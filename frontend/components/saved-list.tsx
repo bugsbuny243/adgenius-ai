@@ -46,10 +46,18 @@ export function SavedList({ items, onDelete }: { items: SavedItem[]; onDelete: (
             </button>
             {item.agent_runs?.[0]?.agent_type_id && item.agent_run_id ? (
               <a
-                href={`/agents/${item.agent_runs[0].agent_type_id}?run_id=${item.agent_run_id}&edit_run_id=${item.agent_run_id}`}
+                href={`/agents/${item.agent_runs[0].agent_type_id}?run_id=${item.agent_run_id}&edit_run_id=${item.agent_run_id}&source=saved`}
                 className="rounded border border-white/20 px-2 py-1"
               >
                 Düzenle / Yeniden çalıştır
+              </a>
+            ) : null}
+            {item.agent_runs?.[0]?.agent_type_id && item.agent_run_id ? (
+              <a
+                href={`/agents/${item.agent_runs[0].agent_type_id}?run_id=${item.agent_run_id}`}
+                className="rounded border border-neon/50 px-2 py-1 text-neon"
+              >
+                Sonuca git
               </a>
             ) : null}
             <button

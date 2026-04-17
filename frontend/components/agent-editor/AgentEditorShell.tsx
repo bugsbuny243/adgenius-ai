@@ -5,6 +5,7 @@ import {
   buildDerivedPrompt,
   buildPreviewBlocks,
   getAgentEditorConfig,
+  getAgentStarterPacks,
   type EditorMetadata,
   type EditorState
 } from '@/lib/agent-editor';
@@ -25,6 +26,7 @@ export function AgentEditorShell({ agentSlug, projects, runAction, initialMetada
   const [isPending, startTransition] = useTransition();
 
   const storageKey = `agent-editor-v2:${agentSlug}`;
+  const starterPacks = useMemo(() => getAgentStarterPacks(agentSlug), [agentSlug]);
 
   useEffect(() => {
     if (initialMetadata) return;
@@ -73,6 +75,38 @@ export function AgentEditorShell({ agentSlug, projects, runAction, initialMetada
         <h3 className="text-lg font-semibold">{config.title}</h3>
         <p className="mt-1 text-sm text-white/70">{config.shortHelp}</p>
         <p className="mt-1 text-xs text-white/55">Bu agent ne üretir: {config.summaryDescription}</p>
+        {starterPacks.length ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-white/50">Hızlı başlat:</span>
+            {starterPacks.map((pack) => (
+              <button
+                key={pack.label}
+                type="button"
+                onClick={() => {
+                  setEditorState((current) => ({ ...current, ...pack.state }));
+                  if (pack.freeNotes) {
+                    setFreeNotes(pack.freeNotes);
+                  }
+                }}
+                className="rounded-md border border-white/20 px-2 py-1 text-xs text-white/80 hover:border-neon"
+                title={pack.description}
+              >
+                {pack.label}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => {
+                setEditorState({});
+                setFreeNotes('');
+                window.localStorage.removeItem(storageKey);
+              }}
+              className="rounded-md border border-white/20 px-2 py-1 text-xs text-white/70 hover:border-red-300/70"
+            >
+              Temizle
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
