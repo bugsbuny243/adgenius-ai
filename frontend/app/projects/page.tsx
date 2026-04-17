@@ -8,12 +8,30 @@ export const dynamic = 'force-dynamic';
 export default async function ProjectsPage() {
   const { supabase, workspace, userId } = await getAppContextOrRedirect();
 
-  const { data: projects, error } = await supabase
-    .from('projects')
-    .select('id, name, description, created_at')
-    .eq('workspace_id', workspace.workspaceId)
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+  const [{ data: projects, error }, { data: items }] = await Promise.all([
+    supabase
+      .from('projects')
+      .select('id, name, description, created_at, updated_at')
+      .eq('workspace_id', workspace.workspaceId)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('project_items')
+      .select('project_id, item_type, created_at')
+      .eq('workspace_id', workspace.workspaceId)
+      .eq('user_id', userId)
+  ]);
+
+  const itemStats = (items ?? []).reduce<Record<string, { count: number; types: Set<string>; lastItemAt: string | null }>>((acc, item) => {
+    if (!acc[item.project_id]) {
+      acc[item.project_id] = { count: 0, types: new Set<string>(), lastItemAt: null };
+    }
+
+    acc[item.project_id].count += 1;
+    acc[item.project_id].types.add(item.item_type);
+    acc[item.project_id].lastItemAt = item.created_at;
+    return acc;
+  }, {});
 
   return (
     <main>
@@ -39,6 +57,13 @@ export default async function ProjectsPage() {
               <Link key={project.id} href={`/projects/${project.id}`} className="block rounded-xl border border-white/10 px-4 py-3">
                 <p className="font-medium">{project.name}</p>
                 <p className="text-sm text-white/60">{project.description || 'Açıklama yok.'}</p>
+                <p className="mt-2 text-xs text-white/55">Öğe sayısı: {itemStats[project.id]?.count ?? 0}</p>
+                <p className="text-xs text-white/55">İçerik tipleri: {Array.from(itemStats[project.id]?.types ?? []).join(', ') || 'Henüz yok'}</p>
+                <p className="text-xs text-white/55">Oluşturulma: {new Date(project.created_at).toLocaleString('tr-TR')}</p>
+                <p className="text-xs text-white/55">
+                  Son güncelleme:{' '}
+                  {new Date(itemStats[project.id]?.lastItemAt ?? project.updated_at ?? project.created_at).toLocaleString('tr-TR')}
+                </p>
               </Link>
             ))}
           </div>

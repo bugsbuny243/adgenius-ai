@@ -17,6 +17,8 @@ export async function runAgentAction(agentId: string, formData: FormData) {
   const derivedPrompt = String(formData.get('derived_prompt') ?? '').trim();
   const freeNotes = String(formData.get('free_notes') ?? '').trim();
   const editorStateRaw = String(formData.get('editor_state') ?? '').trim();
+  const projectIdRaw = String(formData.get('project_id') ?? '').trim();
+  const projectId = projectIdRaw || null;
 
   const prompt = derivedPrompt || rawPrompt;
 
@@ -44,15 +46,28 @@ export async function runAgentAction(agentId: string, formData: FormData) {
 
   const { workspaceId: currentWorkspaceId, userId: currentUserId } = await getWorkspaceContext();
 
-  const { data: agent } = await serverSupabase
-    .from('agent_types')
-    .select('id')
-    .eq('id', agentId)
-    .eq('is_active', true)
-    .maybeSingle();
+  const [agentRes, projectRes] = await Promise.all([
+    serverSupabase.from('agent_types').select('id').eq('id', agentId).eq('is_active', true).maybeSingle(),
+    projectId
+      ? serverSupabase
+          .from('projects')
+          .select('id')
+          .eq('id', projectId)
+          .eq('workspace_id', currentWorkspaceId)
+          .eq('user_id', currentUserId)
+          .maybeSingle()
+      : Promise.resolve({ data: null })
+  ]);
+
+  const agent = agentRes.data;
+  const project = projectRes.data;
 
   if (!agent) {
     redirect(`/agents/${agentId}?error=Agent bulunamadı.`);
+  }
+
+  if (projectId && !project) {
+    redirect(`/agents/${agentId}?error=Seçilen proje doğrulanamadı.`);
   }
 
   let parsedEditorState: Record<string, unknown> = {};
@@ -73,6 +88,7 @@ export async function runAgentAction(agentId: string, formData: FormData) {
       workspace_id: currentWorkspaceId,
       user_id: currentUserId,
       agent_type_id: agentId,
+      project_id: projectId,
       user_input: prompt,
       metadata: {
         editor_state: parsedEditorState,
@@ -101,6 +117,7 @@ export async function runAgentAction(agentId: string, formData: FormData) {
         runId: run.id,
         agentTypeId: agentId,
         userInput: prompt,
+        projectId,
         metadata: {
           editor_state: parsedEditorState,
           derived_prompt: derivedPrompt || prompt,
@@ -119,6 +136,7 @@ export async function runAgentAction(agentId: string, formData: FormData) {
         .update({
           status: 'failed',
           error_message: message,
+          completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
         .eq('id', run.id)
@@ -136,6 +154,7 @@ export async function runAgentAction(agentId: string, formData: FormData) {
       .update({
         status: 'failed',
         error_message: message,
+        completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
       .eq('id', run.id)

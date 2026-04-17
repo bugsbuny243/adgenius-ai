@@ -7,6 +7,8 @@ type SavedItem = {
   title: string | null;
   content: string;
   created_at: string;
+  agent_run_id: string | null;
+  agent_runs: Array<{ id: string; agent_type_id: string }> | null;
 };
 
 export function SavedList({ items, onDelete }: { items: SavedItem[]; onDelete: (id: string) => Promise<void> }) {
@@ -42,6 +44,14 @@ export function SavedList({ items, onDelete }: { items: SavedItem[]; onDelete: (
             <button onClick={() => setActive(item)} className="rounded border border-white/20 px-2 py-1">
               Detay
             </button>
+            {item.agent_runs?.[0]?.agent_type_id && item.agent_run_id ? (
+              <a
+                href={`/agents/${item.agent_runs[0].agent_type_id}?run_id=${item.agent_run_id}&edit_run_id=${item.agent_run_id}`}
+                className="rounded border border-white/20 px-2 py-1"
+              >
+                Düzenle / Yeniden çalıştır
+              </a>
+            ) : null}
             <button
               onClick={() => {
                 void onDelete(item.id);

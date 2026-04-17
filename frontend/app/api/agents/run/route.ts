@@ -7,6 +7,7 @@ type RunRequestBody = {
   runId?: string;
   agentTypeId?: string;
   userInput?: string;
+  projectId?: string | null;
   metadata?: Record<string, unknown>;
 };
 
@@ -43,6 +44,7 @@ export async function POST(request: Request) {
   const runId = body?.runId?.trim();
   const agentTypeId = body?.agentTypeId?.trim();
   const userInput = body?.userInput?.trim();
+  const projectId = body?.projectId?.trim() || null;
   const requestMetadata = body?.metadata ?? null;
 
   if (!runId || !agentTypeId || !userInput) {
@@ -89,7 +91,7 @@ export async function POST(request: Request) {
 
   const { data: run } = await supabase
     .from('agent_runs')
-    .select('id, workspace_id, user_id, agent_type_id, metadata')
+    .select('id, workspace_id, user_id, agent_type_id, project_id, metadata')
     .eq('id', runId)
     .eq('workspace_id', membership.workspace_id)
     .eq('user_id', user.id)
@@ -102,7 +104,7 @@ export async function POST(request: Request) {
 
   const { data: agentType } = await supabase
     .from('agent_types')
-    .select('id, system_prompt')
+    .select('id, slug, system_prompt')
     .eq('id', agentTypeId)
     .eq('is_active', true)
     .maybeSingle();
@@ -119,6 +121,23 @@ export async function POST(request: Request) {
   }
 
   try {
+    await serviceSupabase
+      .from('agent_runs')
+      .update({
+        status: 'processing',
+        error_message: null,
+        updated_at: new Date().toISOString(),
+        metadata: {
+          ...(run.metadata ?? {}),
+          ...(requestMetadata ?? {}),
+          ai_engine: 'AI motoru'
+        }
+      })
+      .eq('id', runId)
+      .eq('user_id', user.id)
+      .eq('workspace_id', membership.workspace_id)
+      .in('status', ['pending', 'processing']);
+
     const client = new GoogleGenAI({ apiKey: modelApiKey });
     const response = await Promise.race([
       client.models.generateContent({
@@ -133,8 +152,18 @@ export async function POST(request: Request) {
       })
     ]);
 
-    const resultText = response.text ?? '';
+    const resultText = (response.text ?? '').trim();
     const usage = response.usageMetadata;
+
+    if (!resultText) {
+      throw new Error('empty_result');
+    }
+
+    const normalizedMetadata = {
+      ...(run.metadata ?? {}),
+      ...(requestMetadata ?? {}),
+      ai_engine: 'AI motoru'
+    };
 
     const { error: updateError } = await serviceSupabase
       .from('agent_runs')
@@ -147,11 +176,7 @@ export async function POST(request: Request) {
         model_name: 'default',
         tokens_input: usage?.promptTokenCount ?? null,
         tokens_output: usage?.candidatesTokenCount ?? null,
-        metadata: {
-          ...(run.metadata ?? {}),
-          ...(requestMetadata ?? {}),
-          ai_engine: 'Varsayılan AI motoru'
-        }
+        metadata: normalizedMetadata
       })
       .eq('id', runId)
       .eq('user_id', user.id)
@@ -159,6 +184,55 @@ export async function POST(request: Request) {
 
     if (updateError) {
       throw new Error(`run_update_failed:${updateError.message}`);
+    }
+
+    if (agentType.slug === 'sosyal') {
+      const variants = {
+        brief: userInput,
+        platforms: ['youtube', 'instagram', 'tiktok'],
+        youtube_title: resultText.slice(0, 90),
+        youtube_description: resultText,
+        instagram_caption: resultText.slice(0, 2200),
+        tiktok_caption: resultText.slice(0, 300)
+      };
+
+      const { data: savedOutput } = await serviceSupabase
+        .from('saved_outputs')
+        .insert({
+          workspace_id: membership.workspace_id,
+          user_id: user.id,
+          project_id: run.project_id ?? projectId,
+          agent_run_id: runId,
+          title: 'Sosyal medya çıktısı',
+          content: resultText
+        })
+        .select('id')
+        .maybeSingle();
+
+      const { data: contentItem } = await serviceSupabase
+        .from('content_items')
+        .insert({
+          workspace_id: membership.workspace_id,
+          user_id: user.id,
+          project_id: run.project_id ?? projectId,
+          run_id: runId,
+          saved_output_id: savedOutput?.id ?? null,
+          status: 'draft',
+          ...variants
+        })
+        .select('id')
+        .maybeSingle();
+
+      if (contentItem?.id) {
+        await serviceSupabase.from('publish_jobs').insert({
+          workspace_id: membership.workspace_id,
+          project_id: run.project_id ?? projectId,
+          content_output_id: contentItem.id,
+          target_platform: 'instagram',
+          status: 'queued',
+          payload: variants
+        });
+      }
     }
 
     return NextResponse.json({ ok: true, runId, result: resultText });
@@ -170,11 +244,12 @@ export async function POST(request: Request) {
       .update({
         status: 'failed',
         error_message: message,
+        completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         metadata: {
           ...(run.metadata ?? {}),
           ...(requestMetadata ?? {}),
-          ai_engine: 'Varsayılan AI motoru'
+          ai_engine: 'AI motoru'
         }
       })
       .eq('id', runId)

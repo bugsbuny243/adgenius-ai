@@ -27,6 +27,7 @@ export async function createContentJobAction(formData: FormData) {
 
   const { supabase, userId, workspace } = await getAppContextOrRedirect();
   const variants = buildVariants(brief, selectedPlatforms);
+  const queuedAt = new Date().toISOString();
 
   const { data: run, error: runError } = await supabase
     .from('agent_runs')
@@ -35,7 +36,7 @@ export async function createContentJobAction(formData: FormData) {
       project_id: projectId,
       user_id: userId,
       status: 'completed',
-      model_name: 'koschei-core',
+      model_name: 'default',
       user_input: brief,
       result_text: JSON.stringify(variants, null, 2),
       completed_at: new Date().toISOString()
@@ -89,14 +90,23 @@ export async function createContentJobAction(formData: FormData) {
     throw new Error(`İçerik kaydı oluşturulamadı: ${contentItemError?.message ?? 'bilinmeyen hata'}`);
   }
 
-  await supabase.from('publish_jobs').insert({
-    workspace_id: workspace.workspaceId,
-    project_id: projectId,
-    content_output_id: contentItem.id,
-    target_platform: selectedPlatforms[0],
-    status: 'draft',
-    payload: variants
-  });
+  await Promise.all(
+    selectedPlatforms.map((platform) =>
+      supabase.from('publish_jobs').insert({
+        workspace_id: workspace.workspaceId,
+        project_id: projectId,
+        content_output_id: contentItem.id,
+        target_platform: platform,
+        status: 'draft',
+        queued_at: queuedAt,
+        payload: {
+          brief,
+          platform,
+          variants
+        }
+      })
+    )
+  );
 
   revalidatePath('/composer');
   revalidatePath('/dashboard');
@@ -108,7 +118,7 @@ export async function updatePublishStatusAction(formData: FormData) {
   const jobId = String(formData.get('job_id') ?? '').trim();
   const status = String(formData.get('status') ?? '').trim();
 
-  if (!jobId || !['draft', 'queued', 'processing', 'published', 'failed', 'cancelled'].includes(status)) {
+  if (!jobId || !['draft', 'queued', 'failed'].includes(status)) {
     return;
   }
 
@@ -117,9 +127,7 @@ export async function updatePublishStatusAction(formData: FormData) {
   await supabase
     .from('publish_jobs')
     .update({
-      status,
-      last_attempt_at: status === 'processing' ? new Date().toISOString() : null,
-      published_at: status === 'published' ? new Date().toISOString() : null
+      status
     })
     .eq('workspace_id', workspace.workspaceId)
     .eq('id', jobId);
