@@ -3,7 +3,7 @@
 Workspace tabanlı bir **AI command center foundation**:
 - Next.js App Router + TypeScript + Tailwind
 - Supabase Auth + Postgres + RLS
-- Gemini-only orchestration
+- 
 
 ## Tech stack
 
@@ -39,7 +39,7 @@ Railway (Production) için aşağıdaki değişkenleri **service level** olarak 
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- `GEMINI_API_KEY`
+- 
 
 > Not: `NEXT_PUBLIC_*` değişkenleri build-time’da bundle’a gömülür. Bu değerler değişirse **rebuild + redeploy** zorunludur.
 
