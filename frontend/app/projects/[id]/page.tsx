@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { Nav } from '@/components/nav';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getWorkspaceContext } from '@/lib/workspace';
-import { addProjectKnowledgeAction, createProjectItemAction } from './actions';
+import { createProjectItemAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -21,7 +21,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const { workspaceId, userId } = await getWorkspaceContext();
 
   const createItem = createProjectItemAction.bind(null, id);
-  const addProjectKnowledge = addProjectKnowledgeAction.bind(null, id);
 
   const { data: project } = await supabase
     .from('projects')
@@ -35,7 +34,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     notFound();
   }
 
-  const [{ data: items }, { data: outputs }, { data: knowledgeEntries }] = await Promise.all([
+  const [{ data: items }, { data: outputs }] = await Promise.all([
     supabase
       .from('project_items')
       .select('id, item_type, title, payload, source_output_id, saved_output_id, created_at')
@@ -44,16 +43,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       .order('created_at', { ascending: false }),
     supabase
       .from('saved_outputs')
-      .select('id, title, content, created_at, agent_runs(status)')
+      .select('id, title, content, created_at')
       .eq('project_id', project.id)
       .eq('workspace_id', workspaceId)
-      .order('created_at', { ascending: false })
-      .limit(10),
-    supabase
-      .from('project_knowledge_entries')
-      .select('id, title, content, entry_type, created_at')
-      .eq('workspace_id', workspaceId)
-      .eq('project_id', project.id)
       .order('created_at', { ascending: false })
       .limit(10)
   ]);
@@ -68,7 +60,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             <p className="text-sm text-white/70">{project.description || 'No description yet.'}</p>
           </div>
           <Link href="/projects" className="rounded-lg border border-white/20 px-3 py-2 text-sm">
-            Back to Projects
+            Projelere dön
           </Link>
         </div>
 
@@ -76,16 +68,16 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <input
             name="title"
             required
-            placeholder="Item title"
+            placeholder="Öğe başlığı"
             className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 outline-none focus:border-neon"
           />
           <input
             name="details"
-            placeholder="Item details (optional)"
+            placeholder="Öğe detayları (opsiyonel)"
             className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 outline-none focus:border-neon"
           />
           <button type="submit" className="rounded-lg bg-neon px-4 py-2 font-semibold text-ink">
-            Add Item
+            Öğe Ekle
           </button>
         </form>
       </section>
@@ -103,20 +95,20 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                       ? String(item.payload.details ?? '')
                       : '') || 'No details.'}
                   </p>
-                  <p className="text-xs text-white/50">Type: {item.item_type}</p>
+                  <p className="text-xs text-white/50">Tip: {item.item_type}</p>
                   {item.source_output_id || item.saved_output_id ? (
-                    <p className="text-xs text-white/50">From output: {item.source_output_id ?? item.saved_output_id}</p>
+                    <p className="text-xs text-white/50">Kaynak çıktı: {item.source_output_id ?? item.saved_output_id}</p>
                   ) : null}
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-white/70">No project items yet.</p>
+            <p className="text-sm text-white/70">Henüz proje öğesi yok.</p>
           )}
         </article>
 
         <article className="panel">
-          <h3 className="mb-3 text-lg font-semibold">Recent Saved Outputs</h3>
+          <h3 className="mb-3 text-lg font-semibold">Son Kaydedilen Çıktılar</h3>
           {outputs && outputs.length > 0 ? (
             <div className="space-y-2">
               {outputs.map((output) => (
@@ -127,54 +119,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               ))}
             </div>
           ) : (
-            <p className="text-sm text-white/70">No saved outputs linked to this project.</p>
-          )}
-        </article>
-      </section>
-
-      <section className="mt-4 grid gap-4 lg:grid-cols-2">
-        <article className="panel lg:col-span-2">
-          <h3 className="mb-3 text-lg font-semibold">Add Project Knowledge</h3>
-          <form action={addProjectKnowledge} className="space-y-2">
-            <input
-              name="title"
-              required
-              placeholder="Knowledge title"
-              className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-neon"
-            />
-            <textarea
-              name="content"
-              required
-              rows={4}
-              placeholder="Knowledge entry content"
-              className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-neon"
-            />
-            <input
-              name="entry_type"
-              defaultValue="note"
-              placeholder="Type (note, strategy, constraint...)"
-              className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-neon"
-            />
-            <button type="submit" className="rounded-lg border border-white/20 px-3 py-2 text-sm hover:border-neon">
-              Save knowledge
-            </button>
-          </form>
-        </article>
-
-        <article className="panel lg:col-span-2">
-          <h3 className="mb-3 text-lg font-semibold">Project Knowledge</h3>
-          {knowledgeEntries && knowledgeEntries.length > 0 ? (
-            <div className="space-y-2 text-sm">
-              {knowledgeEntries.map((entry) => (
-                <div key={entry.id} className="rounded-lg border border-white/10 px-3 py-2">
-                  <p className="font-medium">{entry.title}</p>
-                  <p className="text-white/70">{entry.content}</p>
-                  <p className="text-xs text-white/60">{entry.entry_type}</p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-white/70">No project knowledge yet.</p>
+            <p className="text-sm text-white/70">Bu projeye bağlı kayıtlı çıktı bulunmuyor.</p>
           )}
         </article>
       </section>

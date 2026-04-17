@@ -5,8 +5,8 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 function toDisplayModel(modelName: string | null): string {
-  if (!modelName) return 'Varsayılan model';
-  return 'Varsayılan model';
+  if (!modelName) return 'AI motoru';
+  return 'AI motoru';
 }
 
 export default async function DashboardPage() {
@@ -26,7 +26,7 @@ export default async function DashboardPage() {
       supabase.from('saved_outputs').select('id', { count: 'exact', head: true }).eq('workspace_id', workspace.workspaceId),
       supabase
         .from('agent_runs')
-        .select('id, status, model_name, created_at')
+        .select('id, status, model_name, error_message, created_at, completed_at')
         .eq('workspace_id', workspace.workspaceId)
         .order('created_at', { ascending: false })
         .limit(5),
@@ -73,6 +73,8 @@ export default async function DashboardPage() {
                     <p>Durum: {run.status}</p>
                     <p className="text-white/70">Çalışma motoru: {toDisplayModel(run.model_name)}</p>
                     <p className="text-white/70">{new Date(run.created_at).toLocaleString('tr-TR')}</p>
+                    {run.completed_at ? <p className="text-white/60">Tamamlanma: {new Date(run.completed_at).toLocaleString('tr-TR')}</p> : null}
+                    {run.status === 'failed' && run.error_message ? <p className="text-red-200">Hata: {run.error_message}</p> : null}
                   </div>
                 ))}
               </div>

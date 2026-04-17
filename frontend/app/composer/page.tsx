@@ -17,9 +17,9 @@ export default async function ComposerPage() {
       .limit(10),
     supabase
       .from('publish_jobs')
-      .select('id, status, target_platform, content_output_id, created_at')
+      .select('id, status, target_platform, content_output_id, queued_at')
       .eq('workspace_id', workspace.workspaceId)
-      .order('created_at', { ascending: false })
+      .order('queued_at', { ascending: false })
       .limit(10)
   ]);
 
@@ -94,13 +94,13 @@ export default async function ComposerPage() {
               {jobs.map((job) => (
                 <form key={job.id} action={updatePublishStatusAction} className="rounded-lg border border-white/10 p-3">
                   <input type="hidden" name="job_id" value={job.id} />
-                  <p>{job.target_platform} • {new Date(job.created_at).toLocaleString('tr-TR')}</p>
+                  <p>{job.target_platform} • {job.queued_at ? new Date(job.queued_at).toLocaleString('tr-TR') : 'Tarih yok'}</p>
                   <p className="text-xs text-white/60">Content item: {job.content_output_id ?? '-'} </p>
                   <p className="mb-2 text-white/70">Mevcut durum: {job.status}</p>
                   <div className="flex gap-2">
                     <button name="status" value="draft" className="rounded-md border border-white/20 px-2 py-1">Taslak</button>
                     <button name="status" value="queued" className="rounded-md border border-white/20 px-2 py-1">Sıraya Al</button>
-                    <button name="status" value="processing" className="rounded-md border border-white/20 px-2 py-1">İşleniyor</button>
+                    <button name="status" value="failed" className="rounded-md border border-white/20 px-2 py-1">Başarısız</button>
                   </div>
                 </form>
               ))}

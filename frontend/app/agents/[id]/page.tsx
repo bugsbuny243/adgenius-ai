@@ -11,6 +11,8 @@ import { attachSavedOutputToProjectAction, createProjectItemFromOutputAction, ru
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+const STALE_PENDING_MS = 2 * 60 * 1000;
+
 type AgentDetailPageProps = {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ run_id?: string; edit_run_id?: string; error?: string }>;
@@ -50,7 +52,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
 
   const runQuery = supabase
     .from('agent_runs')
-    .select('id, user_input, result_text, status, error_message, created_at, updated_at, completed_at, metadata')
+    .select('id, user_input, result_text, status, error_message, created_at, updated_at, completed_at, metadata, model_name')
     .eq('workspace_id', workspaceId)
     .eq('user_id', userId)
     .eq('agent_type_id', id)
@@ -70,6 +72,10 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
   const config = getAgentEditorConfig(agent.slug);
   const formSummary = activeRun ? buildFormSummary(config, parseEditorMetadata(activeRun.metadata).editorState) : [];
   const activeMetadata = activeRun ? parseEditorMetadata(activeRun.metadata) : null;
+  const isPending = activeRun?.status === 'pending' || activeRun?.status === 'processing';
+  const isStalePending = activeRun
+    ? isPending && Date.now() - new Date(activeRun.created_at).getTime() > STALE_PENDING_MS
+    : false;
 
   const { data: savedOutputs } = await supabase
     .from('saved_outputs')
@@ -116,6 +122,18 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
               Oluşturulma: {new Date(activeRun.created_at).toLocaleString('tr-TR')}
               {activeRun.completed_at ? ` • Tamamlanma: ${new Date(activeRun.completed_at).toLocaleString('tr-TR')}` : ''}
             </p>
+            <p className="text-xs text-white/50">Çalışma motoru: {activeRun.metadata && typeof activeRun.metadata === 'object' && 'ai_engine' in activeRun.metadata ? String(activeRun.metadata.ai_engine ?? 'AI motoru') : 'AI motoru'}</p>
+
+            {isPending ? (
+              <p className="rounded-lg border border-amber-300/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                Çalıştırma devam ediyor. Sonuç tamamlandığında bu alan otomatik güncellenir.
+              </p>
+            ) : null}
+            {isStalePending ? (
+              <p className="rounded-lg border border-red-300/35 bg-red-500/10 px-3 py-2 text-xs text-red-100">
+                Bu çalıştırma beklenenden uzun sürdü. "Bu sonucu düzenle" ile aynı girdi üzerinden yeniden çalıştırabilirsiniz.
+              </p>
+            ) : null}
 
             <div className="rounded-lg border border-white/10 bg-black/20 p-3">
               <p className="mb-2 text-xs uppercase tracking-wide text-white/50">Form Özeti</p>
@@ -141,7 +159,9 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
             <div className="rounded-lg border border-white/10 bg-black/20 p-3">
               <p className="mb-2 text-xs uppercase tracking-wide text-white/50">Üretilen Çalışma</p>
               <p className="text-sm text-white/80 whitespace-pre-wrap">
-                {activeRun.result_text || activeRun.error_message || 'Sonuç hazırlanıyor. Sayfa otomatik güncellenecek...'}
+                {activeRun.result_text ||
+                  (activeRun.status === 'failed' ? activeRun.error_message || 'Çalıştırma hata ile sonlandı.' : null) ||
+                  'Sonuç hazırlanıyor. Sayfa otomatik güncellenecek...'}
               </p>
             </div>
 
@@ -227,6 +247,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
             <Link key={run.id} href={`/agents/${id}?run_id=${run.id}`} className="block rounded-lg border border-white/10 p-3 text-sm hover:border-neon">
               <p className="text-white/70">{new Date(run.created_at).toLocaleString('tr-TR')}</p>
               <p className="text-xs text-white/50">Durum: {run.status}</p>
+              <p className="text-xs text-white/50">Motor: {run.metadata && typeof run.metadata === 'object' && 'ai_engine' in run.metadata ? String(run.metadata.ai_engine ?? 'AI motoru') : 'AI motoru'}</p>
               <p className="mt-1 text-white/90">{run.user_input.slice(0, 100) || 'İstem yok'}</p>
             </Link>
           ))}
