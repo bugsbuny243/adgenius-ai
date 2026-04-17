@@ -57,7 +57,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-semibold">{project.name}</h2>
-            <p className="text-sm text-white/70">{project.description || 'No description yet.'}</p>
+            <p className="text-sm text-white/70">{project.description || 'Açıklama henüz eklenmedi.'}</p>
           </div>
           <Link href="/projects" className="rounded-lg border border-white/20 px-3 py-2 text-sm">
             Projelere dön
@@ -84,7 +84,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
       <section className="grid gap-4 lg:grid-cols-2">
         <article className="panel">
-          <h3 className="mb-3 text-lg font-semibold">Project Items</h3>
+          <h3 className="mb-3 text-lg font-semibold">Proje Öğeleri</h3>
           {items && items.length > 0 ? (
             <div className="space-y-2">
               {items.map((item) => (
@@ -93,12 +93,13 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                   <p className="text-sm text-white/70">
                     {(item.payload && typeof item.payload === 'object' && 'details' in item.payload
                       ? String(item.payload.details ?? '')
-                      : '') || 'No details.'}
+                      : '') || 'Detay girilmedi.'}
                   </p>
                   <p className="text-xs text-white/50">Tip: {item.item_type}</p>
                   {item.source_output_id || item.saved_output_id ? (
                     <p className="text-xs text-white/50">Kaynak çıktı: {item.source_output_id ?? item.saved_output_id}</p>
                   ) : null}
+                  <p className="text-xs text-white/50">Eklenme: {new Date(item.created_at).toLocaleString('tr-TR')}</p>
                 </div>
               ))}
             </div>
@@ -113,8 +114,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             <div className="space-y-2">
               {outputs.map((output) => (
                 <div key={output.id} className="rounded-lg border border-white/10 px-3 py-2">
-                  <p className="font-medium">{output.title || 'Saved output'}</p>
+                  <p className="font-medium">{output.title || 'Kaydedilen çıktı'}</p>
                   <p className="text-sm text-white/70 line-clamp-3">{output.content}</p>
+                  <p className="text-xs text-white/50">{new Date(output.created_at).toLocaleString('tr-TR')}</p>
                 </div>
               ))}
             </div>

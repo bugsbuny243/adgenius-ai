@@ -13,6 +13,14 @@ export const revalidate = 0;
 
 const STALE_PENDING_MS = 2 * 60 * 1000;
 
+function getStatusLabel(status: string): string {
+  if (status === 'completed') return 'Tamamlandı';
+  if (status === 'failed') return 'Hata';
+  if (status === 'processing') return 'İşleniyor';
+  if (status === 'pending') return 'Sırada';
+  return status;
+}
+
 type AgentDetailPageProps = {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ run_id?: string; edit_run_id?: string; error?: string }>;
@@ -116,7 +124,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
           <div className="space-y-3">
             <RunStatusPoller status={activeRun.status} />
             <p className="text-xs text-white/60">
-              Durum: <span className="font-medium text-white/85">{activeRun.status}</span>
+              Durum: <span className="font-medium text-white/85">{getStatusLabel(activeRun.status)}</span>
             </p>
             <p className="text-xs text-white/50">
               Oluşturulma: {new Date(activeRun.created_at).toLocaleString('tr-TR')}
@@ -130,8 +138,13 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
               </p>
             ) : null}
             {isStalePending ? (
+                <p className="rounded-lg border border-red-300/35 bg-red-500/10 px-3 py-2 text-xs text-red-100">
+                  Bu çalıştırma beklenenden uzun sürdü. "Bu sonucu düzenle" ile aynı girdi üzerinden yeniden çalıştırabilirsiniz.
+                </p>
+              ) : null}
+            {activeRun.status === 'failed' ? (
               <p className="rounded-lg border border-red-300/35 bg-red-500/10 px-3 py-2 text-xs text-red-100">
-                Bu çalıştırma beklenenden uzun sürdü. "Bu sonucu düzenle" ile aynı girdi üzerinden yeniden çalıştırabilirsiniz.
+                {activeRun.error_message || 'Çalıştırma tamamlanamadı. Aynı girdiyi düzenleyip yeniden deneyebilirsiniz.'}
               </p>
             ) : null}
 
@@ -246,7 +259,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
           {recentRuns?.map((run) => (
             <Link key={run.id} href={`/agents/${id}?run_id=${run.id}`} className="block rounded-lg border border-white/10 p-3 text-sm hover:border-neon">
               <p className="text-white/70">{new Date(run.created_at).toLocaleString('tr-TR')}</p>
-              <p className="text-xs text-white/50">Durum: {run.status}</p>
+              <p className="text-xs text-white/50">Durum: {getStatusLabel(run.status)}</p>
               <p className="text-xs text-white/50">Motor: {run.metadata && typeof run.metadata === 'object' && 'ai_engine' in run.metadata ? String(run.metadata.ai_engine ?? 'AI motoru') : 'AI motoru'}</p>
               <p className="mt-1 text-white/90">{run.user_input.slice(0, 100) || 'İstem yok'}</p>
             </Link>
