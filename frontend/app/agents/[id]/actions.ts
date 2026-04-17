@@ -101,9 +101,9 @@ export async function runAgentAction(agentId: string, formData: FormData) {
       workspace_id: currentWorkspaceId,
       user_id: currentUserId,
       agent_type_id: agentId,
-      project_id: projectId,
       user_input: prompt,
       metadata: {
+        project_id: projectId,
         editor_state: parsedEditorState,
         derived_prompt: derivedPrompt || prompt,
         free_notes: freeNotes,

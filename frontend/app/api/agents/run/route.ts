@@ -337,12 +337,18 @@ export async function POST(request: Request) {
         requestEditorState && typeof requestEditorState.platform === 'string' ? requestEditorState.platform.toLowerCase() : null;
       const platforms: Platform[] = preferredPlatform ? normalizePlatforms([preferredPlatform]) : ['youtube', 'instagram', 'tiktok'];
 
+      const runProjectId =
+        run.metadata && typeof run.metadata === 'object' && 'project_id' in run.metadata && typeof run.metadata.project_id === 'string'
+          ? run.metadata.project_id
+          : null;
+      const resolvedProjectId = runProjectId ?? projectId;
+
       const { data: savedOutput } = await serviceSupabase
         .from('saved_outputs')
         .insert({
           workspace_id: membership.workspace_id,
           user_id: user.id,
-          project_id: run.project_id ?? projectId,
+          project_id: resolvedProjectId,
           agent_run_id: runId,
           title: 'Sosyal medya çıktısı',
           content: resultText
