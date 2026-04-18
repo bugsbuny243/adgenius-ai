@@ -2,6 +2,12 @@ import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 import { getServerEnv } from '@/lib/env';
+import {
+  createSocialPublishPayload,
+  normalizeSocialContentDraft,
+  type SocialContentDraft,
+  type SocialPlatform
+} from '@/lib/social-content';
 
 type RunRequestBody = {
   runId?: string;
@@ -11,19 +17,17 @@ type RunRequestBody = {
   metadata?: Record<string, unknown>;
 };
 
-type Platform = 'youtube' | 'instagram' | 'tiktok';
-
 const RUN_TIMEOUT_MS = 40_000;
 const FALLBACK_ENGINE_NAME = 'AI motoru';
 
-function normalizePlatforms(value: unknown): Platform[] {
+function normalizePlatforms(value: unknown): SocialPlatform[] {
   if (!Array.isArray(value)) {
     return ['youtube', 'instagram', 'tiktok'];
   }
 
   const normalized = value
     .map((entry) => String(entry).toLowerCase().trim())
-    .filter((entry): entry is Platform => ['youtube', 'instagram', 'tiktok'].includes(entry));
+    .filter((entry): entry is SocialPlatform => ['youtube', 'instagram', 'tiktok'].includes(entry));
 
   return normalized.length ? Array.from(new Set(normalized)) : ['youtube', 'instagram', 'tiktok'];
 }
@@ -45,9 +49,7 @@ async function insertContentItemWithFallbacks(
     runId: string;
     projectId: string | null;
     savedOutputId: string | null;
-    brief: string;
-    platforms: Platform[];
-    resultText: string;
+    draft: SocialContentDraft;
   }
 ): Promise<string | null> {
   const candidates = [
@@ -58,12 +60,12 @@ async function insertContentItemWithFallbacks(
       run_id: payload.runId,
       saved_output_id: payload.savedOutputId,
       status: 'draft',
-      brief: payload.brief,
-      platforms: payload.platforms,
-      youtube_title: payload.resultText.slice(0, 90),
-      youtube_description: payload.resultText,
-      instagram_caption: payload.resultText.slice(0, 2200),
-      tiktok_caption: payload.resultText.slice(0, 300)
+      brief: payload.draft.brief,
+      platforms: payload.draft.platforms,
+      youtube_title: payload.draft.youtubeTitle,
+      youtube_description: payload.draft.youtubeDescription,
+      instagram_caption: payload.draft.instagramCaption,
+      tiktok_caption: payload.draft.tiktokCaption
     },
     {
       workspace_id: payload.workspaceId,
@@ -71,24 +73,12 @@ async function insertContentItemWithFallbacks(
       project_id: payload.projectId,
       run_id: payload.runId,
       saved_output_id: payload.savedOutputId,
-      brief: payload.brief,
-      platforms: payload.platforms,
-      youtube_title: payload.resultText.slice(0, 90),
-      youtube_description: payload.resultText,
-      instagram_caption: payload.resultText.slice(0, 2200),
-      tiktok_caption: payload.resultText.slice(0, 300)
-    },
-    {
-      workspace_id: payload.workspaceId,
-      user_id: payload.userId,
-      project_id: payload.projectId,
-      source_run_id: payload.runId,
-      source_output_id: payload.savedOutputId,
-      brief: payload.brief,
-      youtube_title: payload.resultText.slice(0, 90),
-      youtube_description: payload.resultText,
-      instagram_caption: payload.resultText.slice(0, 2200),
-      tiktok_caption: payload.resultText.slice(0, 300)
+      brief: payload.draft.brief,
+      platforms: payload.draft.platforms,
+      youtube_title: payload.draft.youtubeTitle,
+      youtube_description: payload.draft.youtubeDescription,
+      instagram_caption: payload.draft.instagramCaption,
+      tiktok_caption: payload.draft.tiktokCaption
     }
   ];
 
@@ -108,12 +98,10 @@ async function insertPublishJobsWithFallbacks(
     workspaceId: string;
     projectId: string | null;
     contentItemId: string;
-    brief: string;
-    platforms: Platform[];
-    resultText: string;
+    draft: SocialContentDraft;
   }
 ) {
-  for (const platform of payload.platforms) {
+  for (const platform of payload.draft.platforms) {
     const candidates = [
       {
         workspace_id: payload.workspaceId,
@@ -121,11 +109,8 @@ async function insertPublishJobsWithFallbacks(
         content_output_id: payload.contentItemId,
         target_platform: platform,
         status: 'queued',
-        payload: {
-          brief: payload.brief,
-          platform,
-          text: payload.resultText
-        }
+        queued_at: new Date().toISOString(),
+        payload: createSocialPublishPayload(payload.draft, platform)
       },
       {
         workspace_id: payload.workspaceId,
@@ -134,11 +119,7 @@ async function insertPublishJobsWithFallbacks(
         target_platform: platform,
         status: 'draft',
         queued_at: new Date().toISOString(),
-        payload: {
-          brief: payload.brief,
-          platform,
-          text: payload.resultText
-        }
+        payload: createSocialPublishPayload(payload.draft, platform)
       }
     ];
 
@@ -349,7 +330,7 @@ export async function POST(request: Request) {
           : null;
       const preferredPlatform =
         requestEditorState && typeof requestEditorState.platform === 'string' ? requestEditorState.platform.toLowerCase() : null;
-      const platforms: Platform[] = preferredPlatform ? normalizePlatforms([preferredPlatform]) : ['youtube', 'instagram', 'tiktok'];
+      const platforms: SocialPlatform[] = preferredPlatform ? normalizePlatforms([preferredPlatform]) : ['youtube', 'instagram', 'tiktok'];
 
       const runProjectId =
         run.metadata && typeof run.metadata === 'object' && 'project_id' in run.metadata && typeof run.metadata.project_id === 'string'
@@ -357,38 +338,99 @@ export async function POST(request: Request) {
           : null;
       const resolvedProjectId = runProjectId ?? projectId;
 
-      const { data: savedOutput } = await serviceSupabase
+      const draft = normalizeSocialContentDraft({
+        sourceBrief: userInput,
+        sourcePlatforms: platforms,
+        rawText: resultText
+      });
+
+      const { data: existingSavedOutput } = await serviceSupabase
         .from('saved_outputs')
-        .insert({
-          workspace_id: membership.workspace_id,
-          user_id: user.id,
-          project_id: resolvedProjectId,
-          agent_run_id: runId,
-          title: 'Sosyal medya çıktısı',
-          content: resultText
-        })
         .select('id')
+        .eq('workspace_id', membership.workspace_id)
+        .eq('user_id', user.id)
+        .eq('agent_run_id', runId)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
-      const contentItemId = await insertContentItemWithFallbacks(serviceSupabase, {
-        workspaceId: membership.workspace_id,
-        userId: user.id,
-        runId,
-        projectId: run.project_id ?? projectId,
-        savedOutputId: savedOutput?.id ?? null,
-        brief: userInput,
-        platforms,
-        resultText
-      });
+      let savedOutputId: string | null = null;
+      if (existingSavedOutput?.id) {
+        savedOutputId = existingSavedOutput.id;
+        await serviceSupabase
+          .from('saved_outputs')
+          .update({
+            project_id: resolvedProjectId,
+            title: 'Sosyal medya çıktısı',
+            content: resultText,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingSavedOutput.id)
+          .eq('workspace_id', membership.workspace_id)
+          .eq('user_id', user.id);
+      } else {
+        const { data: savedOutput } = await serviceSupabase
+          .from('saved_outputs')
+          .insert({
+            workspace_id: membership.workspace_id,
+            user_id: user.id,
+            project_id: resolvedProjectId,
+            agent_run_id: runId,
+            title: 'Sosyal medya çıktısı',
+            content: resultText
+          })
+          .select('id')
+          .maybeSingle();
+        savedOutputId = savedOutput?.id ?? null;
+      }
+
+      const { data: existingContentItem } = await serviceSupabase
+        .from('content_items')
+        .select('id')
+        .eq('workspace_id', membership.workspace_id)
+        .eq('user_id', user.id)
+        .eq('run_id', runId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let contentItemId: string | null = null;
+      if (existingContentItem?.id) {
+        contentItemId = existingContentItem.id;
+        await serviceSupabase
+          .from('content_items')
+          .update({
+            project_id: run.project_id ?? projectId,
+            saved_output_id: savedOutputId,
+            brief: draft.brief,
+            platforms: draft.platforms,
+            youtube_title: draft.youtubeTitle,
+            youtube_description: draft.youtubeDescription,
+            instagram_caption: draft.instagramCaption,
+            tiktok_caption: draft.tiktokCaption,
+            status: 'draft',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingContentItem.id)
+          .eq('workspace_id', membership.workspace_id)
+          .eq('user_id', user.id);
+      } else {
+        contentItemId = await insertContentItemWithFallbacks(serviceSupabase, {
+          workspaceId: membership.workspace_id,
+          userId: user.id,
+          runId,
+          projectId: run.project_id ?? projectId,
+          savedOutputId,
+          draft
+        });
+      }
 
       if (contentItemId) {
         await insertPublishJobsWithFallbacks(serviceSupabase, {
           workspaceId: membership.workspace_id,
           projectId: run.project_id ?? projectId,
           contentItemId,
-          brief: userInput,
-          platforms,
-          resultText
+          draft
         });
       }
     }

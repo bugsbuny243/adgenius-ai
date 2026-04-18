@@ -4,12 +4,14 @@ import { Nav } from '@/components/nav';
 import { AgentEditorShell } from '@/components/agent-editor/AgentEditorShell';
 import { RunStatusPoller } from '@/components/agent-editor/RunStatusPoller';
 import { ResultPanel } from '@/components/agent-editor/ResultPanel';
+import { SocialOutputPanel } from '@/components/agent-editor/SocialOutputPanel';
 import { buildFormSummary, getAgentEditorConfig, parseEditorMetadata } from '@/lib/agent-editor';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getWorkspaceContext } from '@/lib/workspace';
 import {
   attachSavedOutputToProjectAction,
   createProjectItemFromOutputAction,
+  queueSocialPublishAction,
   rerunAgentAction,
   runAgentAction,
   saveOutputAction
@@ -56,6 +58,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
   const rerunAgent = rerunAgentAction.bind(null, id);
   const createProjectItem = createProjectItemFromOutputAction.bind(null, id, runIdParam ?? '');
   const attachOutput = attachSavedOutputToProjectAction.bind(null, id, runIdParam ?? '');
+  const queueSocialPublish = queueSocialPublishAction.bind(null, id, runIdParam ?? '');
 
   const [{ data: agent }, { data: projects }] = await Promise.all([
     supabase.from('agent_types').select('id, slug, name, description, is_active').eq('id', id).maybeSingle(),
@@ -113,6 +116,33 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
     .limit(20);
 
   const activeOutput = activeRun ? (savedOutputs ?? []).find((output) => output.agent_run_id === activeRun.id) : null;
+
+  const activeContentItem = activeRun
+    ? (
+        await supabase
+          .from('content_items')
+          .select(
+            'id, brief, platforms, youtube_title, youtube_description, instagram_caption, tiktok_caption, status, project_id, saved_output_id'
+          )
+          .eq('workspace_id', workspaceId)
+          .eq('user_id', userId)
+          .eq('run_id', activeRun.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      ).data
+    : null;
+
+  const { data: publishJobs } =
+    activeContentItem?.id
+      ? await supabase
+          .from('publish_jobs')
+          .select('id, status, target_platform, queued_at, content_output_id')
+          .eq('workspace_id', workspaceId)
+          .eq('content_output_id', activeContentItem.id)
+          .order('queued_at', { ascending: false })
+          .limit(10)
+      : { data: [] };
 
   return (
     <main>
@@ -189,7 +219,66 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
               <p className="text-sm whitespace-pre-wrap text-white/80">{activeMetadata?.freeNotes || 'Ek not girilmedi.'}</p>
             </div>
 
-            <ResultPanel text={resultText} status={activeRun.status as 'completed' | 'failed' | 'pending' | 'processing'} />
+            {agent.slug === 'sosyal' ? (
+              activeContentItem ? (
+                <div className="space-y-3">
+                  <div className="rounded-lg border border-white/10 bg-black/20 p-3 text-xs text-white/60">
+                    <p>
+                      İçerik kaydı: <span className="text-white/85">{activeContentItem.id}</span>
+                    </p>
+                    <p>
+                      Durum: <span className="text-white/85">{activeContentItem.status ?? 'draft'}</span>
+                    </p>
+                    <p>
+                      Proje bağlantısı:{' '}
+                      <span className="text-white/85">{activeContentItem.project_id ? activeContentItem.project_id : 'Yok'}</span>
+                    </p>
+                  </div>
+                  <SocialOutputPanel
+                    youtubeTitle={activeContentItem.youtube_title}
+                    youtubeDescription={activeContentItem.youtube_description}
+                    instagramCaption={activeContentItem.instagram_caption}
+                    tiktokCaption={activeContentItem.tiktok_caption}
+                  />
+
+                  <form action={queueSocialPublish} className="flex flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-black/20 p-3">
+                    <input type="hidden" name="run_id" value={activeRun.id} />
+                    <input type="hidden" name="content_item_id" value={activeContentItem.id} />
+                    <select name="target_platform" defaultValue="youtube" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm">
+                      <option value="youtube">YouTube</option>
+                      <option value="instagram">Instagram</option>
+                      <option value="tiktok">TikTok</option>
+                    </select>
+                    <button className="rounded-lg border border-white/20 px-3 py-2 text-sm hover:border-neon">Yayın Kuyruğuna Ekle</button>
+                  </form>
+
+                  <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                    <p className="mb-2 text-xs uppercase tracking-wide text-white/50">Yayın Kuyruğu Geçmişi</p>
+                    {publishJobs && publishJobs.length > 0 ? (
+                      <div className="space-y-1 text-sm text-white/80">
+                        {publishJobs.map((job) => (
+                          <p key={job.id}>
+                            {job.target_platform || 'Platform yok'} • {job.status || 'durum yok'} •{' '}
+                            {job.queued_at ? new Date(job.queued_at).toLocaleString('tr-TR') : 'Tarih yok'}
+                          </p>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-white/65">Henüz bu içerik için yayın kuyruğu kaydı bulunmuyor.</p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <ResultPanel text={resultText} status={activeRun.status as 'completed' | 'failed' | 'pending' | 'processing'} />
+                  <p className="rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white/65">
+                    Platform bazlı içerik blokları henüz kayda alınamadı. Ham çıktı aşağıda görüntüleniyor.
+                  </p>
+                </div>
+              )
+            ) : (
+              <ResultPanel text={resultText} status={activeRun.status as 'completed' | 'failed' | 'pending' | 'processing'} />
+            )}
 
             <div className="flex flex-wrap items-center gap-3">
               <Link
