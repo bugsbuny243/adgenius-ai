@@ -74,37 +74,40 @@ export function AgentEditorShell({ agentSlug, projects, runAction, initialMetada
       <div className="rounded-xl border border-white/10 bg-black/20 p-4">
         <h3 className="text-lg font-semibold">{config.title}</h3>
         <p className="mt-1 text-sm text-white/70">{config.shortHelp}</p>
-        <p className="mt-1 text-xs text-white/55">Bu agent ne üretir: {config.summaryDescription}</p>
+        <p className="mt-1 text-xs text-white/55">Bu çalışma sonunda beklenen yapı: {config.summaryDescription}</p>
+
         {starterPacks.length ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-white/50">Hızlı başlat:</span>
-            {starterPacks.map((pack) => (
+          <div className="mt-4 space-y-2">
+            <span className="text-xs text-white/50">Hızlı başlat</span>
+            <div className="flex flex-wrap items-center gap-2">
+              {starterPacks.map((pack) => (
+                <button
+                  key={pack.label}
+                  type="button"
+                  onClick={() => {
+                    setEditorState((current) => ({ ...current, ...pack.state }));
+                    if (pack.freeNotes) {
+                      setFreeNotes(pack.freeNotes);
+                    }
+                  }}
+                  className="rounded-md border border-white/20 px-2 py-1 text-xs text-white/80 hover:border-neon"
+                  title={pack.description}
+                >
+                  {pack.label}
+                </button>
+              ))}
               <button
-                key={pack.label}
                 type="button"
                 onClick={() => {
-                  setEditorState((current) => ({ ...current, ...pack.state }));
-                  if (pack.freeNotes) {
-                    setFreeNotes(pack.freeNotes);
-                  }
+                  setEditorState({});
+                  setFreeNotes('');
+                  window.localStorage.removeItem(storageKey);
                 }}
-                className="rounded-md border border-white/20 px-2 py-1 text-xs text-white/80 hover:border-neon"
-                title={pack.description}
+                className="rounded-md border border-white/20 px-2 py-1 text-xs text-white/70 hover:border-red-300/70"
               >
-                {pack.label}
+                Temizle
               </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => {
-                setEditorState({});
-                setFreeNotes('');
-                window.localStorage.removeItem(storageKey);
-              }}
-              className="rounded-md border border-white/20 px-2 py-1 text-xs text-white/70 hover:border-red-300/70"
-            >
-              Temizle
-            </button>
+            </div>
           </div>
         ) : null}
       </div>
@@ -116,6 +119,7 @@ export function AgentEditorShell({ agentSlug, projects, runAction, initialMetada
           <div className="rounded-xl border border-white/10 bg-black/20 p-4">
             <label className="flex flex-col gap-1 text-sm">
               <span className="text-white/70">Ek notlar</span>
+              <span className="text-xs text-white/50">Bu alan serbesttir. Ek bağlam, örnek ifade veya kaçınılması gereken noktaları yazabilirsiniz.</span>
               <textarea
                 name="free_notes"
                 rows={4}
@@ -131,7 +135,7 @@ export function AgentEditorShell({ agentSlug, projects, runAction, initialMetada
             <select
               name="project_id"
               defaultValue=""
-              className="min-w-64 rounded-lg border border-white/20 bg-black/30 px-3 py-2 outline-none focus:border-neon"
+              className="min-w-0 flex-1 rounded-lg border border-white/20 bg-black/30 px-3 py-2 outline-none focus:border-neon md:min-w-64 md:flex-none"
             >
               <option value="">Proje seçimi (opsiyonel)</option>
               {projects.map((project) => (
@@ -146,7 +150,12 @@ export function AgentEditorShell({ agentSlug, projects, runAction, initialMetada
           </div>
         </div>
 
-        <LivePreviewPanel title="Canlı Önizleme" helpText="Alanları doldurdukça çalıştırma özeti burada güncellenir." blocks={previewBlocks} derivedPrompt={derivedPrompt} />
+        <LivePreviewPanel
+          title="Canlı Önizleme"
+          helpText="Bu panel, sadece mevcut form girdilerinden oluşturulan çalışma önizlemesini gösterir."
+          blocks={previewBlocks}
+          derivedPrompt={derivedPrompt}
+        />
       </div>
 
       <input type="hidden" name="prompt" value={derivedPrompt} />
