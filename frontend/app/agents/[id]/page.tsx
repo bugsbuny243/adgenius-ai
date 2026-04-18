@@ -20,6 +20,11 @@ export const revalidate = 0;
 
 const STALE_PENDING_MS = 2 * 60 * 1000;
 
+function toDisplayEngineLabel(engine: unknown): string {
+  if (!engine) return 'Varsayılan AI motoru';
+  return 'Varsayılan AI motoru';
+}
+
 function getStatusLabel(status: string): string {
   if (status === 'completed') return 'Tamamlandı';
   if (status === 'failed') return 'Hata';
@@ -134,6 +139,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
 
       <section className="panel mb-4">
         <h3 className="mb-3 text-lg font-semibold">Sonuç</h3>
+        <p className="mb-3 text-sm text-white/65">Form özeti, ek notlar ve üretilen çıktı ayrı bloklarda gösterilir.</p>
         {activeRun ? (
           <div className="space-y-3">
             <RunStatusPoller runId={activeRun.id} status={activeRun.status} />
@@ -144,7 +150,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
               Oluşturulma: {new Date(activeRun.created_at).toLocaleString('tr-TR')}
               {activeRun.completed_at ? ` • Tamamlanma: ${new Date(activeRun.completed_at).toLocaleString('tr-TR')}` : ''}
             </p>
-            <p className="text-xs text-white/50">Çalışma motoru: {activeRun.metadata && typeof activeRun.metadata === 'object' && 'ai_engine' in activeRun.metadata ? String(activeRun.metadata.ai_engine ?? 'AI motoru') : 'AI motoru'}</p>
+            <p className="text-xs text-white/50">Çalışma motoru: {toDisplayEngineLabel(activeRun.metadata && typeof activeRun.metadata === 'object' && 'ai_engine' in activeRun.metadata ? activeRun.metadata.ai_engine : null)}</p>
 
             {isPending ? (
               <p className="rounded-lg border border-amber-300/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
@@ -162,7 +168,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
               </p>
             ) : null}
 
-            <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+            <div className="rounded-lg border border-white/10 bg-black/20 p-4">
               <p className="mb-2 text-xs uppercase tracking-wide text-white/50">Form Özeti</p>
               {formSummary.length ? (
                 <ul className="space-y-1 text-sm text-white/85">
@@ -178,12 +184,12 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
               )}
             </div>
 
-            <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+            <div className="rounded-lg border border-white/10 bg-black/20 p-4">
               <p className="mb-2 text-xs uppercase tracking-wide text-white/50">Ek Notlar</p>
               <p className="text-sm whitespace-pre-wrap text-white/80">{activeMetadata?.freeNotes || 'Ek not girilmedi.'}</p>
             </div>
 
-            <ResultPanel text={resultText} />
+            <ResultPanel text={resultText} status={activeRun.status as 'completed' | 'failed' | 'pending' | 'processing'} />
 
             <div className="flex flex-wrap items-center gap-3">
               <Link
@@ -194,7 +200,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
               </Link>
               <form action={rerunAgent}>
                 <input type="hidden" name="source_run_id" value={activeRun.id} />
-                <button className="rounded-lg border border-white/20 px-3 py-2 text-sm hover:border-neon">Aynı girdiyle tekrar çalıştır</button>
+                <button className="rounded-lg border border-white/20 px-3 py-2 text-sm hover:border-neon">Aynı girdiyi tekrar çalıştır</button>
               </form>
             </div>
 
@@ -254,7 +260,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
             ) : null}
           </div>
         ) : (
-          <p className="text-sm text-white/70">Henüz bu agent için çalıştırma bulunmuyor.</p>
+          <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/70">Henüz bu agent için çalıştırma bulunmuyor. Editörü doldurup ilk çalıştırmayı başlatabilirsiniz.</p>
         )}
       </section>
 
@@ -271,7 +277,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
             <Link key={run.id} href={`/agents/${id}?run_id=${run.id}`} className="block rounded-lg border border-white/10 p-3 text-sm hover:border-neon">
               <p className="text-white/70">{new Date(run.created_at).toLocaleString('tr-TR')}</p>
               <p className="text-xs text-white/50">Durum: {getStatusLabel(run.status)}</p>
-              <p className="text-xs text-white/50">Motor: {run.metadata && typeof run.metadata === 'object' && 'ai_engine' in run.metadata ? String(run.metadata.ai_engine ?? 'AI motoru') : 'AI motoru'}</p>
+              <p className="text-xs text-white/50">Motor: {toDisplayEngineLabel(run.metadata && typeof run.metadata === 'object' && 'ai_engine' in run.metadata ? run.metadata.ai_engine : null)}</p>
               <p className="mt-1 text-white/90">{run.user_input.slice(0, 100) || 'İstem yok'}</p>
             </Link>
           ))}
