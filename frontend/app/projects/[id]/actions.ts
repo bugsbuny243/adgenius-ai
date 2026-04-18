@@ -26,37 +26,7 @@ export async function createProjectItemAction(projectId: string, formData: FormD
     user_id: currentUser.id,
     item_type: 'note',
     title,
-    payload: details ? { details } : null
-  });
-
-  revalidatePath(`/projects/${projectId}`);
-}
-
-export async function addProjectKnowledgeAction(projectId: string, formData: FormData) {
-  const title = String(formData.get('title') ?? '').trim();
-  const content = String(formData.get('content') ?? '').trim();
-  const entryType = String(formData.get('entry_type') ?? 'note').trim();
-
-  if (!title || !content) return;
-
-  const serverSupabase = await createSupabaseServerClient();
-  const {
-    data: { user: currentUser }
-  } = await serverSupabase.auth.getUser();
-
-  if (!currentUser) redirect('/signin');
-
-  const { workspaceId: currentWorkspaceId } = await getWorkspaceContext();
-
-  await serverSupabase.from('project_knowledge_entries').insert({
-    workspace_id: currentWorkspaceId,
-    project_id: projectId,
-    source_id: null,
-    entry_type: entryType || 'note',
-    title,
-    content,
-    metadata: {},
-    created_by: currentUser.id
+    content: details || null
   });
 
   revalidatePath(`/projects/${projectId}`);
