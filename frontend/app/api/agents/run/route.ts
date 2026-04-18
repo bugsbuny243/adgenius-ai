@@ -215,6 +215,19 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (!membership?.workspace_id) {
+    await serviceSupabase
+      .from('agent_runs')
+      .update({
+        status: 'failed',
+        error_message: 'Çalışma alanı bulunamadı.',
+        result_text: null,
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', runId)
+      .eq('user_id', user.id)
+      .in('status', ['pending', 'processing']);
+
     return NextResponse.json({ ok: false, error: 'workspace_not_found' }, { status: 404 });
   }
 
@@ -252,6 +265,7 @@ export async function POST(request: Request) {
       .update({
         status: 'failed',
         error_message: 'Agent bulunamadı.',
+        result_text: null,
         completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
@@ -388,6 +402,7 @@ export async function POST(request: Request) {
       .update({
         status: 'failed',
         error_message: message,
+        result_text: null,
         completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         metadata: {

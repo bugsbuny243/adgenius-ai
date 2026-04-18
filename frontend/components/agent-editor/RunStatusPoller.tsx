@@ -4,12 +4,13 @@ import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
 type RunStatusPollerProps = {
+  runId: string;
   status: string;
   intervalMs?: number;
   maxPollCount?: number;
 };
 
-export function RunStatusPoller({ status, intervalMs = 2500, maxPollCount = 18 }: RunStatusPollerProps) {
+export function RunStatusPoller({ runId, status, intervalMs = 2500, maxPollCount = 120 }: RunStatusPollerProps) {
   const router = useRouter();
   const pollCountRef = useRef(0);
   const isPollingStatus = status === 'pending' || status === 'processing';
@@ -31,7 +32,7 @@ export function RunStatusPoller({ status, intervalMs = 2500, maxPollCount = 18 }
     }, intervalMs);
 
     return () => window.clearInterval(timer);
-  }, [isPollingStatus, intervalMs, maxPollCount, router]);
+  }, [runId, isPollingStatus, intervalMs, maxPollCount, router]);
 
   return null;
 }
