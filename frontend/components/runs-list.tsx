@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { sanitizeUserFacingEngineLabel } from '@/lib/publish-queue';
 
 type RunItem = {
   id: string;
@@ -9,11 +10,6 @@ type RunItem = {
   user_input: string | null;
   created_at: string;
 };
-
-function toDisplayModel(modelName: string | null): string {
-  if (!modelName) return 'Varsayılan AI motoru';
-  return 'Varsayılan AI motoru';
-}
 
 export function RunsList({ runs }: { runs: RunItem[] }) {
   const [status, setStatus] = useState('all');
@@ -36,7 +32,7 @@ export function RunsList({ runs }: { runs: RunItem[] }) {
       {filtered.map((run) => (
         <div key={run.id} className="rounded-lg border border-white/10 p-3">
           <p>Durum: {run.status}</p>
-          <p className="text-white/70">Çalışma motoru: {toDisplayModel(run.model_name)}</p>
+          <p className="text-white/70">Çalışma motoru: {sanitizeUserFacingEngineLabel(run.model_name)}</p>
           <p className="text-white/70">{new Date(run.created_at).toLocaleString('tr-TR')}</p>
           <button onClick={() => setActive(run)} className="mt-2 rounded border border-white/20 px-2 py-1">
             Detay

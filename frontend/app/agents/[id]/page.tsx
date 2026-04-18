@@ -6,6 +6,7 @@ import { RunStatusPoller } from '@/components/agent-editor/RunStatusPoller';
 import { ResultPanel } from '@/components/agent-editor/ResultPanel';
 import { SocialOutputPanel } from '@/components/agent-editor/SocialOutputPanel';
 import { buildFormSummary, getAgentEditorConfig, parseEditorMetadata } from '@/lib/agent-editor';
+import { deriveQueuePreview, neutralizeVendorTerms, sanitizeUserFacingEngineLabel, toPlatformLabel, toQueueStateHint, toQueueStatusLabel } from '@/lib/publish-queue';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getWorkspaceContext } from '@/lib/workspace';
 import {
@@ -21,11 +22,6 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 const STALE_PENDING_MS = 2 * 60 * 1000;
-
-function toDisplayEngineLabel(engine: unknown): string {
-  if (!engine) return 'Varsayılan AI motoru';
-  return 'Varsayılan AI motoru';
-}
 
 function getStatusLabel(status: string): string {
   if (status === 'completed') return 'Tamamlandı';
@@ -101,10 +97,12 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
     ? isPending && Date.now() - new Date(activeRun.updated_at ?? activeRun.created_at).getTime() > STALE_PENDING_MS
     : false;
   const resultText = activeRun
-    ? activeRun.result_text ||
-      (activeRun.status === 'failed' ? activeRun.error_message || 'Çalıştırma hata ile sonlandı.' : '') ||
-      (activeRun.status === 'completed' ? 'Çalıştırma tamamlandı ancak sonuç metni boş görünüyor.' : '') ||
-      'Sonuç hazırlanıyor. Sayfa otomatik güncellenecek...'
+    ? neutralizeVendorTerms(
+        activeRun.result_text ||
+          (activeRun.status === 'failed' ? activeRun.error_message || 'Çalıştırma hata ile sonlandı.' : '') ||
+          (activeRun.status === 'completed' ? 'Çalıştırma tamamlandı ancak sonuç metni boş görünüyor.' : '') ||
+          'Sonuç hazırlanıyor. Sayfa otomatik güncellenecek...'
+      )
     : '';
 
   const { data: savedOutputs } = await supabase
@@ -137,12 +135,27 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
     activeContentItem?.id
       ? await supabase
           .from('publish_jobs')
-          .select('id, status, target_platform, queued_at, content_output_id')
+          .select('id, status, target_platform, queued_at, content_output_id, payload, project_id')
           .eq('workspace_id', workspaceId)
           .eq('content_output_id', activeContentItem.id)
           .order('queued_at', { ascending: false })
           .limit(10)
       : { data: [] };
+
+
+  const [{ data: linkedProject }, { data: linkedSavedOutput }] = await Promise.all([
+    activeContentItem?.project_id
+      ? supabase.from('projects').select('id, name').eq('workspace_id', workspaceId).eq('id', activeContentItem.project_id).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    activeContentItem?.saved_output_id
+      ? supabase
+          .from('saved_outputs')
+          .select('id, title, content')
+          .eq('workspace_id', workspaceId)
+          .eq('id', activeContentItem.saved_output_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null })
+  ]);
 
   return (
     <main>
@@ -157,7 +170,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
           <span className="rounded-md border border-white/15 px-2 py-1 text-xs text-white/70">{agent.is_active ? 'Aktif' : 'Pasif'}</span>
         </div>
 
-        {errorParam ? <p className="mb-3 rounded-lg border border-red-300/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">{errorParam}</p> : null}
+        {errorParam ? <p className="mb-3 rounded-lg border border-red-300/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">{neutralizeVendorTerms(errorParam)}</p> : null}
 
         <AgentEditorShell
           agentSlug={agent.slug}
@@ -180,7 +193,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
               Oluşturulma: {new Date(activeRun.created_at).toLocaleString('tr-TR')}
               {activeRun.completed_at ? ` • Tamamlanma: ${new Date(activeRun.completed_at).toLocaleString('tr-TR')}` : ''}
             </p>
-            <p className="text-xs text-white/50">Çalışma motoru: {toDisplayEngineLabel(activeRun.metadata && typeof activeRun.metadata === 'object' && 'ai_engine' in activeRun.metadata ? activeRun.metadata.ai_engine : null)}</p>
+            <p className="text-xs text-white/50">Çalışma motoru: {sanitizeUserFacingEngineLabel(activeRun.metadata && typeof activeRun.metadata === 'object' && 'ai_engine' in activeRun.metadata ? activeRun.metadata.ai_engine : null)}</p>
 
             {isPending ? (
               <p className="rounded-lg border border-amber-300/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
@@ -194,7 +207,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
               ) : null}
             {activeRun.status === 'failed' ? (
               <p className="rounded-lg border border-red-300/35 bg-red-500/10 px-3 py-2 text-xs text-red-100">
-                {activeRun.error_message || 'Çalıştırma tamamlanamadı. Aynı girdiyi düzenleyip yeniden deneyebilirsiniz.'}
+                {neutralizeVendorTerms(activeRun.error_message || 'Çalıştırma tamamlanamadı. Aynı girdiyi düzenleyip yeniden deneyebilirsiniz.')}
               </p>
             ) : null}
 
@@ -253,15 +266,29 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
                   </form>
 
                   <div className="rounded-lg border border-white/10 bg-black/20 p-3">
-                    <p className="mb-2 text-xs uppercase tracking-wide text-white/50">Yayın Kuyruğu Geçmişi</p>
+                    <p className="mb-1 text-xs uppercase tracking-wide text-white/50">Yayın Kuyruğu Geçmişi</p>
+                    <p className="mb-2 text-xs text-white/55">Bu alan yalnızca mevcut kuyruk kayıtlarının hazırlık durumunu gösterir.</p>
                     {publishJobs && publishJobs.length > 0 ? (
-                      <div className="space-y-1 text-sm text-white/80">
-                        {publishJobs.map((job) => (
-                          <p key={job.id}>
-                            {job.target_platform || 'Platform yok'} • {job.status || 'durum yok'} •{' '}
-                            {job.queued_at ? new Date(job.queued_at).toLocaleString('tr-TR') : 'Tarih yok'}
-                          </p>
-                        ))}
+                      <div className="space-y-2 text-sm text-white/80">
+                        {publishJobs.map((job) => {
+                          const preview = deriveQueuePreview({
+                            payload: job.payload,
+                            targetPlatform: job.target_platform,
+                            contentItem: activeContentItem,
+                            savedOutput: linkedSavedOutput
+                          });
+
+                          return (
+                            <div key={job.id} className="rounded-md border border-white/10 p-2">
+                              <p className="text-white/90">{toPlatformLabel(job.target_platform)} • {toQueueStatusLabel(job.status)}</p>
+                              <p className="text-xs text-white/60">{toQueueStateHint(job.status)} • {job.queued_at ? new Date(job.queued_at).toLocaleString('tr-TR') : 'Tarih yok'}</p>
+                              <p className="mt-1 text-white/80">İçerik özeti: {preview.summary}</p>
+                              {preview.detail ? <p className="text-xs text-white/65">Detay: {preview.detail}</p> : null}
+                              <p className="text-xs text-white/60">Proje: {linkedProject?.name ?? 'Bağlı proje yok'}</p>
+                              {preview.payloadPartial ? <p className="text-xs text-amber-200">Payload kısmi olduğundan özet mevcut içerikten türetildi.</p> : null}
+                            </div>
+                          );
+                        })}
                       </div>
                     ) : (
                       <p className="text-sm text-white/65">Henüz bu içerik için yayın kuyruğu kaydı bulunmuyor.</p>
@@ -366,7 +393,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
             <Link key={run.id} href={`/agents/${id}?run_id=${run.id}`} className="block rounded-lg border border-white/10 p-3 text-sm hover:border-neon">
               <p className="text-white/70">{new Date(run.created_at).toLocaleString('tr-TR')}</p>
               <p className="text-xs text-white/50">Durum: {getStatusLabel(run.status)}</p>
-              <p className="text-xs text-white/50">Motor: {toDisplayEngineLabel(run.metadata && typeof run.metadata === 'object' && 'ai_engine' in run.metadata ? run.metadata.ai_engine : null)}</p>
+              <p className="text-xs text-white/50">Motor: {sanitizeUserFacingEngineLabel(run.metadata && typeof run.metadata === 'object' && 'ai_engine' in run.metadata ? run.metadata.ai_engine : null)}</p>
               <p className="mt-1 text-white/90">{run.user_input.slice(0, 100) || 'İstem yok'}</p>
             </Link>
           ))}

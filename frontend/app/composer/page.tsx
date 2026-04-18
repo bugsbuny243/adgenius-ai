@@ -1,5 +1,6 @@
 import { Nav } from '@/components/nav';
 import { getAppContextOrRedirect } from '@/lib/app-context';
+import { deriveQueuePreview, toPlatformLabel, toQueueStateHint, toQueueStatusLabel } from '@/lib/publish-queue';
 import { createContentJobAction, updatePublishStatusAction } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -17,11 +18,36 @@ export default async function ComposerPage() {
       .limit(10),
     supabase
       .from('publish_jobs')
-      .select('id, status, target_platform, content_output_id, queued_at')
+      .select('id, status, target_platform, content_output_id, queued_at, project_id, payload')
       .eq('workspace_id', workspace.workspaceId)
       .order('queued_at', { ascending: false })
-      .limit(10)
+      .limit(20)
   ]);
+
+  const relatedContentIds = Array.from(new Set((jobs ?? []).map((job) => job.content_output_id).filter(Boolean)));
+  const relatedProjectIds = Array.from(new Set((jobs ?? []).map((job) => job.project_id).filter(Boolean)));
+
+  const [{ data: relatedContentItems }, { data: relatedProjects }] = await Promise.all([
+    relatedContentIds.length
+      ? supabase
+          .from('content_items')
+          .select('id, brief, youtube_title, youtube_description, instagram_caption, tiktok_caption, saved_output_id')
+          .eq('workspace_id', workspace.workspaceId)
+          .in('id', relatedContentIds)
+      : Promise.resolve({ data: [], error: null }),
+    relatedProjectIds.length
+      ? supabase.from('projects').select('id, name').eq('workspace_id', workspace.workspaceId).in('id', relatedProjectIds)
+      : Promise.resolve({ data: [], error: null })
+  ]);
+
+  const savedOutputIds = Array.from(new Set((relatedContentItems ?? []).map((item) => item.saved_output_id).filter(Boolean)));
+  const { data: relatedSavedOutputs } = savedOutputIds.length
+    ? await supabase.from('saved_outputs').select('id, title, content').eq('workspace_id', workspace.workspaceId).in('id', savedOutputIds)
+    : { data: [] };
+
+  const contentById = new Map((relatedContentItems ?? []).map((item) => [item.id, item]));
+  const projectById = new Map((relatedProjects ?? []).map((project) => [project.id, project]));
+  const savedById = new Map((relatedSavedOutputs ?? []).map((item) => [item.id, item]));
 
   return (
     <main>
@@ -88,25 +114,52 @@ export default async function ComposerPage() {
         </article>
 
         <article className="panel">
-          <h3 className="mb-3 text-lg font-semibold">Yayın Kuyruğu (Mock)</h3>
+          <h3 className="mb-1 text-lg font-semibold">Yayın Kuyruğu</h3>
+          <p className="mb-3 text-xs text-white/60">Sıraya alınan gönderiler ve hazırlık durumları mevcut alanlarla listelenir.</p>
           {jobs && jobs.length > 0 ? (
-            <div className="space-y-2 text-sm">
-              {jobs.map((job) => (
-                <form key={job.id} action={updatePublishStatusAction} className="rounded-lg border border-white/10 p-3">
-                  <input type="hidden" name="job_id" value={job.id} />
-                  <p>{job.target_platform} • {job.queued_at ? new Date(job.queued_at).toLocaleString('tr-TR') : 'Tarih yok'}</p>
-                  <p className="text-xs text-white/60">Content item: {job.content_output_id ?? '-'} </p>
-                  <p className="mb-2 text-white/70">Mevcut durum: {job.status}</p>
-                  <div className="flex gap-2">
-                    <button name="status" value="draft" className="rounded-md border border-white/20 px-2 py-1">Taslak</button>
-                    <button name="status" value="queued" className="rounded-md border border-white/20 px-2 py-1">Sıraya Al</button>
-                    <button name="status" value="failed" className="rounded-md border border-white/20 px-2 py-1">Başarısız</button>
-                  </div>
-                </form>
-              ))}
+            <div className="space-y-3 text-sm">
+              {jobs.map((job) => {
+                const relatedContent = job.content_output_id ? contentById.get(job.content_output_id) : null;
+                const relatedProject = job.project_id ? projectById.get(job.project_id) : null;
+                const relatedSaved = relatedContent?.saved_output_id ? savedById.get(relatedContent.saved_output_id) : null;
+                const preview = deriveQueuePreview({
+                  payload: job.payload,
+                  targetPlatform: job.target_platform,
+                  contentItem: relatedContent,
+                  savedOutput: relatedSaved
+                });
+
+                return (
+                  <form key={job.id} action={updatePublishStatusAction} className="rounded-lg border border-white/10 p-3">
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <p className="font-medium text-white/90">{toPlatformLabel(job.target_platform)}</p>
+                      <span className="text-white/45">•</span>
+                      <p className="text-white/80">{toQueueStatusLabel(job.status)}</p>
+                      <span className="text-white/45">•</span>
+                      <p className="text-xs text-white/60">{toQueueStateHint(job.status)}</p>
+                    </div>
+                    <p className="mt-1 text-xs text-white/55">Kuyruğa alınma: {job.queued_at ? new Date(job.queued_at).toLocaleString('tr-TR') : 'Zaman bilgisi yok'}</p>
+                    <p className="mt-2 text-white/80">İçerik özeti: {preview.summary}</p>
+                    {preview.detail ? <p className="text-xs text-white/65">Detay: {preview.detail}</p> : null}
+                    <p className="text-xs text-white/60">Proje: {relatedProject?.name ?? 'Bağlı proje yok'}</p>
+                    <p className="text-xs text-white/60">İçerik kaynağı: {job.content_output_id ?? 'İçerik kaydı bulunamadı'}</p>
+                    {preview.payloadPartial ? <p className="mt-1 text-xs text-amber-200">Uyarı: Payload alanı kısmi görünüyor; önizleme ilişkili içerikten türetildi.</p> : null}
+                    {!relatedContent && job.content_output_id ? <p className="mt-1 text-xs text-amber-200">Bağlı içerik kaydı artık bulunamıyor olabilir.</p> : null}
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button name="status" value="draft" className="rounded-md border border-white/20 px-2 py-1">Taslak</button>
+                      <button name="status" value="queued" className="rounded-md border border-white/20 px-2 py-1">Sıraya Alındı</button>
+                      <button name="status" value="processing" className="rounded-md border border-white/20 px-2 py-1">İşleniyor</button>
+                      <button name="status" value="published" className="rounded-md border border-white/20 px-2 py-1">Yayınlandı</button>
+                      <button name="status" value="failed" className="rounded-md border border-white/20 px-2 py-1">Başarısız</button>
+                    </div>
+                  </form>
+                );
+              })}
             </div>
           ) : (
-            <p className="text-sm text-white/70">Henüz kuyruk kaydı yok.</p>
+            <p className="text-sm text-white/70">Kuyruk boş. İçerik üretip platform seçerek sıraya ekleyebilirsiniz.</p>
           )}
         </article>
       </section>

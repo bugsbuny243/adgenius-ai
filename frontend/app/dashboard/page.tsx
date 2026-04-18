@@ -1,13 +1,9 @@
 import { Nav } from '@/components/nav';
 import { getAppContextOrRedirect } from '@/lib/app-context';
+import { neutralizeVendorTerms, sanitizeUserFacingEngineLabel } from '@/lib/publish-queue';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-function toDisplayModel(modelName: string | null): string {
-  if (!modelName) return 'AI motoru';
-  return 'AI motoru';
-}
 
 function toDisplayStatus(status: string): string {
   if (status === 'completed') return 'Tamamlandı';
@@ -89,11 +85,11 @@ export default async function DashboardPage() {
                     <div key={run.id} className="rounded-lg border border-white/10 px-3 py-2">
                       <p>Durum: {effectiveStatus}</p>
                       <p className="text-white/70">Etiket: {toDisplayStatus(effectiveStatus)}</p>
-                      <p className="text-white/70">Çalışma motoru: {toDisplayModel(run.model_name)}</p>
+                      <p className="text-white/70">Çalışma motoru: {sanitizeUserFacingEngineLabel(run.model_name)}</p>
                       <p className="line-clamp-2 text-white/65">{run.user_input || 'İstem kaydı yok.'}</p>
                       <p className="text-white/70">{new Date(run.created_at).toLocaleString('tr-TR')}</p>
                       {run.completed_at ? <p className="text-white/60">Tamamlanma: {new Date(run.completed_at).toLocaleString('tr-TR')}</p> : null}
-                      {effectiveStatus === 'failed' && run.error_message ? <p className="text-red-200">Hata: {run.error_message}</p> : null}
+                      {effectiveStatus === 'failed' && run.error_message ? <p className="text-red-200">Hata: {neutralizeVendorTerms(run.error_message)}</p> : null}
                       {run.status === 'completed' && !run.result_text ? (
                         <p className="text-amber-200">Uyarı: Tamamlandı görünüyor ancak sonuç metni bulunamadı.</p>
                       ) : null}

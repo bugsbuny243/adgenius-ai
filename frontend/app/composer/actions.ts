@@ -5,6 +5,8 @@ import { getAppContextOrRedirect } from '@/lib/app-context';
 
 type Platform = 'youtube' | 'instagram' | 'tiktok';
 
+const SUPPORTED_STATUS_VALUES = ['draft', 'queued', 'processing', 'published', 'failed'] as const;
+
 function buildVariants(brief: string, platforms: Platform[]) {
   const cleanBrief = brief.trim();
   return {
@@ -14,6 +16,39 @@ function buildVariants(brief: string, platforms: Platform[]) {
     tiktokCaption: `${cleanBrief.slice(0, 120)} #icerik #tiktok`,
     platforms
   };
+}
+
+function buildPublishPayload(input: {
+  brief: string;
+  platform: Platform;
+  variants: ReturnType<typeof buildVariants>;
+  runId: string;
+  contentItemId: string;
+  savedOutputId: string;
+  projectId: string | null;
+}) {
+  const payload: Record<string, unknown> = {
+    brief: input.brief,
+    platform: input.platform,
+    run_id: input.runId,
+    content_item_id: input.contentItemId,
+    saved_output_id: input.savedOutputId,
+    project_id: input.projectId,
+    source: 'composer'
+  };
+
+  if (input.platform === 'youtube') {
+    payload.youtube_title = input.variants.youtubeTitle;
+    payload.youtube_description = input.variants.youtubeDescription;
+  }
+  if (input.platform === 'instagram') {
+    payload.instagram_caption = input.variants.instagramCaption;
+  }
+  if (input.platform === 'tiktok') {
+    payload.tiktok_caption = input.variants.tiktokCaption;
+  }
+
+  return payload;
 }
 
 export async function createContentJobAction(formData: FormData) {
@@ -92,7 +127,7 @@ export async function createContentJobAction(formData: FormData) {
     throw new Error(`İçerik kaydı oluşturulamadı: ${contentItemError?.message ?? 'bilinmeyen hata'}`);
   }
 
-  await Promise.all(
+  const insertResults = await Promise.all(
     selectedPlatforms.map((platform) =>
       supabase.from('publish_jobs').insert({
         workspace_id: workspace.workspaceId,
@@ -101,14 +136,23 @@ export async function createContentJobAction(formData: FormData) {
         target_platform: platform,
         status: 'draft',
         queued_at: queuedAt,
-        payload: {
+        payload: buildPublishPayload({
           brief,
           platform,
-          variants
-        }
+          variants,
+          runId: run.id,
+          contentItemId: contentItem.id,
+          savedOutputId: saved.id,
+          projectId
+        })
       })
     )
   );
+
+  const queueError = insertResults.find((result) => result.error)?.error;
+  if (queueError) {
+    throw new Error(`Yayın kuyruğuna eklenemedi: ${queueError.message}`);
+  }
 
   revalidatePath('/composer');
   revalidatePath('/dashboard');
@@ -120,7 +164,7 @@ export async function updatePublishStatusAction(formData: FormData) {
   const jobId = String(formData.get('job_id') ?? '').trim();
   const status = String(formData.get('status') ?? '').trim();
 
-  if (!jobId || !['draft', 'queued', 'failed'].includes(status)) {
+  if (!jobId || !SUPPORTED_STATUS_VALUES.includes(status as (typeof SUPPORTED_STATUS_VALUES)[number])) {
     return;
   }
 
