@@ -90,8 +90,14 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
   const activeMetadata = activeRun ? parseEditorMetadata(activeRun.metadata) : null;
   const isPending = activeRun?.status === 'pending' || activeRun?.status === 'processing';
   const isStalePending = activeRun
-    ? isPending && Date.now() - new Date(activeRun.created_at).getTime() > STALE_PENDING_MS
+    ? isPending && Date.now() - new Date(activeRun.updated_at ?? activeRun.created_at).getTime() > STALE_PENDING_MS
     : false;
+  const resultText = activeRun
+    ? activeRun.result_text ||
+      (activeRun.status === 'failed' ? activeRun.error_message || 'Çalıştırma hata ile sonlandı.' : '') ||
+      (activeRun.status === 'completed' ? 'Çalıştırma tamamlandı ancak sonuç metni boş görünüyor.' : '') ||
+      'Sonuç hazırlanıyor. Sayfa otomatik güncellenecek...'
+    : '';
 
   const { data: savedOutputs } = await supabase
     .from('saved_outputs')
@@ -130,7 +136,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
         <h3 className="mb-3 text-lg font-semibold">Sonuç</h3>
         {activeRun ? (
           <div className="space-y-3">
-            <RunStatusPoller status={activeRun.status} />
+            <RunStatusPoller runId={activeRun.id} status={activeRun.status} />
             <p className="text-xs text-white/60">
               Durum: <span className="font-medium text-white/85">{getStatusLabel(activeRun.status)}</span>
             </p>
@@ -177,13 +183,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
               <p className="text-sm whitespace-pre-wrap text-white/80">{activeMetadata?.freeNotes || 'Ek not girilmedi.'}</p>
             </div>
 
-            <ResultPanel
-              text={
-                activeRun.result_text ||
-                (activeRun.status === 'failed' ? activeRun.error_message || 'Çalıştırma hata ile sonlandı.' : '') ||
-                'Sonuç hazırlanıyor. Sayfa otomatik güncellenecek...'
-              }
-            />
+            <ResultPanel text={resultText} />
 
             <div className="flex flex-wrap items-center gap-3">
               <Link

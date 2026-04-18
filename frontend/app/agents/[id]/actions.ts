@@ -25,6 +25,18 @@ function parseRunMetadata(source: unknown): { editorState: Record<string, unknow
   };
 }
 
+function toUserFacingRunError(errorCode: string): string {
+  if (errorCode === 'workspace_not_found') return 'Çalışma alanı bulunamadı.';
+  if (errorCode === 'agent_not_found') return 'Agent bulunamadı.';
+  if (errorCode === 'invalid_payload') return 'Çalıştırma verisi doğrulanamadı.';
+  if (errorCode === 'invalid_user' || errorCode === 'missing_token') return 'Oturum doğrulanamadı.';
+  if (errorCode === 'run_not_found') return 'Çalıştırma kaydı bulunamadı.';
+  if (errorCode === 'empty_result') return 'AI motoru boş sonuç döndürdü. Lütfen tekrar deneyin.';
+  if (errorCode === 'run_timeout') return 'Çalıştırma zaman aşımına uğradı. Lütfen tekrar deneyin.';
+  if (errorCode === 'missing_environment') return 'Sunucu yapılandırması eksik. Lütfen yöneticinizle iletişime geçin.';
+  return errorCode || 'Çalıştırma sırasında hata oluştu.';
+}
+
 export async function runAgentAction(agentId: string, formData: FormData) {
   const rawPrompt = String(formData.get('prompt') ?? '').trim();
   const derivedPrompt = String(formData.get('derived_prompt') ?? '').trim();
@@ -142,13 +154,14 @@ export async function runAgentAction(agentId: string, formData: FormData) {
 
     if (!runResponse.ok) {
       const payload = (await runResponse.json().catch(() => null)) as { error?: string } | null;
-      const message = payload?.error ?? 'Çalıştırma sırasında hata oluştu.';
+      const message = toUserFacingRunError(payload?.error ?? '');
 
       await serverSupabase
         .from('agent_runs')
         .update({
           status: 'failed',
           error_message: message,
+          result_text: null,
           completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
@@ -180,6 +193,7 @@ export async function runAgentAction(agentId: string, formData: FormData) {
       .update({
         status: 'failed',
         error_message: message,
+        result_text: null,
         completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
