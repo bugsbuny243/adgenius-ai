@@ -20,6 +20,20 @@ type RunRequestBody = {
 const RUN_TIMEOUT_MS = 40_000;
 const FALLBACK_ENGINE_NAME = 'AI motoru';
 
+function toRunFailureMessage(input: string): string {
+  const code = input.trim().toLowerCase();
+  if (code === 'run_timeout') return 'Çalıştırma zaman aşımına uğradı.';
+  if (code === 'empty_result') return 'AI motoru boş sonuç döndürdü.';
+  if (code.startsWith('run_update_failed:')) return 'Çalıştırma kaydı güncellenemedi.';
+  return input || 'Çalıştırma sırasında beklenmeyen bir hata oluştu.';
+}
+
+function resolveProjectIdFromMetadata(metadata: unknown): string | null {
+  if (!metadata || typeof metadata !== 'object') return null;
+  const value = (metadata as Record<string, unknown>).project_id;
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
 function normalizePlatforms(value: unknown): SocialPlatform[] {
   if (!Array.isArray(value)) {
     return ['youtube', 'instagram', 'tiktok'];
@@ -201,7 +215,6 @@ export async function POST(request: Request) {
       .update({
         status: 'failed',
         error_message: 'Çalışma alanı bulunamadı.',
-        result_text: null,
         completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
@@ -214,7 +227,7 @@ export async function POST(request: Request) {
 
   const { data: run } = await supabase
     .from('agent_runs')
-    .select('id, workspace_id, user_id, agent_type_id, project_id, metadata, status, result_text, error_message')
+    .select('id, workspace_id, user_id, agent_type_id, metadata, status, result_text, error_message, created_at, updated_at')
     .eq('id', runId)
     .eq('workspace_id', membership.workspace_id)
     .eq('user_id', user.id)
@@ -227,6 +240,22 @@ export async function POST(request: Request) {
 
   if (run.status === 'completed' && run.result_text) {
     return NextResponse.json({ ok: true, runId, result: run.result_text, fromCache: true });
+  }
+
+  if (run.status === 'completed' && !run.result_text) {
+    await serviceSupabase
+      .from('agent_runs')
+      .update({
+        status: 'failed',
+        error_message: 'Çalıştırma tamamlandı ancak sonuç metni boş döndü.',
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', runId)
+      .eq('workspace_id', membership.workspace_id)
+      .eq('user_id', user.id);
+
+    return NextResponse.json({ ok: false, error: 'empty_result' }, { status: 409 });
   }
 
   if (run.status === 'failed' && run.error_message) {
@@ -246,7 +275,6 @@ export async function POST(request: Request) {
       .update({
         status: 'failed',
         error_message: 'Agent bulunamadı.',
-        result_text: null,
         completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
@@ -332,11 +360,7 @@ export async function POST(request: Request) {
         requestEditorState && typeof requestEditorState.platform === 'string' ? requestEditorState.platform.toLowerCase() : null;
       const platforms: SocialPlatform[] = preferredPlatform ? normalizePlatforms([preferredPlatform]) : ['youtube', 'instagram', 'tiktok'];
 
-      const runProjectId =
-        run.metadata && typeof run.metadata === 'object' && 'project_id' in run.metadata && typeof run.metadata.project_id === 'string'
-          ? run.metadata.project_id
-          : null;
-      const resolvedProjectId = runProjectId ?? projectId;
+      const resolvedProjectId = resolveProjectIdFromMetadata(run.metadata) ?? projectId;
 
       const draft = normalizeSocialContentDraft({
         sourceBrief: userInput,
@@ -400,7 +424,7 @@ export async function POST(request: Request) {
         await serviceSupabase
           .from('content_items')
           .update({
-            project_id: run.project_id ?? projectId,
+            project_id: resolvedProjectId,
             saved_output_id: savedOutputId,
             brief: draft.brief,
             platforms: draft.platforms,
@@ -419,7 +443,7 @@ export async function POST(request: Request) {
           workspaceId: membership.workspace_id,
           userId: user.id,
           runId,
-          projectId: run.project_id ?? projectId,
+          projectId: resolvedProjectId,
           savedOutputId,
           draft
         });
@@ -428,7 +452,7 @@ export async function POST(request: Request) {
       if (contentItemId) {
         await insertPublishJobsWithFallbacks(serviceSupabase, {
           workspaceId: membership.workspace_id,
-          projectId: run.project_id ?? projectId,
+          projectId: resolvedProjectId,
           contentItemId,
           draft
         });
@@ -437,14 +461,13 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, runId, result: resultText });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'unknown_error';
+    const message = toRunFailureMessage(error instanceof Error ? error.message : 'unknown_error');
 
     await serviceSupabase
       .from('agent_runs')
       .update({
         status: 'failed',
         error_message: message,
-        result_text: null,
         completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         metadata: {

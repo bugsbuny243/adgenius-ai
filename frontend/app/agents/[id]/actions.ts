@@ -232,7 +232,7 @@ export async function rerunAgentAction(agentId: string, formData: FormData) {
 
   const { data: sourceRun } = await serverSupabase
     .from('agent_runs')
-    .select('id, user_input, metadata, project_id')
+    .select('id, user_input, metadata')
     .eq('id', sourceRunId)
     .eq('workspace_id', currentWorkspaceId)
     .eq('user_id', currentUserId)
@@ -249,8 +249,12 @@ export async function rerunAgentAction(agentId: string, formData: FormData) {
   runFormData.set('derived_prompt', parsed.derivedPrompt || sourceRun.user_input);
   runFormData.set('free_notes', parsed.freeNotes);
   runFormData.set('editor_state', JSON.stringify(parsed.editorState));
-  if (sourceRun.project_id) {
-    runFormData.set('project_id', sourceRun.project_id);
+  const sourceProjectId =
+    sourceRun.metadata && typeof sourceRun.metadata === 'object' && 'project_id' in sourceRun.metadata && typeof sourceRun.metadata.project_id === 'string'
+      ? sourceRun.metadata.project_id
+      : '';
+  if (sourceProjectId) {
+    runFormData.set('project_id', sourceProjectId);
   }
 
   await runAgentAction(agentId, runFormData);
