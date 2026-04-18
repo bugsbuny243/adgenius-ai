@@ -6,6 +6,8 @@ import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getWorkspaceContext } from '@/lib/workspace';
 
+const SUPPORTED_SOCIAL_PLATFORMS = ['youtube', 'instagram', 'tiktok'] as const;
+
 function buildInternalUrl(pathname: string, headerList: Headers): string {
   const protocol = headerList.get('x-forwarded-proto') ?? 'http';
   const host = headerList.get('x-forwarded-host') ?? headerList.get('host') ?? 'localhost:3000';
@@ -427,5 +429,73 @@ export async function attachSavedOutputToProjectAction(agentId: string, runIdPar
 
   revalidatePath('/saved');
   revalidatePath(`/projects/${projectId}`);
+  redirect(`/agents/${agentId}?run_id=${runIdParam}`);
+}
+
+export async function queueSocialPublishAction(agentId: string, runIdParam: string, formData: FormData) {
+  const runId = String(formData.get('run_id') ?? '').trim();
+  const contentItemId = String(formData.get('content_item_id') ?? '').trim();
+  const selectedPlatform = String(formData.get('target_platform') ?? '')
+    .trim()
+    .toLowerCase();
+
+  if (!runId || !contentItemId || !SUPPORTED_SOCIAL_PLATFORMS.includes(selectedPlatform as (typeof SUPPORTED_SOCIAL_PLATFORMS)[number])) {
+    redirect(`/agents/${agentId}?run_id=${runIdParam}&error=Yayın kuyruğu için geçerli platform seçin.`);
+  }
+
+  const serverSupabase = await createSupabaseServerClient();
+  const {
+    data: { user: currentUser }
+  } = await serverSupabase.auth.getUser();
+
+  if (!currentUser) {
+    redirect('/signin');
+  }
+
+  const { workspaceId, userId } = await getWorkspaceContext();
+
+  const { data: contentItem } = await serverSupabase
+    .from('content_items')
+    .select(
+      'id, workspace_id, project_id, brief, youtube_title, youtube_description, instagram_caption, tiktok_caption, platforms'
+    )
+    .eq('id', contentItemId)
+    .eq('run_id', runId)
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (!contentItem) {
+    redirect(`/agents/${agentId}?run_id=${runIdParam}&error=Yayın için içerik kaydı bulunamadı.`);
+  }
+
+  const payload: Record<string, unknown> = {
+    brief: contentItem.brief ?? '',
+    platform: selectedPlatform
+  };
+
+  if (selectedPlatform === 'youtube') {
+    payload.youtube_title = contentItem.youtube_title ?? null;
+    payload.youtube_description = contentItem.youtube_description ?? null;
+  }
+  if (selectedPlatform === 'instagram') {
+    payload.instagram_caption = contentItem.instagram_caption ?? null;
+  }
+  if (selectedPlatform === 'tiktok') {
+    payload.tiktok_caption = contentItem.tiktok_caption ?? null;
+  }
+
+  await serverSupabase.from('publish_jobs').insert({
+    workspace_id: workspaceId,
+    project_id: contentItem.project_id,
+    content_output_id: contentItem.id,
+    payload,
+    queued_at: new Date().toISOString(),
+    status: 'queued',
+    target_platform: selectedPlatform
+  });
+
+  revalidatePath('/composer');
+  revalidatePath(`/agents/${agentId}`);
   redirect(`/agents/${agentId}?run_id=${runIdParam}`);
 }
