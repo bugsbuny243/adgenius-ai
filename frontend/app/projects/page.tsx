@@ -8,10 +8,10 @@ export const dynamic = 'force-dynamic';
 export default async function ProjectsPage() {
   const { supabase, workspace, userId } = await getAppContextOrRedirect();
 
-  const [{ data: projects, error }, { data: items }] = await Promise.all([
+  const [{ data: projects, error }, { data: items, error: itemsError }] = await Promise.all([
     supabase
       .from('projects')
-      .select('id, name, description, created_at, updated_at')
+      .select('id, name, description, created_at, updated_at, workspace_id, user_id')
       .eq('workspace_id', workspace.workspaceId)
       .eq('user_id', userId)
       .order('created_at', { ascending: false }),
@@ -51,6 +51,7 @@ export default async function ProjectsPage() {
       </section>
 
       <section className="panel">
+        {itemsError ? <p className="mb-3 text-xs text-amber-200">Öğe özeti yüklenemedi, proje listesi gösteriliyor.</p> : null}
         {error ? (
           <p className="text-sm text-red-300">Projeler yüklenemedi: {error.message}</p>
         ) : projects && projects.length > 0 ? (

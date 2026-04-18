@@ -34,11 +34,13 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     notFound();
   }
 
-  const [{ data: items }, { data: outputs }] = await Promise.all([
+  const [{ data: items, error: itemsError }, { data: outputs, error: outputsError }, { data: contentItems, error: contentItemsError }] =
+    await Promise.all([
     supabase
       .from('project_items')
-      .select('id, item_type, title, payload, source_output_id, saved_output_id, created_at')
+      .select('id, item_type, title, content, saved_output_id, created_at, updated_at')
       .eq('project_id', project.id)
+      .eq('user_id', userId)
       .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: false }),
     supabase
@@ -46,6 +48,15 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       .select('id, title, content, created_at')
       .eq('project_id', project.id)
       .eq('workspace_id', workspaceId)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(10),
+    supabase
+      .from('content_items')
+      .select('id, brief, created_at')
+      .eq('project_id', project.id)
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(10)
   ]);
@@ -58,6 +69,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <div>
             <h2 className="text-2xl font-semibold">{project.name}</h2>
             <p className="text-sm text-white/70">{project.description || 'Açıklama henüz eklenmedi.'}</p>
+            <p className="mt-1 text-xs text-white/60">Oluşturulma: {new Date(project.created_at).toLocaleString('tr-TR')}</p>
           </div>
           <Link href="/projects" className="rounded-lg border border-white/20 px-3 py-2 text-sm">
             Projelere dön
@@ -85,32 +97,33 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       <section className="grid gap-4 lg:grid-cols-2">
         <article className="panel">
           <h3 className="mb-3 text-lg font-semibold">Proje Öğeleri</h3>
-          {items && items.length > 0 ? (
+          {itemsError ? (
+            <p className="text-sm text-red-300">Öğeler yüklenemedi: {itemsError.message}</p>
+          ) : items && items.length > 0 ? (
             <div className="space-y-2">
               {items.map((item) => (
                 <div key={item.id} className="rounded-lg border border-white/10 px-3 py-2">
                   <p className="font-medium">{item.title}</p>
-                  <p className="text-sm text-white/70">
-                    {(item.payload && typeof item.payload === 'object' && 'details' in item.payload
-                      ? String(item.payload.details ?? '')
-                      : '') || 'Detay girilmedi.'}
-                  </p>
-                  <p className="text-xs text-white/50">Tip: {item.item_type}</p>
-                  {item.source_output_id || item.saved_output_id ? (
-                    <p className="text-xs text-white/50">Kaynak çıktı: {item.source_output_id ?? item.saved_output_id}</p>
+                  <p className="text-sm text-white/70 line-clamp-3">{item.content || 'İçerik henüz girilmedi.'}</p>
+                  <p className="text-xs text-white/50">İçerik türü: {item.item_type}</p>
+                  {item.saved_output_id ? (
+                    <p className="text-xs text-white/50">Kaydedilen çıktı: {item.saved_output_id}</p>
                   ) : null}
                   <p className="text-xs text-white/50">Eklenme: {new Date(item.created_at).toLocaleString('tr-TR')}</p>
+                  <p className="text-xs text-white/50">Son güncelleme: {new Date(item.updated_at ?? item.created_at).toLocaleString('tr-TR')}</p>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-white/70">Henüz proje öğesi yok.</p>
+            <p className="text-sm text-white/70">Henüz öğe yok.</p>
           )}
         </article>
 
         <article className="panel">
           <h3 className="mb-3 text-lg font-semibold">Son Kaydedilen Çıktılar</h3>
-          {outputs && outputs.length > 0 ? (
+          {outputsError ? (
+            <p className="text-sm text-red-300">Kaydedilen çıktılar yüklenemedi: {outputsError.message}</p>
+          ) : outputs && outputs.length > 0 ? (
             <div className="space-y-2">
               {outputs.map((output) => (
                 <div key={output.id} className="rounded-lg border border-white/10 px-3 py-2">
@@ -122,6 +135,25 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             </div>
           ) : (
             <p className="text-sm text-white/70">Bu projeye bağlı kayıtlı çıktı bulunmuyor.</p>
+          )}
+        </article>
+
+        <article className="panel lg:col-span-2">
+          <h3 className="mb-3 text-lg font-semibold">İçerik Öğeleri</h3>
+          {contentItemsError ? (
+            <p className="text-sm text-red-300">İçerik öğeleri yüklenemedi: {contentItemsError.message}</p>
+          ) : contentItems && contentItems.length > 0 ? (
+            <div className="space-y-2">
+              {contentItems.map((contentItem) => (
+                <div key={contentItem.id} className="rounded-lg border border-white/10 px-3 py-2">
+                  <p className="font-medium">İçerik öğesi</p>
+                  <p className="text-sm text-white/70 line-clamp-3">{contentItem.brief || 'Brief kaydı yok.'}</p>
+                  <p className="text-xs text-white/50">Eklenme: {new Date(contentItem.created_at).toLocaleString('tr-TR')}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-white/70">Bu projede içerik öğesi bulunmuyor.</p>
           )}
         </article>
       </section>

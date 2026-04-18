@@ -368,10 +368,7 @@ export async function createProjectItemFromOutputAction(agentId: string, runIdPa
   });
 
   if (withSavedOutputError) {
-    await serverSupabase.from('project_items').insert({
-      ...baseItem,
-      source_output_id: output.id
-    });
+    redirect(`/agents/${agentId}?error=Çıktı projeye eklenemedi: ${withSavedOutputError.message}`);
   }
 
   revalidatePath(`/projects/${projectId}`);
