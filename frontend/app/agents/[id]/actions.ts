@@ -471,7 +471,11 @@ export async function queueSocialPublishAction(agentId: string, runIdParam: stri
 
   const payload: Record<string, unknown> = {
     brief: contentItem.brief ?? '',
-    platform: selectedPlatform
+    platform: selectedPlatform,
+    source: 'agent_detail',
+    run_id: runId,
+    content_item_id: contentItem.id,
+    project_id: contentItem.project_id ?? null
   };
 
   if (selectedPlatform === 'youtube') {
@@ -485,7 +489,7 @@ export async function queueSocialPublishAction(agentId: string, runIdParam: stri
     payload.tiktok_caption = contentItem.tiktok_caption ?? null;
   }
 
-  await serverSupabase.from('publish_jobs').insert({
+  const { error: queueError } = await serverSupabase.from('publish_jobs').insert({
     workspace_id: workspaceId,
     project_id: contentItem.project_id,
     content_output_id: contentItem.id,
@@ -494,6 +498,10 @@ export async function queueSocialPublishAction(agentId: string, runIdParam: stri
     status: 'queued',
     target_platform: selectedPlatform
   });
+
+  if (queueError) {
+    redirect(`/agents/${agentId}?run_id=${runIdParam}&error=Yayın kuyruğuna eklenemedi: ${queueError.message}`);
+  }
 
   revalidatePath('/composer');
   revalidatePath(`/agents/${agentId}`);
