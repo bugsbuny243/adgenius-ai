@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { getAppContextOrRedirect } from '@/lib/app-context';
 
-type Platform = 'youtube' | 'instagram' | 'tiktok';
+type Platform = 'youtube';
 
 const SUPPORTED_STATUS_VALUES = ['draft', 'queued', 'processing', 'published', 'failed'] as const;
 
@@ -12,8 +12,6 @@ function buildVariants(brief: string, platforms: Platform[]) {
   return {
     youtubeTitle: `🎯 ${cleanBrief.slice(0, 58)}`,
     youtubeDescription: `${cleanBrief}\n\nBu içerik AI motoru ile planlandı. #icerik`,
-    instagramCaption: `${cleanBrief}\n\n#icerik #instagram`,
-    tiktokCaption: `${cleanBrief.slice(0, 120)} #icerik #tiktok`,
     platforms
   };
 }
@@ -41,12 +39,6 @@ function buildPublishPayload(input: {
     payload.youtube_title = input.variants.youtubeTitle;
     payload.youtube_description = input.variants.youtubeDescription;
   }
-  if (input.platform === 'instagram') {
-    payload.instagram_caption = input.variants.instagramCaption;
-  }
-  if (input.platform === 'tiktok') {
-    payload.tiktok_caption = input.variants.tiktokCaption;
-  }
 
   return payload;
 }
@@ -54,7 +46,7 @@ function buildPublishPayload(input: {
 export async function createContentJobAction(formData: FormData) {
   const brief = String(formData.get('brief') ?? '').trim();
   const projectId = String(formData.get('project_id') ?? '').trim() || null;
-  const selectedPlatforms = formData.getAll('platforms').map((value) => String(value)) as Platform[];
+  const selectedPlatforms: Platform[] = ['youtube'];
 
   if (!brief || selectedPlatforms.length === 0) {
     return;
@@ -114,8 +106,8 @@ export async function createContentJobAction(formData: FormData) {
       platforms: selectedPlatforms,
       youtube_title: variants.youtubeTitle,
       youtube_description: variants.youtubeDescription,
-      instagram_caption: variants.instagramCaption,
-      tiktok_caption: variants.tiktokCaption,
+      instagram_caption: null,
+      tiktok_caption: null,
       run_id: run.id,
       saved_output_id: saved.id,
       status: 'draft'

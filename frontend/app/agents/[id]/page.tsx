@@ -250,8 +250,6 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
                   <SocialOutputPanel
                     youtubeTitle={activeContentItem.youtube_title}
                     youtubeDescription={activeContentItem.youtube_description}
-                    instagramCaption={activeContentItem.instagram_caption}
-                    tiktokCaption={activeContentItem.tiktok_caption}
                   />
 
                   <form action={queueSocialPublish} className="flex flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-black/20 p-3">
@@ -259,8 +257,6 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
                     <input type="hidden" name="content_item_id" value={activeContentItem.id} />
                     <select name="target_platform" defaultValue="youtube" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm">
                       <option value="youtube">YouTube</option>
-                      <option value="instagram">Instagram</option>
-                      <option value="tiktok">TikTok</option>
                     </select>
                     <button className="rounded-lg border border-white/20 px-3 py-2 text-sm hover:border-neon">Yayın Kuyruğuna Ekle</button>
                   </form>
