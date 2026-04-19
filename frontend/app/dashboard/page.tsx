@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Nav } from '@/components/nav';
 import { getAppContextOrRedirect } from '@/lib/app-context';
 import { neutralizeVendorTerms, sanitizeUserFacingEngineLabel } from '@/lib/publish-queue';
@@ -13,136 +14,148 @@ function toDisplayStatus(status: string): string {
   return status;
 }
 
-function toEffectiveStatus(run: { status: string; result_text: string | null }): string {
-  if (run.status === 'completed' && !run.result_text) {
-    return 'failed';
-  }
-  return run.status;
-}
+const QUICK_AGENTS = [
+  { slug: 'yazilim', label: 'Yazılım', mood: 'Derin analiz' },
+  { slug: 'sosyal', label: 'Sosyal Medya', mood: 'Hızlı' },
+  { slug: 'arastirma', label: 'Araştırma', mood: 'Araştırma odaklı' },
+  { slug: 'rapor', label: 'Rapor', mood: 'Derin analiz' }
+] as const;
 
 export default async function DashboardPage() {
-  try {
-    const { supabase, workspace } = await getAppContextOrRedirect();
+  const { supabase, workspace } = await getAppContextOrRedirect();
 
-    const [
-      projectsRes,
-      runsRes,
-      savedRes,
-      recentRunsRes,
-      recentSavedRes,
-      workspaceMembersRes
-    ] = await Promise.all([
-      supabase.from('projects').select('id', { count: 'exact', head: true }).eq('workspace_id', workspace.workspaceId),
-      supabase.from('agent_runs').select('id', { count: 'exact', head: true }).eq('workspace_id', workspace.workspaceId),
-      supabase.from('saved_outputs').select('id', { count: 'exact', head: true }).eq('workspace_id', workspace.workspaceId),
-      supabase
-        .from('agent_runs')
-        .select('id, status, model_name, error_message, user_input, result_text, created_at, completed_at')
-        .eq('workspace_id', workspace.workspaceId)
-        .order('created_at', { ascending: false })
-        .limit(5),
-      supabase
-        .from('saved_outputs')
-        .select('id, title, content, created_at')
-        .eq('workspace_id', workspace.workspaceId)
-        .order('created_at', { ascending: false })
-        .limit(5),
-      supabase.from('workspace_members').select('workspace_id', { count: 'exact', head: true }).eq('workspace_id', workspace.workspaceId)
-    ]);
+  const monthStart = new Date();
+  monthStart.setUTCDate(1);
+  monthStart.setUTCHours(0, 0, 0, 0);
 
-    const metrics = {
-      projects: projectsRes.count ?? 0,
-      runs: runsRes.count ?? 0,
-      saved: savedRes.count ?? 0,
-      members: workspaceMembersRes.count ?? 0
-    };
+  const [
+    projectsRes,
+    runsRes,
+    savedRes,
+    recentRunsRes,
+    recentSavedRes,
+    subscriptionRes,
+    usageRes,
+    agentsRes
+  ] = await Promise.all([
+    supabase.from('projects').select('id', { count: 'exact', head: true }).eq('workspace_id', workspace.workspaceId),
+    supabase.from('agent_runs').select('id', { count: 'exact', head: true }).eq('workspace_id', workspace.workspaceId),
+    supabase.from('saved_outputs').select('id', { count: 'exact', head: true }).eq('workspace_id', workspace.workspaceId),
+    supabase
+      .from('agent_runs')
+      .select('id, status, model_name, error_message, user_input, result_text, created_at, agent_type_id, agent_types(name)')
+      .eq('workspace_id', workspace.workspaceId)
+      .order('created_at', { ascending: false })
+      .limit(6),
+    supabase
+      .from('saved_outputs')
+      .select('id, title, content, created_at, agent_run_id')
+      .eq('workspace_id', workspace.workspaceId)
+      .order('created_at', { ascending: false })
+      .limit(5),
+    supabase
+      .from('subscriptions')
+      .select('plan_name, run_limit, status')
+      .eq('workspace_id', workspace.workspaceId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('agent_runs')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspace.workspaceId)
+      .gte('created_at', monthStart.toISOString()),
+    supabase.from('agent_types').select('id, slug, name').eq('is_active', true).limit(8)
+  ]);
 
-    return (
-      <main>
-        <Nav />
-        <section className="panel mb-4">
-          <h2 className="text-lg font-semibold">Çalışma Alanı</h2>
-          <p className="text-white/70">{workspace.workspaceName}</p>
+  const runLimit = subscriptionRes.data?.run_limit ?? 30;
+  const usedRuns = usageRes.count ?? 0;
+  const percent = Math.min(100, Math.round((usedRuns / Math.max(1, runLimit)) * 100));
+
+  return (
+    <main>
+      <Nav />
+      <section className="panel mb-4">
+        <h2 className="text-lg font-semibold">Çalışma Alanı</h2>
+        <p className="text-white/70">{workspace.workspaceName}</p>
+      </section>
+
+      {usedRuns >= runLimit ? (
+        <section className="panel mb-4 border-amber-300/40 bg-amber-500/10">
+          <p className="text-sm text-amber-100">Aylık run limitiniz doldu. Kesintisiz kullanım için planınızı yükseltin.</p>
+          <Link href="/upgrade" className="mt-2 inline-flex rounded-lg border border-amber-200/60 px-3 py-1.5 text-sm text-amber-50">Yükselt</Link>
         </section>
+      ) : null}
 
-        <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <MetricCard title="Proje" value={metrics.projects} />
-          <MetricCard title="Çalıştırma" value={metrics.runs} />
-          <MetricCard title="Kaydedilen Çıktı" value={metrics.saved} />
-          <MetricCard title="Üye" value={metrics.members} />
-        </section>
+      <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <MetricCard title="Aktif plan" value={subscriptionRes.data?.plan_name ?? 'free'} />
+        <MetricCard title="Toplam çalışma" value={String(runsRes.count ?? 0)} />
+        <MetricCard title="Kaydedilen" value={String(savedRes.count ?? 0)} />
+        <MetricCard title="Projeler" value={String(projectsRes.count ?? 0)} />
+      </section>
 
-        <section className="mt-4 grid gap-4 lg:grid-cols-2">
-          <article className="panel">
-            <h3 className="mb-3 text-lg font-semibold">Son Çalıştırmalar</h3>
-            {recentRunsRes.error ? (
-              <p className="text-sm text-red-300">Çalıştırmalar alınamadı: {recentRunsRes.error.message}</p>
-            ) : recentRunsRes.data && recentRunsRes.data.length > 0 ? (
-              <div className="space-y-2 text-sm">
-                {recentRunsRes.data.map((run) => {
-                  const effectiveStatus = toEffectiveStatus(run);
-                  return (
-                    <div key={run.id} className="rounded-lg border border-white/10 px-3 py-2">
-                      <p>Durum: {effectiveStatus}</p>
-                      <p className="text-white/70">Etiket: {toDisplayStatus(effectiveStatus)}</p>
-                      <p className="text-white/70">Çalışma motoru: {sanitizeUserFacingEngineLabel(run.model_name)}</p>
-                      <p className="line-clamp-2 text-white/65">{run.user_input || 'İstem kaydı yok.'}</p>
-                      <p className="text-white/70">{new Date(run.created_at).toLocaleString('tr-TR')}</p>
-                      {run.completed_at ? <p className="text-white/60">Tamamlanma: {new Date(run.completed_at).toLocaleString('tr-TR')}</p> : null}
-                      {effectiveStatus === 'failed' && run.error_message ? <p className="text-red-200">Hata: {neutralizeVendorTerms(run.error_message)}</p> : null}
-                      {run.status === 'completed' && !run.result_text ? (
-                        <p className="text-amber-200">Uyarı: Tamamlandı görünüyor ancak sonuç metni bulunamadı.</p>
-                      ) : null}
-                    </div>
-                  );
-                })}
+      <section className="panel mt-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Aylık kullanım</h3>
+          <p className="text-sm text-white/70">{usedRuns} / {runLimit}</p>
+        </div>
+        <div className="mt-2 h-2 rounded-full bg-white/10">
+          <div className="h-full rounded-full bg-neon" style={{ width: `${percent}%` }} />
+        </div>
+      </section>
+
+      <section className="mt-4 grid gap-4 lg:grid-cols-2">
+        <article className="panel">
+          <h3 className="mb-3 text-lg font-semibold">Hızlı Agent Erişimi</h3>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {(agentsRes.data ?? []).map((agent) => {
+              const quick = QUICK_AGENTS.find((item) => item.slug === agent.slug);
+              return (
+                <Link key={agent.id} href={`/agents/${agent.id}`} className="rounded-lg border border-white/10 p-3 hover:border-neon">
+                  <p className="font-medium">{agent.name}</p>
+                  <p className="text-xs text-white/60">{quick?.mood ?? 'Hızlı mod'}</p>
+                </Link>
+              );
+            })}
+          </div>
+        </article>
+
+        <article className="panel">
+          <h3 className="mb-3 text-lg font-semibold">Son Kaydedilenler</h3>
+          <div className="space-y-2 text-sm">
+            {(recentSavedRes.data ?? []).map((item) => (
+              <div key={item.id} className="rounded-lg border border-white/10 px-3 py-2">
+                <p className="font-medium">{item.title ?? 'Kaydedilen çıktı'}</p>
+                <p className="line-clamp-2 text-white/70">{item.content}</p>
               </div>
-            ) : (
-              <p className="text-sm text-white/70">Henüz çalıştırma yok.</p>
-            )}
-          </article>
+            ))}
+          </div>
+        </article>
+      </section>
 
-          <article className="panel">
-            <h3 className="mb-3 text-lg font-semibold">Son Kaydedilenler</h3>
-            {recentSavedRes.error ? (
-              <p className="text-sm text-red-300">Kayıtlar alınamadı: {recentSavedRes.error.message}</p>
-            ) : recentSavedRes.data && recentSavedRes.data.length > 0 ? (
-              <div className="space-y-2 text-sm">
-                {recentSavedRes.data.map((item) => (
-                  <div key={item.id} className="rounded-lg border border-white/10 px-3 py-2">
-                    <p className="font-medium">{item.title ?? 'Kaydedilen çıktı'}</p>
-                    <p className="line-clamp-2 text-white/70">{item.content}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-white/70">Henüz kaydedilen çıktı yok.</p>
-            )}
-          </article>
-        </section>
-      </main>
-    );
-  } catch (error) {
-    return (
-      <main>
-        <Nav />
-        <section className="panel">
-          <h2 className="text-lg font-semibold">Dashboard geçici olarak kullanılamıyor</h2>
-          <p className="mt-2 text-sm text-white/70">
-            Sistem çekirdek servisleri hazır değil ya da çalışma alanı başlatılamadı.
-          </p>
-          <p className="mt-2 text-xs text-red-300">{error instanceof Error ? error.message : 'Bilinmeyen hata'}</p>
-        </section>
-      </main>
-    );
-  }
+      <section className="panel mt-4">
+        <h3 className="mb-3 text-lg font-semibold">Son Çalıştırmalar</h3>
+        <div className="space-y-2 text-sm">
+          {(recentRunsRes.data ?? []).map((run) => (
+            <div key={run.id} className="rounded-lg border border-white/10 px-3 py-2">
+              <p>Durum: {toDisplayStatus(run.status)}</p>
+              <p className="text-white/70">Motor: {sanitizeUserFacingEngineLabel(run.model_name)}</p>
+              <p className="line-clamp-2 text-white/65">{run.user_input || 'İstem kaydı yok.'}</p>
+              <p className="text-white/60">{new Date(run.created_at).toLocaleString('tr-TR')}</p>
+              {run.error_message ? <p className="text-red-200">Hata: {neutralizeVendorTerms(run.error_message)}</p> : null}
+            </div>
+          ))}
+        </div>
+      </section>
+    </main>
+  );
 }
 
-function MetricCard({ title, value }: { title: string; value: number }) {
+function MetricCard({ title, value }: { title: string; value: string }) {
   return (
     <article className="panel">
       <h2 className="text-sm text-white/70">{title}</h2>
-      <p className="mt-2 text-3xl font-semibold">{value}</p>
+      <p className="mt-2 text-2xl font-semibold">{value}</p>
     </article>
   );
 }

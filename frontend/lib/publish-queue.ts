@@ -5,7 +5,7 @@ export function toQueueStatusLabel(status: QueueStatus): string {
   if (status === 'draft') return 'Taslak';
   if (status === 'queued') return 'Sıraya alındı';
   if (status === 'processing') return 'İşleniyor';
-  if (status === 'published') return 'Yayınlandı';
+  if (status === 'published') return 'Yayın hazırlığında';
   if (status === 'failed') return 'Başarısız';
   return status;
 }
@@ -14,7 +14,7 @@ export function toQueueStateHint(status: QueueStatus): string {
   if (status === 'draft') return 'Gönderime hazır';
   if (status === 'queued') return 'Yayın hazırlığında';
   if (status === 'processing') return 'İşlem sürüyor';
-  if (status === 'published') return 'Yayın akışı tamamlandı';
+  if (status === 'published') return 'Yayın hazırlığında';
   if (status === 'failed') return 'Tekrar denenebilir';
   return 'Durum bilgisi sınırlı';
 }
@@ -84,5 +84,5 @@ export function sanitizeUserFacingEngineLabel(_: unknown): string {
 }
 
 export function neutralizeVendorTerms(text: string): string {
-  return text.replace(/gemini/gi, 'AI motoru').replace(/google\s*genai/gi, 'AI motoru');
+  return text.replace(/gemini/gi, 'AI motoru').replace(/google\s*genai/gi, 'AI motoru').replace(/google search/gi, 'araştırma modu');
 }

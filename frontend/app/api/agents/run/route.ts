@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 import { getServerEnv } from '@/lib/env';
+import { runTextStreamWithAiEngine, runTextWithAiEngine } from '@/lib/ai-engine';
 import {
   createSocialPublishPayload,
   normalizeSocialContentDraft,
@@ -18,7 +18,7 @@ type RunRequestBody = {
 };
 
 const RUN_TIMEOUT_MS = 40_000;
-const FALLBACK_ENGINE_NAME = 'AI motoru';
+const FALLBACK_ENGINE_NAME = 'Koschei AI motoru';
 
 function toRunFailureMessage(input: string): string {
   const code = input.trim().toLowerCase();
@@ -56,7 +56,7 @@ function getAccessToken(request: Request): string | null {
 }
 
 async function insertContentItemWithFallbacks(
-  serviceSupabase: any,
+  serviceSupabase: unknown,
   payload: {
     workspaceId: string;
     userId: string;
@@ -97,7 +97,7 @@ async function insertContentItemWithFallbacks(
   ];
 
   for (const candidate of candidates) {
-    const { data, error } = await (serviceSupabase.from('content_items') as any).insert(candidate).select('id').maybeSingle();
+    const { data, error } = await ((serviceSupabase as { from: (table: string) => { insert: (value: unknown) => { select: (query: string) => { maybeSingle: () => Promise<{ data: { id?: string } | null; error: { message?: string } | null }> } } } }).from('content_items')).insert(candidate).select('id').maybeSingle();
     if (!error && data?.id) {
       return data.id;
     }
@@ -107,7 +107,7 @@ async function insertContentItemWithFallbacks(
 }
 
 async function insertPublishJobsWithFallbacks(
-  serviceSupabase: any,
+  serviceSupabase: unknown,
   payload: {
     workspaceId: string;
     projectId: string | null;
@@ -138,7 +138,7 @@ async function insertPublishJobsWithFallbacks(
     ];
 
     for (const candidate of candidates) {
-      const { error } = await (serviceSupabase.from('publish_jobs') as any).insert(candidate);
+      const { error } = await ((serviceSupabase as { from: (table: string) => { insert: (value: unknown) => Promise<{ error: { message?: string } | null }> } }).from('publish_jobs')).insert(candidate);
       if (!error) {
         break;
       }
@@ -303,22 +303,34 @@ export async function POST(request: Request) {
       .eq('workspace_id', membership.workspace_id)
       .in('status', ['pending', 'processing']);
 
-    const client = new GoogleGenAI({ apiKey: modelApiKey });
-    const response = await Promise.race([
-      client.models.generateContent({
-        model: 'gemini-2.5-flash',
-        config: {
-          systemInstruction: agentType.system_prompt
-        },
-        contents: userInput
-      }),
+    const shouldStream =
+      requestMetadata &&
+      typeof requestMetadata === 'object' &&
+      'stream' in requestMetadata &&
+      typeof requestMetadata.stream === 'boolean'
+        ? requestMetadata.stream
+        : agentType.slug === 'arastirma' || agentType.slug === 'rapor';
+
+    const aiRun = await Promise.race([
+      shouldStream
+        ? runTextStreamWithAiEngine({
+            apiKey: modelApiKey,
+            agentSlug: agentType.slug,
+            userInput,
+            systemPrompt: agentType.system_prompt
+          })
+        : runTextWithAiEngine({
+            apiKey: modelApiKey,
+            agentSlug: agentType.slug,
+            userInput,
+            systemPrompt: agentType.system_prompt
+          }),
       new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error('run_timeout')), RUN_TIMEOUT_MS);
       })
     ]);
 
-    const resultText = (response.text ?? '').trim();
-    const usage = response.usageMetadata;
+    const resultText = aiRun.text;
 
     if (!resultText) {
       throw new Error('empty_result');
@@ -327,7 +339,7 @@ export async function POST(request: Request) {
     const normalizedMetadata = {
       ...(run.metadata ?? {}),
       ...(requestMetadata ?? {}),
-      ai_engine: FALLBACK_ENGINE_NAME
+      ai_engine: aiRun.displayLabel
     };
 
     const { error: updateError } = await serviceSupabase
@@ -338,9 +350,9 @@ export async function POST(request: Request) {
         error_message: null,
         completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        model_name: 'default',
-        tokens_input: usage?.promptTokenCount ?? null,
-        tokens_output: usage?.candidatesTokenCount ?? null,
+        model_name: aiRun.alias,
+        tokens_input: aiRun.usage.inputTokens,
+        tokens_output: aiRun.usage.outputTokens,
         metadata: normalizedMetadata
       })
       .eq('id', runId)

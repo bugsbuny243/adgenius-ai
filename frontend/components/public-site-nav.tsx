@@ -5,6 +5,7 @@ const links = [
   { href: '/about', label: 'Hakkımızda' },
   { href: '/contact', label: 'İletişim' },
   { href: '/articles', label: 'Yazılar' },
+  { href: '/pricing', label: 'Fiyatlandırma' },
   { href: '/privacy-policy', label: 'Gizlilik' },
   { href: '/terms', label: 'Kullanım Koşulları' },
   { href: '/login', label: 'Giriş' }

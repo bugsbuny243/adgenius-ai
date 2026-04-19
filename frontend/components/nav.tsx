@@ -9,7 +9,9 @@ const links = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/agents', label: 'Agentlar' },
   { href: '/projects', label: 'Projeler' },
-  { href: '/saved', label: 'Kaydedilenler' }
+  { href: '/saved', label: 'Kaydedilenler' },
+  { href: '/runs', label: 'Çalışmalar' },
+  { href: '/settings', label: 'Ayarlar' }
 ] as const satisfies ReadonlyArray<{ href: Route; label: string }>;
 
 export function Nav() {
@@ -42,6 +44,9 @@ export function Nav() {
             {link.label}
           </Link>
         ))}
+        <Link href="/upgrade" className="rounded-xl border border-neon/60 px-4 py-2 text-sm text-neon transition hover:bg-neon/10">
+          Yükselt
+        </Link>
         <button
           type="button"
           onClick={handleSignOut}

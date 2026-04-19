@@ -151,7 +151,7 @@ export default async function ComposerPage() {
                       <button name="status" value="draft" className="rounded-md border border-white/20 px-2 py-1">Taslak</button>
                       <button name="status" value="queued" className="rounded-md border border-white/20 px-2 py-1">Sıraya Alındı</button>
                       <button name="status" value="processing" className="rounded-md border border-white/20 px-2 py-1">İşleniyor</button>
-                      <button name="status" value="published" className="rounded-md border border-white/20 px-2 py-1">Yayınlandı</button>
+                      <button name="status" value="published" className="rounded-md border border-white/20 px-2 py-1">Yayın hazırlığında</button>
                       <button name="status" value="failed" className="rounded-md border border-white/20 px-2 py-1">Başarısız</button>
                     </div>
                   </form>
