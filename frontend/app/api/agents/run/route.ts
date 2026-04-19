@@ -36,14 +36,14 @@ function resolveProjectIdFromMetadata(metadata: unknown): string | null {
 
 function normalizePlatforms(value: unknown): SocialPlatform[] {
   if (!Array.isArray(value)) {
-    return ['youtube', 'instagram', 'tiktok'];
+    return ['youtube'];
   }
 
   const normalized = value
     .map((entry) => String(entry).toLowerCase().trim())
-    .filter((entry): entry is SocialPlatform => ['youtube', 'instagram', 'tiktok'].includes(entry));
+    .filter((entry): entry is SocialPlatform => ['youtube'].includes(entry));
 
-  return normalized.length ? Array.from(new Set(normalized)) : ['youtube', 'instagram', 'tiktok'];
+  return normalized.length ? Array.from(new Set(normalized)) : ['youtube'];
 }
 
 function getAccessToken(request: Request): string | null {
@@ -370,7 +370,7 @@ export async function POST(request: Request) {
           : null;
       const preferredPlatform =
         requestEditorState && typeof requestEditorState.platform === 'string' ? requestEditorState.platform.toLowerCase() : null;
-      const platforms: SocialPlatform[] = preferredPlatform ? normalizePlatforms([preferredPlatform]) : ['youtube', 'instagram', 'tiktok'];
+      const platforms: SocialPlatform[] = preferredPlatform ? normalizePlatforms([preferredPlatform]) : ['youtube'];
 
       const resolvedProjectId = resolveProjectIdFromMetadata(run.metadata) ?? projectId;
 

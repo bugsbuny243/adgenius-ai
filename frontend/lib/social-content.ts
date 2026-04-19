@@ -1,4 +1,4 @@
-export type SocialPlatform = 'youtube' | 'instagram' | 'tiktok';
+export type SocialPlatform = 'youtube';
 
 export type SocialContentDraft = {
   brief: string;
@@ -9,7 +9,7 @@ export type SocialContentDraft = {
   tiktokCaption: string | null;
 };
 
-const PLATFORM_SET = new Set<SocialPlatform>(['youtube', 'instagram', 'tiktok']);
+const PLATFORM_SET = new Set<SocialPlatform>(['youtube']);
 
 function cleanLine(value: string): string {
   return value.replace(/^[\-*#\d.)\s]+/, '').trim();
@@ -104,10 +104,8 @@ function derivePlatforms(
   const derived = new Set<SocialPlatform>(preferredPlatforms);
 
   if (payload.youtubeTitle || payload.youtubeDescription) derived.add('youtube');
-  if (payload.instagramCaption) derived.add('instagram');
-  if (payload.tiktokCaption) derived.add('tiktok');
 
-  return derived.size > 0 ? Array.from(derived) : ['youtube', 'instagram', 'tiktok'];
+  return derived.size > 0 ? Array.from(derived) : ['youtube'];
 }
 
 export function normalizeSocialContentDraft(input: {
@@ -153,14 +151,6 @@ export function createSocialPublishPayload(
   if (platform === 'youtube') {
     payload.youtube_title = draft.youtubeTitle;
     payload.youtube_description = draft.youtubeDescription;
-  }
-
-  if (platform === 'instagram') {
-    payload.instagram_caption = draft.instagramCaption;
-  }
-
-  if (platform === 'tiktok') {
-    payload.tiktok_caption = draft.tiktokCaption;
   }
 
   return payload;

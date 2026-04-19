@@ -3,8 +3,6 @@
 type SocialOutputPanelProps = {
   youtubeTitle?: string | null;
   youtubeDescription?: string | null;
-  instagramCaption?: string | null;
-  tiktokCaption?: string | null;
 };
 
 function OutputCard({
@@ -40,7 +38,7 @@ function OutputCard({
   );
 }
 
-export function SocialOutputPanel({ youtubeTitle, youtubeDescription, instagramCaption, tiktokCaption }: SocialOutputPanelProps) {
+export function SocialOutputPanel({ youtubeTitle, youtubeDescription }: SocialOutputPanelProps) {
   return (
     <div className="space-y-3">
       <div className="grid gap-3 md:grid-cols-2">
@@ -50,14 +48,6 @@ export function SocialOutputPanel({ youtubeTitle, youtubeDescription, instagramC
           content={youtubeDescription}
           emptyText="Bu çalıştırmada YouTube açıklaması üretilemedi."
         />
-      </div>
-      <div className="grid gap-3 md:grid-cols-2">
-        <OutputCard
-          title="Instagram Açıklama Metni"
-          content={instagramCaption}
-          emptyText="Bu çalıştırmada Instagram metni üretilemedi."
-        />
-        <OutputCard title="TikTok Açıklama Metni" content={tiktokCaption} emptyText="Bu çalıştırmada TikTok metni üretilemedi." />
       </div>
     </div>
   );

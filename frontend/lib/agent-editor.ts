@@ -119,18 +119,24 @@ export const agentEditorConfigs: Record<AgentEditorSlug, AgentEditorConfig> = {
   },
   sosyal: {
     slug: 'sosyal',
-    title: 'Sosyal Medya Editörü',
-    shortHelp: 'Platform, kitle, ton ve CTA bilgisiyle net bir içerik brifi oluşturun.',
-    summaryDescription: 'Platforma uygun içerik akışı, başlık taslağı ve CTA önerileri hazırlar.',
-    placeholder: 'Örn: Lansman haftası için 3 reels + 2 story akışı',
-    outputMode: 'İçerik özeti + başlık taslağı + format bazlı akış + CTA',
+    title: 'Koschei V5 • YouTube Agent Editörü',
+    shortHelp: 'Yalnızca YouTube için agent modu, kitle, ton ve hedef çıktıyı netleştirin.',
+    summaryDescription: 'YouTube odaklı agent çıktısı üretir ve Gemini yeteneklerini mod bazında çalıştırır.',
+    placeholder: 'Örn: AI destekli üretkenlik videosu için araştırma + script + SEO paketi',
+    outputMode: 'Agent modu özeti + YouTube başlık + YouTube açıklama + CTA',
     sections: [
       {
         title: 'İçerik Çerçevesi',
         fields: [
-          { key: 'platform', label: 'Platform', type: 'select', options: ['Instagram', 'TikTok', 'LinkedIn', 'YouTube', 'X'] },
+          { key: 'platform', label: 'Platform', type: 'select', options: ['YouTube'] },
+          {
+            key: 'agent_mode',
+            label: 'Koschei Agent Modu',
+            type: 'select',
+            options: ['orchestrator', 'research', 'script', 'title-hook', 'seo', 'thumbnail', 'qa-safety']
+          },
           { key: 'hedef_kitle', label: 'Hedef kitle', type: 'text', placeholder: 'Örn: 24-35 yaş e-ticaret kurucuları' },
-          { key: 'icerik_amaci', label: 'İçerik amacı', type: 'text', placeholder: 'Örn: Etkileşim artırma / topluluğu büyütme' },
+          { key: 'icerik_amaci', label: 'İçerik amacı', type: 'text', placeholder: 'Örn: İzlenme süresini ve abone dönüşümünü artırma' },
           { key: 'ton', label: 'Ton', type: 'text', placeholder: 'Örn: Samimi, motive edici, öğretici' }
         ]
       },
@@ -138,39 +144,41 @@ export const agentEditorConfigs: Record<AgentEditorSlug, AgentEditorConfig> = {
         title: 'Mesaj',
         fields: [
           { key: 'konu', label: 'Konu', type: 'textarea', placeholder: 'Ana konu ve mesajı kısa bir paragrafla girin' },
-          { key: 'cta', label: 'CTA', type: 'text', placeholder: 'Örn: Yoruma fikir bırak, kaydet, DM gönder' },
-          { key: 'format', label: 'Format', type: 'select', options: ['post', 'reel', 'story', 'short', 'video thread'] }
+          { key: 'cta', label: 'CTA', type: 'text', placeholder: 'Örn: Yoruma görüş bırak, kanala abone ol, videoyu paylaş' },
+          { key: 'format', label: 'Format', type: 'select', options: ['short', 'long-form', 'live'] }
         ]
       }
     ],
     previewSections: [
-      { title: 'İçerik özeti', template: '{{platform}} | {{format}} | {{icerik_amaci}}' },
+      { title: 'İçerik özeti', template: '{{platform}} | {{agent_mode}} | {{format}} | {{icerik_amaci}}' },
       { title: 'Başlık taslağı', template: '{{hedef_kitle}} için: {{konu}}' },
       { title: 'Ton ve mesaj', template: '{{ton}} tonunda kısa anlatım' },
       { title: 'CTA özeti', template: '{{cta}}' }
     ],
     starterPacks: [
       {
-        label: 'Haftalık Plan',
-        description: 'Haftalık sosyal medya içerik planı için hızlı başlangıç.',
+        label: 'Orchestrator',
+        description: 'Araştırma + script + SEO + hook çıktısını tek akışta üretir.',
         state: {
-          platform: 'Instagram',
-          format: 'reel',
-          icerik_amaci: 'Etkileşim artırma',
+          platform: 'YouTube',
+          agent_mode: 'orchestrator',
+          format: 'long-form',
+          icerik_amaci: 'İzlenme süresini artırma',
           ton: 'Samimi ve enerjik'
         },
-        freeNotes: 'Her içerik için bir hook ve alternatif CTA öner.'
+        freeNotes: 'Çıktıyı bölüm bölüm ver: araştırma notu, script iskeleti, başlık alternatifleri ve SEO paketi.'
       },
       {
-        label: 'Lansman',
-        description: 'Yeni ürün/hizmet duyurusu odaklı akış başlangıcı.',
+        label: 'Research',
+        description: 'Gemini araştırma modu ile konu ve rakip çerçevesi çıkarır.',
         state: {
-          platform: 'LinkedIn',
-          format: 'post',
-          icerik_amaci: 'Lansman duyurusu',
+          platform: 'YouTube',
+          agent_mode: 'research',
+          format: 'long-form',
+          icerik_amaci: 'Konu derinliği ve farklılaşma',
           ton: 'Güven veren ve profesyonel'
         },
-        freeNotes: 'İlk cümle güçlü bir problemle başlasın.'
+        freeNotes: 'Konu başına kısa veri notu, izleyici sorusu ve önerilen hook ver.'
       }
     ]
   },

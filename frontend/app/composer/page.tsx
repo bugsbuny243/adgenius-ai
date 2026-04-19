@@ -82,8 +82,6 @@ export default async function ComposerPage() {
             <legend className="text-sm">Platform varyantları</legend>
             <div className="mt-2 flex flex-wrap gap-4 text-sm">
               <label><input type="checkbox" name="platforms" value="youtube" defaultChecked /> YouTube</label>
-              <label><input type="checkbox" name="platforms" value="instagram" defaultChecked /> Instagram</label>
-              <label><input type="checkbox" name="platforms" value="tiktok" defaultChecked /> TikTok</label>
             </div>
           </fieldset>
 
@@ -103,8 +101,6 @@ export default async function ComposerPage() {
                   <p className="text-xs text-white/60">{new Date(item.created_at).toLocaleString('tr-TR')}</p>
                   <p className="mt-1 font-medium">Brief: {item.brief}</p>
                   <p>YouTube: {item.youtube_title}</p>
-                  <p>Instagram: {item.instagram_caption}</p>
-                  <p>TikTok: {item.tiktok_caption}</p>
                 </div>
               ))}
             </div>
