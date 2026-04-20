@@ -28,7 +28,7 @@ function statusLabel(status: string): string {
   if (status === 'processing') return 'İşleniyor';
   if (status === 'pending') return 'Sırada';
   if (status === 'failed') return 'Başarısız';
-  return status;
+  return 'Bilinmiyor';
 }
 
 export function RunsList({ runs }: { runs: RunItem[] }) {
@@ -60,7 +60,7 @@ export function RunsList({ runs }: { runs: RunItem[] }) {
 
   return (
     <div className="space-y-3 text-sm">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 rounded-lg border border-white/10 bg-black/20 p-2">
         <select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded-lg border border-white/20 bg-black/30 px-3 py-2">
           <option value="all">Durum: Tümü</option>
           <option value="completed">Tamamlandı</option>
@@ -85,14 +85,14 @@ export function RunsList({ runs }: { runs: RunItem[] }) {
       </div>
 
       {visible.map((run) => (
-        <div key={run.id} className="rounded-lg border border-white/10 p-3">
+        <div key={run.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="font-medium">{getAgentLabel(run.agent_types)}</p>
             <span className="rounded border border-white/20 px-2 py-0.5 text-xs">{statusLabel(run.status)}</span>
           </div>
           <p className="mt-1 line-clamp-2 text-white/70">{(run.user_input ?? 'İstem kaydı yok.').slice(0, 260)}</p>
           <p className="mt-1 text-xs text-white/60">{new Date(run.created_at).toLocaleString('tr-TR')} • {sanitizeUserFacingEngineLabel(run.model_name)}</p>
-          <button onClick={() => setActive(run)} className="mt-2 rounded border border-white/20 px-2 py-1 hover:border-neon">Detay</button>
+          <button onClick={() => setActive(run)} className="mt-2 rounded border border-white/20 px-2 py-1 hover:border-neon">Detay / yeniden çalıştır</button>
         </div>
       ))}
 

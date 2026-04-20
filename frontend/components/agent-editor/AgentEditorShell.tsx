@@ -31,6 +31,11 @@ export function AgentEditorShell({ agentSlug, projects, runAction, initialMetada
   const starterPacks = useMemo(() => getAgentStarterPacks(agentSlug), [agentSlug]);
   const [selectedPackIndex, setSelectedPackIndex] = useState(0);
 
+  const suggestedPackIndex = useMemo(() => {
+    const index = starterPacks.findIndex((pack) => pack.label.toLowerCase().includes('boş başla'));
+    return index >= 0 ? index : 0;
+  }, [starterPacks]);
+
   const helperTips = useMemo(() => {
     const tips: Record<string, string[]> = {
       yazilim: ['Problemi ve beklenen davranışı ayrı yazın.', 'Kısıtlarda dokunulmaması gereken alanları net belirtin.'],
@@ -98,6 +103,13 @@ export function AgentEditorShell({ agentSlug, projects, runAction, initialMetada
           <div className="rounded-xl border border-white/10 bg-black/20 p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <p className="text-sm font-semibold">Hızlı başlat presetleri</p>
+              <button
+                type="button"
+                onClick={() => setSelectedPackIndex(suggestedPackIndex)}
+                className="rounded-lg border border-white/20 px-2.5 py-1 text-xs text-white/75 hover:border-neon"
+              >
+                Akıllı başlangıç
+              </button>
             </div>
             <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
               <select
@@ -129,7 +141,7 @@ export function AgentEditorShell({ agentSlug, projects, runAction, initialMetada
                 </button>
               </div>
             </div>
-            <p className="mt-2 text-xs text-white/65">{starterPacks[selectedPackIndex]?.description}</p>
+            <p className="mt-2 text-xs text-white/65">{starterPacks[selectedPackIndex]?.description ?? 'Şablon seçerek formu tek tıkla doldurabilirsiniz.'}</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {starterPacks.map((pack, index) => (
                 <button

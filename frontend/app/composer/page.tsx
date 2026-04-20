@@ -101,12 +101,13 @@ export default async function ComposerPage() {
                 <div key={item.id} className="rounded-lg border border-white/10 p-3">
                   <p className="text-xs text-white/60">{new Date(item.created_at).toLocaleString('tr-TR')}</p>
                   <p className="mt-1 font-medium">Brief: {item.brief}</p>
-                  <p>YouTube: {item.youtube_title}</p>
+                  <p className="line-clamp-2 text-white/75">YouTube: {item.youtube_title ?? 'Başlık yok'}</p>
+                  <p className="text-xs text-white/55">Platformlar: {(item.platforms ?? []).join(', ') || 'Belirtilmedi'}</p>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-white/70">Henüz içerik işi yok.</p>
+            <div className="rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-white/70">Henüz içerik işi yok. İlk içerik briefinizi oluşturup yayın hazırlık akışını başlatın.</div>
           )}
         </article>
 

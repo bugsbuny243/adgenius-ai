@@ -15,7 +15,7 @@ const plans = [
     badge: 'En dengeli plan',
     price: '₺590',
     period: '/ay',
-    features: ['300 çalışma/ay', 'Hızlı + derin mod erişimi', 'Araştırma destekli akış', 'Öncelikli işlem sırası'],
+    features: ['300 çalışma/ay', 'Hızlı mod + Derin analiz modu', 'Araştırma destekli akış', 'Öncelikli işlem sırası'],
     cta: { href: '/upgrade', label: 'Başlangıç Planını Seç' }
   },
   {
@@ -23,7 +23,7 @@ const plans = [
     badge: 'Ekipler için',
     price: '₺1.490',
     period: '/ay',
-    features: ['Yüksek kullanım limiti', 'Gelişmiş ekip üretim akışı', 'Daha geniş operasyon kapasitesi', 'Öncelikli destek'],
+    features: ['Yüksek kullanım limiti', 'Yoğun operasyon iş yükü', 'Geniş ekip üretim akışları', 'Öncelikli destek'],
     cta: { href: '/upgrade', label: 'Pro Planına Geç' }
   }
 ] as const;
@@ -35,7 +35,7 @@ export default function PricingPage() {
       <section className="space-y-3">
         <p className="text-sm uppercase tracking-[0.2em] text-lilac">Fiyatlandırma</p>
         <h1 className="text-4xl font-bold">Koschei AI ile ölçeklenen planlar</h1>
-        <p className="max-w-3xl text-white/75">Planlar net limitlerle sunulur. Gerçekleşmemiş özellikler için yanıltıcı ifade kullanılmaz; tüm durumlar ürün içinde dürüst şekilde gösterilir.</p>
+        <p className="max-w-3xl text-white/75">Planlar net limitlerle sunulur. Kullanımınız arttıkça yükseltme kararını veriye göre rahatça alabilirsiniz.</p>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-3">
@@ -51,11 +51,29 @@ export default function PricingPage() {
       </section>
 
       <section className="rounded-2xl border border-white/10 bg-black/20 p-5">
+        <h2 className="text-2xl font-semibold">Özellik karşılaştırması</h2>
+        <div className="mt-3 overflow-auto text-sm">
+          <table className="w-full min-w-[640px] border-collapse">
+            <thead>
+              <tr className="text-left text-white/60">
+                <th className="border-b border-white/10 py-2">Özellik</th><th className="border-b border-white/10 py-2">Ücretsiz</th><th className="border-b border-white/10 py-2">Başlangıç</th><th className="border-b border-white/10 py-2">Pro</th>
+              </tr>
+            </thead>
+            <tbody className="text-white/80">
+              <tr><td className="py-2">Aylık çalışma limiti</td><td>30</td><td>300</td><td>Yüksek</td></tr>
+              <tr><td className="py-2">Araştırma destekli mod</td><td>Sınırlı</td><td>Var</td><td>Var</td></tr>
+              <tr><td className="py-2">Ekip operasyonu</td><td>Temel</td><td>Orta</td><td>Geniş</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-white/10 bg-black/20 p-5">
         <h2 className="text-2xl font-semibold">Sık sorulan sorular</h2>
         <div className="mt-3 space-y-3 text-sm text-white/80">
           <p><strong>Plan yükseltince verilerim silinir mi?</strong> Hayır, mevcut proje ve çıktılarınız korunur.</p>
-          <p><strong>Ödeme entegrasyonu hazır mı?</strong> Bu sürümde ödeme adımı hazırlık modundadır; durum sayfada açıkça belirtilir.</p>
-          <p><strong>Ekip planı kimler için?</strong> Düzenli içerik/publish operasyonu yürüten ekipler için uygundur.</p>
+          <p><strong>Ödeme entegrasyonu hazır mı?</strong> Bu sürümde ödeme adımı hazırlık modundadır; yükseltme sayfasında bu durum açıkça belirtilir.</p>
+          <p><strong>Hangi planı seçmeliyim?</strong> Günlük kullanım yoğunluğu düşükse Ücretsiz, düzenli operasyon varsa Başlangıç, ekip çalışması yoğunsa Pro plan önerilir.</p>
         </div>
       </section>
     </main>

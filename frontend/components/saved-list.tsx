@@ -49,28 +49,18 @@ export function SavedList({ items, onDelete }: { items: SavedItem[]; onDelete: (
         const runId = item.agent_run_id;
 
         return (
-          <div key={item.id} className="rounded-lg border border-white/10 p-3 text-sm">
-            <p className="font-medium">{item.title ?? 'Kaydedilen çıktı'}</p>
-            <p className="line-clamp-2 text-white/70">{item.content}</p>
-            <p className="mt-1 text-xs text-white/60">{new Date(item.created_at).toLocaleString('tr-TR')}</p>
-            <div className="mt-2 flex flex-wrap gap-2">
+          <div key={item.id} className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm">
+            <div className="flex items-start justify-between gap-2">
+              <p className="font-medium">{item.title ?? 'Kaydedilen çıktı'}</p>
+              <span className="rounded border border-white/15 px-2 py-1 text-[11px] text-white/65">{new Date(item.created_at).toLocaleDateString('tr-TR')}</span>
+            </div>
+            <p className="mt-2 line-clamp-2 text-white/70">{item.content}</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               <button onClick={() => navigator.clipboard.writeText(item.content)} className="rounded border border-white/20 px-2 py-1">Kopyala</button>
-              <button onClick={() => setActive(item)} className="rounded border border-white/20 px-2 py-1">Modal</button>
-              {agentTypeId && runId ? (
-                <Link href={`/agents/${agentTypeId}?run_id=${runId}`} className="rounded border border-neon/50 px-2 py-1 text-neon">
-                  İlgili sonuca git
-                </Link>
-              ) : null}
-              {item.project_id ? (
-                <Link href={`/projects/${item.project_id}`} className="rounded border border-white/20 px-2 py-1">
-                  İlgili projeye git
-                </Link>
-              ) : null}
-              {agentTypeId && runId ? (
-                <Link href={`/agents/${agentTypeId}?run_id=${runId}&edit_run_id=${runId}&source=saved`} className="rounded border border-white/20 px-2 py-1">
-                  Yeniden çalıştır
-                </Link>
-              ) : null}
+              <button onClick={() => setActive(item)} className="rounded border border-white/20 px-2 py-1">Detay modalı</button>
+              {agentTypeId && runId ? <Link href={`/agents/${agentTypeId}?run_id=${runId}`} className="rounded border border-neon/50 px-2 py-1 text-neon">Sonuca git</Link> : null}
+              {item.project_id ? <Link href={`/projects/${item.project_id}`} className="rounded border border-white/20 px-2 py-1">Projeye git</Link> : null}
+              {agentTypeId && runId ? <Link href={`/agents/${agentTypeId}?run_id=${runId}&edit_run_id=${runId}&source=saved`} className="rounded border border-white/20 px-2 py-1">Bu çıktıyla yeniden çalış</Link> : null}
               <button
                 disabled={isPending}
                 onClick={() => {
@@ -89,11 +79,12 @@ export function SavedList({ items, onDelete }: { items: SavedItem[]; onDelete: (
       })}
 
       {active ? (
-        <dialog open className="max-w-xl rounded-xl border border-white/20 bg-ink p-4 text-white">
+        <dialog open className="max-w-2xl rounded-xl border border-white/20 bg-ink p-4 text-white">
           <h4 className="mb-2 text-lg">{active.title ?? 'Detay'}</h4>
-          <pre className="max-h-96 overflow-auto whitespace-pre-wrap text-sm text-white/80">{active.content}</pre>
-          <div className="mt-3 flex gap-2">
+          <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-white/10 bg-black/25 p-3 text-sm text-white/80">{active.content}</pre>
+          <div className="mt-3 flex flex-wrap gap-2">
             <button onClick={() => navigator.clipboard.writeText(active.content)} className="rounded border border-white/20 px-3 py-1">Kopyala</button>
+            {active.project_id ? <Link href={`/projects/${active.project_id}`} className="rounded border border-white/20 px-3 py-1">Projeye git</Link> : null}
             <button onClick={() => setActive(null)} className="rounded border border-white/20 px-3 py-1">Kapat</button>
           </div>
         </dialog>
