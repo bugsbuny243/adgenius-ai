@@ -322,7 +322,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    await serviceSupabase
+    const { error: markProcessingError } = await serviceSupabase
       .from('agent_runs')
       .update({
         status: 'processing',
@@ -338,6 +338,10 @@ export async function POST(request: Request) {
       .eq('user_id', user.id)
       .eq('workspace_id', membership.workspace_id)
       .in('status', ['pending', 'processing']);
+
+    if (markProcessingError) {
+      throw new Error(`run_update_failed:${markProcessingError.message}`);
+    }
 
     const shouldStream =
       requestMetadata &&

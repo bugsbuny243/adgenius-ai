@@ -55,9 +55,9 @@ export default async function ProjectsPage() {
         {error ? (
           <p className="text-sm text-red-300">Projeler yüklenemedi: {error.message}</p>
         ) : projects && projects.length > 0 ? (
-          <div className="space-y-3">
+          <div className="grid gap-3 md:grid-cols-2">
             {projects.map((project) => (
-              <Link key={project.id} href={`/projects/${project.id}`} className="block rounded-xl border border-white/10 px-4 py-3">
+              <Link key={project.id} href={`/projects/${project.id}`} className="block rounded-xl border border-white/10 px-4 py-3 hover:border-neon">
                 <p className="font-medium">{project.name}</p>
                 <p className="text-sm text-white/60">{project.description || 'Açıklama yok.'}</p>
                 <p className="mt-2 text-xs text-white/55">Öğe sayısı: {itemStats[project.id]?.count ?? 0}</p>

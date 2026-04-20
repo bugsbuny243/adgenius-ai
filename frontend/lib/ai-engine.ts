@@ -4,10 +4,11 @@ export type KoscheiModelAlias = 'koschei-fast' | 'koschei-deep' | 'koschei-resea
 
 export type AgentRunProfile = {
   alias: KoscheiModelAlias;
-  displayLabel: string;
+  displayLabel: 'Hızlı mod' | 'Derin analiz modu' | 'Araştırma destekli mod';
   enableResearchMode: boolean;
   maxOutputTokens: number;
   thinkingBudget?: number;
+  temperature: number;
 };
 
 type RunTextOptions = {
@@ -21,7 +22,7 @@ type RunTextOptions = {
 export type AiRunResult = {
   text: string;
   alias: KoscheiModelAlias;
-  displayLabel: string;
+  displayLabel: AgentRunProfile['displayLabel'];
   usage: {
     inputTokens: number | null;
     outputTokens: number | null;
@@ -32,7 +33,8 @@ const PROFILE_FAST: AgentRunProfile = {
   alias: 'koschei-fast',
   displayLabel: 'Hızlı mod',
   enableResearchMode: false,
-  maxOutputTokens: 2_048
+  maxOutputTokens: 2_048,
+  temperature: 0.8
 };
 
 const PROFILE_DEEP: AgentRunProfile = {
@@ -40,7 +42,8 @@ const PROFILE_DEEP: AgentRunProfile = {
   displayLabel: 'Derin analiz modu',
   enableResearchMode: false,
   maxOutputTokens: 4_096,
-  thinkingBudget: 2048
+  thinkingBudget: 2_048,
+  temperature: 0.35
 };
 
 const PROFILE_RESEARCH: AgentRunProfile = {
@@ -48,22 +51,25 @@ const PROFILE_RESEARCH: AgentRunProfile = {
   displayLabel: 'Araştırma destekli mod',
   enableResearchMode: true,
   maxOutputTokens: 4_096,
-  thinkingBudget: 1536
+  thinkingBudget: 1_536,
+  temperature: 0.3
 };
+
+const DEEP_AGENT_SLUGS = new Set(['yazilim', 'rapor']);
+const RESEARCH_AGENT_SLUGS = new Set(['arastirma']);
+const RESEARCH_MODES = new Set(['research']);
+const DEEP_MODES = new Set(['orchestrator', 'script', 'title-hook', 'seo', 'qa-safety']);
 
 function resolveRunProfile(agentSlug: string, agentMode?: string | null): AgentRunProfile {
   const normalizedSlug = agentSlug.trim().toLowerCase();
   const normalizedMode = typeof agentMode === 'string' ? agentMode.trim().toLowerCase() : '';
 
-  if (normalizedSlug === 'arastirma' || normalizedMode === 'research') return PROFILE_RESEARCH;
-  if (normalizedSlug === 'yazilim' || normalizedSlug === 'rapor') return PROFILE_DEEP;
-
-  if (['orchestrator', 'script', 'title-hook', 'seo', 'qa-safety'].includes(normalizedMode)) {
-    return PROFILE_DEEP;
+  if (RESEARCH_AGENT_SLUGS.has(normalizedSlug) || RESEARCH_MODES.has(normalizedMode)) {
+    return PROFILE_RESEARCH;
   }
 
-  if (normalizedMode === 'thumbnail') {
-    return PROFILE_FAST;
+  if (DEEP_AGENT_SLUGS.has(normalizedSlug) || DEEP_MODES.has(normalizedMode)) {
+    return PROFILE_DEEP;
   }
 
   return PROFILE_FAST;
@@ -87,7 +93,8 @@ function extractUsage(source: unknown): { inputTokens: number | null; outputToke
 
 function buildConfig(profile: AgentRunProfile, systemPrompt: string | null): Record<string, unknown> {
   const config: Record<string, unknown> = {
-    maxOutputTokens: profile.maxOutputTokens
+    maxOutputTokens: profile.maxOutputTokens,
+    temperature: profile.temperature
   };
 
   if (systemPrompt?.trim()) {
@@ -110,7 +117,6 @@ function buildConfig(profile: AgentRunProfile, systemPrompt: string | null): Rec
 async function runInternal(options: RunTextOptions, stream: boolean): Promise<AiRunResult> {
   const profile = resolveRunProfile(options.agentSlug, options.agentMode);
   const model = resolveServerModel(profile.alias);
-
   const client = new GoogleGenAI({ apiKey: options.apiKey });
 
   if (!stream) {
@@ -139,7 +145,11 @@ async function runInternal(options: RunTextOptions, stream: boolean): Promise<Ai
 
   for await (const chunk of responseStream) {
     text += chunk.text ?? '';
-    usage = extractUsage(chunk.usageMetadata);
+    const usageChunk = extractUsage(chunk.usageMetadata);
+    usage = {
+      inputTokens: usageChunk.inputTokens ?? usage.inputTokens,
+      outputTokens: usageChunk.outputTokens ?? usage.outputTokens
+    };
   }
 
   return {
