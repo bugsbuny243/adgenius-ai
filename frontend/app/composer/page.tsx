@@ -53,7 +53,8 @@ export default async function ComposerPage() {
     <main>
       <Nav />
       <section className="panel mb-4">
-        <h2 className="mb-3 text-xl font-semibold">İçerik Oluşturucu</h2>
+        <h2 className="mb-1 text-xl font-semibold">Sosyal İçerik Stüdyosu</h2>
+        <p className="mb-3 text-sm text-white/65">İçerik üret, varyantlarını incele ve yayın hazırlık kuyruğuna gönder.</p>
         <form action={createContentJobAction} className="space-y-3">
           <label className="block text-sm">
             Proje
@@ -126,7 +127,7 @@ export default async function ComposerPage() {
                 });
 
                 return (
-                  <form key={job.id} action={updatePublishStatusAction} className="rounded-lg border border-white/10 p-3">
+                  <form key={job.id} action={updatePublishStatusAction} className="rounded-xl border border-white/10 bg-black/20 p-3">
                     <input type="hidden" name="job_id" value={job.id} />
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <p className="font-medium text-white/90">{toPlatformLabel(job.target_platform)}</p>
@@ -142,6 +143,11 @@ export default async function ComposerPage() {
                     <p className="text-xs text-white/60">İçerik kaynağı: {job.content_output_id ?? 'İçerik kaydı bulunamadı'}</p>
                     {preview.payloadPartial ? <p className="mt-1 text-xs text-amber-200">Uyarı: Payload alanı kısmi görünüyor; önizleme ilişkili içerikten türetildi.</p> : null}
                     {!relatedContent && job.content_output_id ? <p className="mt-1 text-xs text-amber-200">Bağlı içerik kaydı artık bulunamıyor olabilir.</p> : null}
+                    <details className="mt-2 rounded-md border border-white/10 bg-black/30 p-2">
+                      <summary className="cursor-pointer text-xs text-white/70">Detaylı önizlemeyi aç</summary>
+                      <p className="mt-2 text-xs text-white/70">{preview.detail ?? 'Detay yok.'}</p>
+                      <p className="text-xs text-white/55">İş kimliği: {job.id}</p>
+                    </details>
 
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button name="status" value="draft" className="rounded-md border border-white/20 px-2 py-1">Taslak</button>
@@ -155,7 +161,9 @@ export default async function ComposerPage() {
               })}
             </div>
           ) : (
-            <p className="text-sm text-white/70">Kuyruk boş. İçerik üretip platform seçerek sıraya ekleyebilirsiniz.</p>
+            <div className="rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-white/70">
+              Kuyruk şu an boş. İçerik üretip platform seçerek gönderiyi “yayın hazırlığında” durumuna alabilirsiniz.
+            </div>
           )}
         </article>
       </section>

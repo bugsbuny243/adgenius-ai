@@ -29,6 +29,21 @@ export function AgentEditorShell({ agentSlug, projects, runAction, initialMetada
 
   const storageKey = `agent-editor-v2:${agentSlug}`;
   const starterPacks = useMemo(() => getAgentStarterPacks(agentSlug), [agentSlug]);
+  const [selectedPackIndex, setSelectedPackIndex] = useState(0);
+
+  const helperTips = useMemo(() => {
+    const tips: Record<string, string[]> = {
+      yazilim: ['Problemi ve beklenen davranışı ayrı yazın.', 'Kısıtlarda dokunulmaması gereken alanları net belirtin.'],
+      sosyal: ['Platform ve format seçimi çıktıyı doğrudan etkiler.', 'CTA cümlesini tek ve ölçülebilir hedefle yazın.'],
+      eposta: ['Alıcı tipi + amaç birlikte net olursa metin daha güçlü olur.', 'Tek e-postada tek ana CTA kullanın.'],
+      icerik: ['Ana konu ve hedef kelimeleri birlikte girin.', 'Amaç alanına beklenen iş sonucunu yazın.'],
+      rapor: ['Veri özetini kısa ama sayısal yazın.', 'Hedef okuyucu seviyesine uygun format seçin.'],
+      arastirma: ['Rakip listesini mümkünse gerçek marka adlarıyla girin.', 'Derinlik seviyesi süre ve kapsamı belirler.'],
+      emlak: ['Hedef müşteri ve konum bilgisini birlikte netleştirin.', 'Öne çıkan özellikler kısa madde yapısında daha iyi çalışır.'],
+      eticaret: ['Ürün faydalarını müşteri problemleriyle eşleyin.', 'Platform seçimi metin uzunluğu ve tonunu değiştirir.']
+    };
+    return tips[agentSlug] ?? ['Brief ne kadar netse çıktı o kadar tutarlı olur.'];
+  }, [agentSlug]);
 
   useEffect(() => {
     if (initialMetadata) return;
@@ -83,21 +98,45 @@ export function AgentEditorShell({ agentSlug, projects, runAction, initialMetada
           <div className="rounded-xl border border-white/10 bg-black/20 p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <p className="text-sm font-semibold">Hızlı başlat presetleri</p>
-              <button type="button" onClick={handleReset} className="inline-flex items-center gap-1 rounded-md border border-white/20 px-2 py-1 text-xs hover:border-neon">
-                Temizle
-              </button>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {starterPacks.map((pack) => (
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+              <select
+                value={selectedPackIndex}
+                onChange={(event) => setSelectedPackIndex(Number(event.target.value))}
+                className="rounded-lg border border-white/20 bg-black/40 px-3 py-2 text-sm"
+              >
+                {starterPacks.map((pack, index) => (
+                  <option key={pack.label} value={index}>
+                    {pack.label}
+                  </option>
+                ))}
+              </select>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const pack = starterPacks[selectedPackIndex];
+                    if (!pack) return;
+                    setEditorState((current) => ({ ...current, ...pack.state }));
+                    setFreeNotes(pack.freeNotes ?? '');
+                  }}
+                  className="rounded-lg border border-neon/40 px-3 py-2 text-xs text-neon hover:bg-neon/10"
+                >
+                  Şablondan doldur
+                </button>
+                <button type="button" onClick={handleReset} className="rounded-lg border border-white/20 px-3 py-2 text-xs hover:border-neon">
+                  Formu temizle
+                </button>
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-white/65">{starterPacks[selectedPackIndex]?.description}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {starterPacks.map((pack, index) => (
                 <button
                   key={pack.label}
                   type="button"
-                  onClick={() => {
-                    setEditorState((current) => ({ ...current, ...pack.state }));
-                    if (pack.freeNotes) setFreeNotes(pack.freeNotes);
-                  }}
-                  className="rounded-lg border border-white/20 px-2.5 py-1.5 text-xs text-white/80 hover:border-neon"
-                  title={pack.description}
+                  onClick={() => setSelectedPackIndex(index)}
+                  className={`rounded-lg border px-2.5 py-1.5 text-xs ${index === selectedPackIndex ? 'border-neon text-neon' : 'border-white/20 text-white/80'}`}
                 >
                   {pack.label}
                 </button>
@@ -128,6 +167,14 @@ export function AgentEditorShell({ agentSlug, projects, runAction, initialMetada
             </div>
 
             <AgentEditorRenderer config={config} state={editorState} onChange={handleFieldChange} />
+            <div className="mt-4 rounded-lg border border-white/10 bg-black/30 p-3">
+              <p className="text-xs uppercase tracking-wide text-white/50">Mini yardımcı ipuçları</p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-white/75">
+                {helperTips.map((tip) => (
+                  <li key={tip}>{tip}</li>
+                ))}
+              </ul>
+            </div>
           </div>
 
           <div className="rounded-xl border border-white/10 bg-black/20 p-4">

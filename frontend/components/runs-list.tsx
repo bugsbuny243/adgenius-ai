@@ -35,13 +35,25 @@ export function RunsList({ runs }: { runs: RunItem[] }) {
   const [status, setStatus] = useState('all');
   const [agent, setAgent] = useState('all');
   const [limit, setLimit] = useState(20);
+  const [dateRange, setDateRange] = useState<'all' | 'today' | 'week'>('all');
   const [active, setActive] = useState<RunItem | null>(null);
 
   const agents = useMemo(() => Array.from(new Set(runs.map((run) => getAgentLabel(run.agent_types)))).sort((a, b) => a.localeCompare(b, 'tr')), [runs]);
 
   const filtered = useMemo(
-    () => runs.filter((run) => (status === 'all' || run.status === status) && (agent === 'all' || getAgentLabel(run.agent_types) === agent)),
-    [runs, status, agent]
+    () =>
+      runs.filter((run) => {
+        const byStatus = status === 'all' || run.status === status;
+        const byAgent = agent === 'all' || getAgentLabel(run.agent_types) === agent;
+        const createdTime = new Date(run.created_at).getTime();
+        const now = Date.now();
+        const byDate =
+          dateRange === 'all' ||
+          (dateRange === 'today' && now - createdTime <= 24 * 60 * 60 * 1000) ||
+          (dateRange === 'week' && now - createdTime <= 7 * 24 * 60 * 60 * 1000);
+        return byStatus && byAgent && byDate;
+      }),
+    [runs, status, agent, dateRange]
   );
 
   const visible = filtered.slice(0, limit);
@@ -65,6 +77,11 @@ export function RunsList({ runs }: { runs: RunItem[] }) {
             </option>
           ))}
         </select>
+        <select value={dateRange} onChange={(e) => setDateRange(e.target.value as 'all' | 'today' | 'week')} className="rounded-lg border border-white/20 bg-black/30 px-3 py-2">
+          <option value="all">Tarih: Tümü</option>
+          <option value="today">Son 24 saat</option>
+          <option value="week">Son 7 gün</option>
+        </select>
       </div>
 
       {visible.map((run) => (
@@ -73,7 +90,7 @@ export function RunsList({ runs }: { runs: RunItem[] }) {
             <p className="font-medium">{getAgentLabel(run.agent_types)}</p>
             <span className="rounded border border-white/20 px-2 py-0.5 text-xs">{statusLabel(run.status)}</span>
           </div>
-          <p className="mt-1 line-clamp-2 text-white/70">{run.user_input ?? 'İstem kaydı yok.'}</p>
+          <p className="mt-1 line-clamp-2 text-white/70">{(run.user_input ?? 'İstem kaydı yok.').slice(0, 260)}</p>
           <p className="mt-1 text-xs text-white/60">{new Date(run.created_at).toLocaleString('tr-TR')} • {sanitizeUserFacingEngineLabel(run.model_name)}</p>
           <button onClick={() => setActive(run)} className="mt-2 rounded border border-white/20 px-2 py-1 hover:border-neon">Detay</button>
         </div>

@@ -52,7 +52,9 @@ export default async function DashboardPage() {
     recentSavedRes,
     subscriptionRes,
     usageRes,
-    agentsRes
+    agentsRes,
+    queueRes,
+    socialRes
   ] = await Promise.all([
     supabase.from('projects').select('id', { count: 'exact', head: true }).eq('workspace_id', workspace.workspaceId),
     supabase.from('agent_runs').select('id', { count: 'exact', head: true }).eq('workspace_id', workspace.workspaceId),
@@ -81,7 +83,9 @@ export default async function DashboardPage() {
       .select('id', { count: 'exact', head: true })
       .eq('workspace_id', workspace.workspaceId)
       .gte('created_at', monthStart.toISOString()),
-    supabase.from('agent_types').select('id, slug, name').eq('is_active', true).limit(8)
+    supabase.from('agent_types').select('id, slug, name').eq('is_active', true).limit(8),
+    supabase.from('publish_jobs').select('id, status', { count: 'exact' }).eq('workspace_id', workspace.workspaceId).limit(100),
+    supabase.from('content_items').select('id', { count: 'exact', head: true }).eq('workspace_id', workspace.workspaceId)
   ]);
 
   const runLimit = subscriptionRes.data?.run_limit ?? 30;
@@ -108,6 +112,18 @@ export default async function DashboardPage() {
         <MetricCard title="Toplam çalışma" value={String(runsRes.count ?? 0)} />
         <MetricCard title="Kaydedilen" value={String(savedRes.count ?? 0)} />
         <MetricCard title="Projeler" value={String(projectsRes.count ?? 0)} />
+      </section>
+      <section className="mt-4 grid gap-4 md:grid-cols-3">
+        <MetricCard title="Sosyal içerik" value={String(socialRes.count ?? 0)} />
+        <MetricCard title="Queue kaydı" value={String(queueRes.count ?? 0)} />
+        <article className="panel">
+          <h2 className="text-sm text-white/70">Bugün ne yapabilirsin?</h2>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-white/80">
+            <li>Yeni bir agent çalıştırıp sonucu projeye ekle.</li>
+            <li>Kaydedilen çıktılardan birini yeniden çalıştır.</li>
+            <li>Sosyal içerikleri yayın kuyruğuna hazırla.</li>
+          </ul>
+        </article>
       </section>
 
       <section className="panel mt-4">

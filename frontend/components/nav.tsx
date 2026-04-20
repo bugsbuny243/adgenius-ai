@@ -11,6 +11,7 @@ const links = [
   { href: '/projects', label: 'Projeler' },
   { href: '/saved', label: 'Kaydedilenler' },
   { href: '/runs', label: 'Çalışmalar' },
+  { href: '/composer', label: 'Queue' },
   { href: '/settings', label: 'Ayarlar' }
 ] as const satisfies ReadonlyArray<{ href: Route; label: string }>;
 
@@ -34,7 +35,7 @@ export function Nav() {
         <h1 className="text-2xl font-semibold">Koschei AI</h1>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="hidden flex-wrap items-center gap-2 md:flex">
         {links.map((link) => (
           <Link
             key={link.href}
@@ -55,6 +56,22 @@ export function Nav() {
           Çıkış
         </button>
       </div>
+      <details className="w-full md:hidden">
+        <summary className="cursor-pointer rounded-xl border border-white/10 px-4 py-2 text-sm">Menü</summary>
+        <div className="mt-2 grid gap-2">
+          {links.map((link) => (
+            <Link key={link.href} href={link.href} className="rounded-xl border border-white/10 px-4 py-2 text-sm">
+              {link.label}
+            </Link>
+          ))}
+          <Link href="/upgrade" className="rounded-xl border border-neon/60 px-4 py-2 text-sm text-neon">
+            Planı Yükselt
+          </Link>
+          <button type="button" onClick={handleSignOut} className="rounded-xl border border-white/10 px-4 py-2 text-left text-sm">
+            Çıkış
+          </button>
+        </div>
+      </details>
     </nav>
   );
 }

@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export default async function ProjectsPage() {
   const { supabase, workspace, userId } = await getAppContextOrRedirect();
 
-  const [{ data: projects, error }, { data: items, error: itemsError }] = await Promise.all([
+  const [{ data: projects, error }, { data: items, error: itemsError }, { data: savedOutputs }, { data: contentItems }] = await Promise.all([
     supabase
       .from('projects')
       .select('id, name, description, created_at, updated_at, workspace_id, user_id')
@@ -20,6 +20,9 @@ export default async function ProjectsPage() {
       .select('project_id, item_type, created_at')
       .eq('workspace_id', workspace.workspaceId)
       .eq('user_id', userId)
+    ,
+    supabase.from('saved_outputs').select('id, project_id').eq('workspace_id', workspace.workspaceId).eq('user_id', userId),
+    supabase.from('content_items').select('id, project_id').eq('workspace_id', workspace.workspaceId).eq('user_id', userId)
   ]);
 
   const itemStats = (items ?? []).reduce<Record<string, { count: number; types: Set<string>; lastItemAt: string | null }>>((acc, item) => {
@@ -32,6 +35,17 @@ export default async function ProjectsPage() {
     const currentLast = acc[item.project_id].lastItemAt;
     acc[item.project_id].lastItemAt =
       !currentLast || new Date(item.created_at).getTime() > new Date(currentLast).getTime() ? item.created_at : currentLast;
+    return acc;
+  }, {});
+
+  const savedCounts = (savedOutputs ?? []).reduce<Record<string, number>>((acc: Record<string, number>, item: { project_id: string | null }) => {
+    if (!item.project_id) return acc;
+    acc[item.project_id] = (acc[item.project_id] ?? 0) + 1;
+    return acc;
+  }, {});
+  const contentCounts = (contentItems ?? []).reduce<Record<string, number>>((acc: Record<string, number>, item: { project_id: string | null }) => {
+    if (!item.project_id) return acc;
+    acc[item.project_id] = (acc[item.project_id] ?? 0) + 1;
     return acc;
   }, {});
 
@@ -61,6 +75,8 @@ export default async function ProjectsPage() {
                 <p className="font-medium">{project.name}</p>
                 <p className="text-sm text-white/60">{project.description || 'Açıklama yok.'}</p>
                 <p className="mt-2 text-xs text-white/55">Öğe sayısı: {itemStats[project.id]?.count ?? 0}</p>
+                <p className="text-xs text-white/55">Kaydedilen çıktı: {savedCounts[project.id] ?? 0}</p>
+                <p className="text-xs text-white/55">Sosyal/içerik üretimi: {contentCounts[project.id] ?? 0}</p>
                 <p className="text-xs text-white/55">İçerik tipleri: {Array.from(itemStats[project.id]?.types ?? []).join(', ') || 'Henüz yok'}</p>
                 <p className="text-xs text-white/55">Oluşturulma: {new Date(project.created_at).toLocaleString('tr-TR')}</p>
                 <p className="text-xs text-white/55">
@@ -71,7 +87,10 @@ export default async function ProjectsPage() {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-white/70">Henüz proje yok.</p>
+          <div className="rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">
+            <p>Henüz proje yok.</p>
+            <p className="mt-1">İlk projeni oluşturup agent sonuçlarını tek merkezde toplamaya başlayabilirsin.</p>
+          </div>
         )}
       </section>
     </main>

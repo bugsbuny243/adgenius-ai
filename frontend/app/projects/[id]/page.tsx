@@ -71,9 +71,16 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             <p className="text-sm text-white/70">{project.description || 'Açıklama henüz eklenmedi.'}</p>
             <p className="mt-1 text-xs text-white/60">Oluşturulma: {new Date(project.created_at).toLocaleString('tr-TR')}</p>
           </div>
-          <Link href="/projects" className="rounded-lg border border-white/20 px-3 py-2 text-sm">
-            Projelere dön
-          </Link>
+          <div className="flex gap-2">
+            <Link href={`/agents`} className="rounded-lg border border-neon/40 px-3 py-2 text-sm text-neon">Yeni çalışma başlat</Link>
+            <Link href="/projects" className="rounded-lg border border-white/20 px-3 py-2 text-sm">Projelere dön</Link>
+          </div>
+        </div>
+        <div className="mb-4 flex flex-wrap gap-2 text-xs">
+          <a href="#genel-bakis" className="rounded border border-white/20 px-2 py-1">Genel Bakış</a>
+          <a href="#proje-ogeleri" className="rounded border border-white/20 px-2 py-1">Proje Öğeleri</a>
+          <a href="#kaydedilen-ciktilar" className="rounded border border-white/20 px-2 py-1">Kaydedilen Çıktılar</a>
+          <a href="#sosyal-icerikler" className="rounded border border-white/20 px-2 py-1">Sosyal İçerikler</a>
         </div>
 
         <form action={createItem} className="grid gap-3 md:grid-cols-[1fr_2fr_auto]">
@@ -94,8 +101,18 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         </form>
       </section>
 
+      <section id="genel-bakis" className="panel mb-4">
+        <h3 className="mb-2 text-lg font-semibold">Genel Bakış</h3>
+        <div className="grid gap-2 text-sm md:grid-cols-4">
+          <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">Proje öğeleri: {items?.length ?? 0}</p>
+          <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">Kaydedilen çıktılar: {outputs?.length ?? 0}</p>
+          <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">Sosyal içerikler: {contentItems?.length ?? 0}</p>
+          <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">Son hareket: {new Date(project.created_at).toLocaleDateString('tr-TR')}</p>
+        </div>
+      </section>
+
       <section className="grid gap-4 lg:grid-cols-2">
-        <article className="panel">
+        <article id="proje-ogeleri" className="panel">
           <h3 className="mb-3 text-lg font-semibold">Proje Öğeleri</h3>
           {itemsError ? (
             <p className="text-sm text-red-300">Öğeler yüklenemedi: {itemsError.message}</p>
@@ -119,7 +136,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           )}
         </article>
 
-        <article className="panel">
+        <article id="kaydedilen-ciktilar" className="panel">
           <h3 className="mb-3 text-lg font-semibold">Son Kaydedilen Çıktılar</h3>
           {outputsError ? (
             <p className="text-sm text-red-300">Kaydedilen çıktılar yüklenemedi: {outputsError.message}</p>
@@ -138,7 +155,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           )}
         </article>
 
-        <article className="panel lg:col-span-2">
+        <article id="sosyal-icerikler" className="panel lg:col-span-2">
           <h3 className="mb-3 text-lg font-semibold">İçerik Öğeleri</h3>
           {contentItemsError ? (
             <p className="text-sm text-red-300">İçerik öğeleri yüklenemedi: {contentItemsError.message}</p>
@@ -153,7 +170,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               ))}
             </div>
           ) : (
-            <p className="text-sm text-white/70">Bu projede içerik öğesi bulunmuyor.</p>
+            <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/70">
+              Bu projede sosyal içerik bulunmuyor. Agent çalıştırırken projeyi seçip ilk içeriği başlatabilirsiniz.
+            </div>
           )}
         </article>
       </section>

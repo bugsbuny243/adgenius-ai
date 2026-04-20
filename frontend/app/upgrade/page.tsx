@@ -25,7 +25,7 @@ export default async function UpgradePage() {
     <main>
       <Nav />
       <section className="panel space-y-4">
-        <h2 className="text-2xl font-semibold">Yükseltme Merkezi</h2>
+        <h2 className="text-2xl font-semibold">Plan ve Yükseltme Merkezi</h2>
         <p className="text-sm text-white/70">Mevcut planınızı, kullanım seviyenizi ve limit durumunu tek ekranda takip edin.</p>
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -47,7 +47,7 @@ export default async function UpgradePage() {
 
         {nearLimit ? <div className="rounded-xl border border-amber-300/30 bg-amber-500/10 p-4 text-sm text-amber-100">Kullanım limitine yaklaştınız. Kesintisiz üretim için plan yükseltmeyi değerlendirin.</div> : null}
 
-        <div className="rounded-xl border border-amber-300/30 bg-amber-500/10 p-4 text-sm text-amber-100">Gerçek ödeme akışı bu sürümde aktif değil. Hazır olduğunda güvenli ödeme adımına buradan yönlendirileceksiniz.</div>
+        <div className="rounded-xl border border-amber-300/30 bg-amber-500/10 p-4 text-sm text-amber-100">Ödeme entegrasyonu henüz aktif değil. Bu sayfa şu an kullanım görünürlüğü ve plan kararı için güvenli bir fallback deneyimi sunar.</div>
 
         <div className="flex flex-wrap gap-3">
           <Link href="/pricing" className="rounded-lg border border-white/20 px-4 py-2 text-sm hover:border-neon">Planları karşılaştır</Link>

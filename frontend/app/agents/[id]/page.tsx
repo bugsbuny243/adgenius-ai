@@ -245,6 +245,10 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
                     </p>
                   </div>
                   <SocialOutputPanel
+                    agentId={id}
+                    runId={activeRun.id}
+                    contentItemId={activeContentItem.id}
+                    projectId={activeContentItem.project_id}
                     youtubeTitle={activeContentItem.youtube_title}
                     youtubeDescription={activeContentItem.youtube_description}
                     instagramCaption={activeContentItem.instagram_caption}
@@ -294,17 +298,19 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <ResultPanel text={resultText} status={activeRun.status as 'completed' | 'failed' | 'pending' | 'processing'} />
+                  <ResultPanel agentSlug={agent.slug} text={resultText} status={activeRun.status as 'completed' | 'failed' | 'pending' | 'processing'} />
                   <p className="rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white/65">
                     Platform bazlı içerik blokları henüz kayda alınamadı. Ham çıktı aşağıda görüntüleniyor.
                   </p>
                 </div>
               )
             ) : (
-              <ResultPanel text={resultText} status={activeRun.status as 'completed' | 'failed' | 'pending' | 'processing'} />
+              <ResultPanel agentSlug={agent.slug} text={resultText} status={activeRun.status as 'completed' | 'failed' | 'pending' | 'processing'} />
             )}
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <p className="mb-2 text-xs uppercase tracking-wide text-white/50">Hızlı aksiyonlar</p>
+              <div className="flex flex-wrap items-center gap-3">
               <Link
                 href={`/agents/${id}?run_id=${activeRun.id}&edit_run_id=${activeRun.id}`}
                 className="rounded-lg border border-white/20 px-3 py-2 text-sm hover:border-neon"
@@ -315,6 +321,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
                 <input type="hidden" name="source_run_id" value={activeRun.id} />
                 <button className="rounded-lg border border-white/20 px-3 py-2 text-sm hover:border-neon">Aynı girdiyi tekrar çalıştır</button>
               </form>
+              </div>
             </div>
 
             {activeRun.status === 'completed' ? (

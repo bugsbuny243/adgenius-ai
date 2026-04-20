@@ -34,6 +34,7 @@ export default async function AgentsPage() {
       <Nav />
       <section className="panel">
         <h2 className="mb-4 text-2xl font-semibold">Agentlar</h2>
+        <p className="mb-4 text-sm text-white/70">Hızlı mod, derin analiz modu ve araştırma destekli mod etiketleri ile çalışma tipine uygun agent seçin.</p>
         {agents && agents.length > 0 ? (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {agents.map((agent) => (

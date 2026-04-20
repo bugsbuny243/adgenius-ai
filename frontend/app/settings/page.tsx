@@ -28,6 +28,9 @@ export default async function SettingsPage() {
   return (
     <main>
       <Nav />
+      <section className="mb-4 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">
+        Profil, workspace, plan-kullanım ve oturum ayarları tek ekranda düzenli şekilde sunulur.
+      </section>
       <section className="grid gap-4 lg:grid-cols-2">
         <article className="panel">
           <h2 className="text-xl font-semibold">Profil</h2>
