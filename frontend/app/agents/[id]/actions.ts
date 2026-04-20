@@ -28,6 +28,17 @@ function parseRunMetadata(source: unknown): { editorState: Record<string, unknow
 }
 
 function toUserFacingRunError(errorCode: string): string {
+  const normalized = errorCode.trim().toLowerCase();
+  if (
+    normalized === 'provider_quota_exceeded' ||
+    normalized.includes('429') ||
+    normalized.includes('too many requests') ||
+    normalized.includes('resource_exhausted') ||
+    normalized.includes('depleted credits') ||
+    normalized.includes('billing')
+  ) {
+    return 'AI servis limiti doldu veya proje kredisi bitti. Lütfen billing/quota ayarlarını kontrol edin.';
+  }
   if (errorCode === 'workspace_not_found') return 'Çalışma alanı bulunamadı.';
   if (errorCode === 'agent_not_found') return 'Agent bulunamadı.';
   if (errorCode === 'invalid_payload') return 'Çalıştırma verisi doğrulanamadı.';
@@ -36,7 +47,14 @@ function toUserFacingRunError(errorCode: string): string {
   if (errorCode === 'empty_result') return 'AI motoru boş sonuç döndürdü. Lütfen tekrar deneyin.';
   if (errorCode === 'run_timeout') return 'Çalıştırma zaman aşımına uğradı. Lütfen tekrar deneyin.';
   if (errorCode === 'missing_environment') return 'Sunucu yapılandırması eksik. Lütfen yöneticinizle iletişime geçin.';
-  return errorCode || 'Çalıştırma sırasında hata oluştu.';
+  return 'Çalıştırma sırasında hata oluştu. Lütfen tekrar deneyin.';
+}
+
+function isRedirectControlFlowError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const digest = 'digest' in error ? String((error as { digest?: unknown }).digest ?? '') : '';
+  const message = 'message' in error ? String((error as { message?: unknown }).message ?? '') : '';
+  return digest.includes('NEXT_REDIRECT') || message.includes('NEXT_REDIRECT');
 }
 
 export async function runAgentAction(agentId: string, formData: FormData) {
@@ -175,7 +193,12 @@ export async function runAgentAction(agentId: string, formData: FormData) {
       redirect(`/agents/${agentId}?error=${encodeURIComponent(message)}`);
     }
   } catch (error) {
+    if (isRedirectControlFlowError(error)) {
+      throw error;
+    }
+
     const message = error instanceof Error ? error.message : 'Çalıştırma başlatma hatası.';
+    const safeMessage = toUserFacingRunError(message);
     const isTimeout = message.toLowerCase().includes('timeout') || message.toLowerCase().includes('aborted');
 
     const { data: latestRun } = await serverSupabase
@@ -194,7 +217,7 @@ export async function runAgentAction(agentId: string, formData: FormData) {
       .from('agent_runs')
       .update({
         status: 'failed',
-        error_message: message,
+        error_message: safeMessage,
         result_text: null,
         completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -204,7 +227,7 @@ export async function runAgentAction(agentId: string, formData: FormData) {
       .eq('user_id', currentUserId)
       .in('status', ['pending', 'processing']);
 
-    redirect(`/agents/${agentId}?error=${encodeURIComponent(message)}`);
+    redirect(`/agents/${agentId}?error=${encodeURIComponent(safeMessage)}`);
   }
 
   revalidatePath('/dashboard');
