@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Nav } from '@/components/nav';
 import { getAppContextOrRedirect } from '@/lib/app-context';
-import { neutralizeVendorTerms, sanitizeUserFacingEngineLabel } from '@/lib/publish-queue';
+import { neutralizeVendorTerms, sanitizeUserFacingEngineLabel, toQueueStateHint, toQueueStatusLabel } from '@/lib/publish-queue';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -14,27 +14,25 @@ function toDisplayStatus(status: string): string {
   return status;
 }
 
-function toFriendlyRunError(errorMessage: string): string {
-  const normalized = errorMessage.toLowerCase();
-  if (
-    normalized.includes('429') ||
-    normalized.includes('too many requests') ||
-    normalized.includes('resource_exhausted') ||
-    normalized.includes('depleted credits') ||
-    normalized.includes('billing') ||
-    normalized.includes('provider_quota_exceeded')
-  ) {
-    return 'AI servis limiti doldu veya proje kredisi bitti. Lütfen billing/quota ayarlarını kontrol edin.';
-  }
 
-  return neutralizeVendorTerms(errorMessage).slice(0, 220);
+function getRunAgentName(value: unknown): string {
+  if (!value) return 'Agent çalışması';
+  if (Array.isArray(value)) {
+    const first = value[0] as { name?: string } | undefined;
+    return first?.name ?? 'Agent çalışması';
+  }
+  if (typeof value === 'object' && value && 'name' in (value as Record<string, unknown>)) {
+    const name = (value as { name?: string }).name;
+    return name ?? 'Agent çalışması';
+  }
+  return 'Agent çalışması';
 }
 
-const QUICK_AGENTS = [
-  { slug: 'yazilim', label: 'Yazılım', mood: 'Derin analiz modu' },
-  { slug: 'sosyal', label: 'Sosyal Medya', mood: 'Hızlı mod' },
-  { slug: 'arastirma', label: 'Araştırma', mood: 'Araştırma destekli mod' },
-  { slug: 'rapor', label: 'Rapor', mood: 'Derin analiz modu' }
+const QUICK_ACTIONS = [
+  { href: '/agents', label: 'Yeni çalışma başlat' },
+  { href: '/projects', label: 'Projeye bağlı çalışma başlat' },
+  { href: '/agents', label: 'Sosyal içerik üret' },
+  { href: '/runs', label: 'Haftalık rapor oluştur' }
 ] as const;
 
 export default async function DashboardPage() {
@@ -44,30 +42,19 @@ export default async function DashboardPage() {
   monthStart.setUTCDate(1);
   monthStart.setUTCHours(0, 0, 0, 0);
 
-  const [
-    projectsRes,
-    runsRes,
-    savedRes,
-    recentRunsRes,
-    recentSavedRes,
-    subscriptionRes,
-    usageRes,
-    agentsRes,
-    queueRes,
-    socialRes
-  ] = await Promise.all([
-    supabase.from('projects').select('id', { count: 'exact', head: true }).eq('workspace_id', workspace.workspaceId),
+  const [projectsRes, runsRes, savedRes, recentRunsRes, recentSavedRes, subscriptionRes, usageRes, agentsRes, queueRes, socialRes] = await Promise.all([
+    supabase.from('projects').select('id, name, created_at', { count: 'exact' }).eq('workspace_id', workspace.workspaceId).order('created_at', { ascending: false }).limit(5),
     supabase.from('agent_runs').select('id', { count: 'exact', head: true }).eq('workspace_id', workspace.workspaceId),
     supabase.from('saved_outputs').select('id', { count: 'exact', head: true }).eq('workspace_id', workspace.workspaceId),
     supabase
       .from('agent_runs')
-      .select('id, status, model_name, error_message, user_input, result_text, created_at, agent_type_id, agent_types(name)')
+      .select('id, status, model_name, error_message, user_input, result_text, created_at, agent_types(name)')
       .eq('workspace_id', workspace.workspaceId)
       .order('created_at', { ascending: false })
       .limit(6),
     supabase
       .from('saved_outputs')
-      .select('id, title, content, created_at, agent_run_id')
+      .select('id, title, content, created_at, project_id')
       .eq('workspace_id', workspace.workspaceId)
       .order('created_at', { ascending: false })
       .limit(5),
@@ -84,102 +71,123 @@ export default async function DashboardPage() {
       .eq('workspace_id', workspace.workspaceId)
       .gte('created_at', monthStart.toISOString()),
     supabase.from('agent_types').select('id, slug, name').eq('is_active', true).limit(8),
-    supabase.from('publish_jobs').select('id, status', { count: 'exact' }).eq('workspace_id', workspace.workspaceId).limit(100),
+    supabase.from('publish_jobs').select('id, status, target_platform, queued_at, project_id', { count: 'exact' }).eq('workspace_id', workspace.workspaceId).order('queued_at', { ascending: false }).limit(5),
     supabase.from('content_items').select('id', { count: 'exact', head: true }).eq('workspace_id', workspace.workspaceId)
   ]);
 
   const runLimit = subscriptionRes.data?.run_limit ?? 30;
   const usedRuns = usageRes.count ?? 0;
+  const remaining = Math.max(0, runLimit - usedRuns);
   const percent = Math.min(100, Math.round((usedRuns / Math.max(1, runLimit)) * 100));
+  const hasData = (runsRes.count ?? 0) > 0 || (projectsRes.count ?? 0) > 0 || (savedRes.count ?? 0) > 0;
+  const nearLimit = percent >= 80;
 
   return (
     <main>
       <Nav />
-      <section className="panel mb-4">
-        <h2 className="text-lg font-semibold">Çalışma Alanı</h2>
-        <p className="text-white/70">{workspace.workspaceName}</p>
-      </section>
-
-      {usedRuns >= runLimit ? (
-        <section className="panel mb-4 border-amber-300/40 bg-amber-500/10">
-          <p className="text-sm text-amber-100">Aylık run limitiniz doldu. Kesintisiz kullanım için planınızı yükseltin.</p>
-          <Link href="/upgrade" className="mt-2 inline-flex rounded-lg border border-amber-200/60 px-3 py-1.5 text-sm text-amber-50">Yükselt</Link>
-        </section>
-      ) : null}
-
-      <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <MetricCard title="Aktif plan" value={subscriptionRes.data?.plan_name ?? 'Ücretsiz'} />
-        <MetricCard title="Toplam çalışma" value={String(runsRes.count ?? 0)} />
-        <MetricCard title="Kaydedilen" value={String(savedRes.count ?? 0)} />
-        <MetricCard title="Projeler" value={String(projectsRes.count ?? 0)} />
-      </section>
-      <section className="mt-4 grid gap-4 md:grid-cols-3">
-        <MetricCard title="Sosyal içerik" value={String(socialRes.count ?? 0)} />
-        <MetricCard title="Queue kaydı" value={String(queueRes.count ?? 0)} />
+      <section className="mb-4 grid gap-4 lg:grid-cols-[1.6fr_1fr]">
         <article className="panel">
-          <h2 className="text-sm text-white/70">Bugün ne yapabilirsin?</h2>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-white/80">
-            <li>Yeni bir agent çalıştırıp sonucu projeye ekle.</li>
-            <li>Kaydedilen çıktılardan birini yeniden çalıştır.</li>
-            <li>Sosyal içerikleri yayın kuyruğuna hazırla.</li>
-          </ul>
+          <p className="text-xs uppercase tracking-wide text-lilac">Bugünün Durumu</p>
+          <h2 className="mt-1 text-xl font-semibold">{workspace.workspaceName}</h2>
+          <p className="text-sm text-white/70">Plan, kullanım ve son çalışma özetini tek merkezde takip edin.</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <MetricCard title="Aktif plan" value={subscriptionRes.data?.plan_name ?? 'Ücretsiz'} />
+            <MetricCard title="Kullanım" value={`${usedRuns} / ${runLimit}`} />
+            <MetricCard title="Kalan hak" value={String(remaining)} />
+            <MetricCard title="Son çalışma" value={recentRunsRes.data?.[0] ? new Date(recentRunsRes.data[0].created_at).toLocaleDateString('tr-TR') : 'Henüz yok'} />
+          </div>
+          <div className="mt-3 h-2 rounded-full bg-white/10">
+            <div className="h-full rounded-full bg-neon" style={{ width: `${percent}%` }} />
+          </div>
+          {nearLimit ? <p className="mt-3 rounded-lg border border-amber-300/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">Limit dolma riski var. Kesintisiz üretim için plan yükseltmeyi değerlendirin.</p> : null}
         </article>
-      </section>
 
-      <section className="panel mt-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Aylık kullanım</h3>
-          <p className="text-sm text-white/70">{usedRuns} / {runLimit}</p>
-        </div>
-        <div className="mt-2 h-2 rounded-full bg-white/10">
-          <div className="h-full rounded-full bg-neon" style={{ width: `${percent}%` }} />
-        </div>
-      </section>
-
-      <section className="mt-4 grid gap-4 lg:grid-cols-2">
         <article className="panel">
-          <h3 className="mb-3 text-lg font-semibold">Hızlı Agent Erişimi</h3>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {(agentsRes.data ?? []).map((agent) => {
-              const quick = QUICK_AGENTS.find((item) => item.slug === agent.slug);
-              return (
-                <Link key={agent.id} href={`/agents/${agent.id}`} className="rounded-lg border border-white/10 p-3 hover:border-neon">
-                  <p className="font-medium">{agent.name}</p>
-                  <p className="text-xs text-white/60">{quick?.mood ?? 'Koschei AI motoru'}</p>
-                </Link>
-              );
-            })}
+          <p className="text-xs uppercase tracking-wide text-lilac">Odak Bloğu</p>
+          <h3 className="mt-1 text-lg font-semibold">Bugün ne üretmek istiyorsun?</h3>
+          <div className="mt-3 grid gap-2 text-sm">
+            <Link href="/projects" className="rounded-lg border border-white/15 px-3 py-2 hover:border-neon">Son projen üzerinden devam et</Link>
+            <Link href="/saved" className="rounded-lg border border-white/15 px-3 py-2 hover:border-neon">Geçen çıktıyı yeniden işle</Link>
+            <Link href="/composer" className="rounded-lg border border-white/15 px-3 py-2 hover:border-neon">Sosyal içerik kuyruğunu gözden geçir</Link>
+            <Link href="/agents" className="rounded-lg border border-neon/40 px-3 py-2 text-neon hover:bg-neon/10">Yeni agent çalıştır</Link>
           </div>
         </article>
+      </section>
 
+      <section className="mb-4 grid gap-4 lg:grid-cols-2">
         <article className="panel">
-          <h3 className="mb-3 text-lg font-semibold">Son Kaydedilenler</h3>
-          <div className="space-y-2 text-sm">
-            {(recentSavedRes.data ?? []).map((item) => (
-              <div key={item.id} className="rounded-lg border border-white/10 px-3 py-2">
-                <p className="font-medium">{item.title ?? 'Kaydedilen çıktı'}</p>
-                <p className="line-clamp-2 text-white/70">{item.content}</p>
-                <Link href="/saved" className="mt-2 inline-flex text-xs text-neon">Kaydedilenlere git</Link>
-              </div>
+          <h3 className="mb-3 text-lg font-semibold">Hızlı Başlat</h3>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {QUICK_ACTIONS.map((action) => (
+              <Link key={action.label} href={action.href} className="rounded-lg border border-white/15 px-3 py-2 text-sm hover:border-neon">
+                {action.label}
+              </Link>
+            ))}
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {(agentsRes.data ?? []).slice(0, 4).map((agent) => (
+              <Link key={agent.id} href={`/agents/${agent.id}`} className="rounded-lg border border-white/10 bg-black/20 p-3">
+                <p className="font-medium">{agent.name}</p>
+                <p className="text-xs text-white/60">Koschei AI motoru</p>
+              </Link>
             ))}
           </div>
         </article>
+
+        <article className="panel">
+          <h3 className="mb-3 text-lg font-semibold">Operasyon Özeti</h3>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <InfoPill label="Toplam çalışma" value={String(runsRes.count ?? 0)} />
+            <InfoPill label="Kaydedilen çıktı" value={String(savedRes.count ?? 0)} />
+            <InfoPill label="Projeler" value={String(projectsRes.count ?? 0)} />
+            <InfoPill label="Sosyal içerik" value={String(socialRes.count ?? 0)} />
+            <InfoPill label="Queue öğesi" value={String(queueRes.count ?? 0)} />
+          </div>
+        </article>
       </section>
 
-      <section className="panel mt-4">
-        <h3 className="mb-3 text-lg font-semibold">Son Çalıştırmalar</h3>
-        <div className="space-y-2 text-sm">
-          {(recentRunsRes.data ?? []).map((run) => (
-            <div key={run.id} className="rounded-lg border border-white/10 px-3 py-2">
-              <p>Durum: {toDisplayStatus(run.status)}</p>
-              <p className="text-white/70">Motor: {sanitizeUserFacingEngineLabel(run.model_name)}</p>
-              <p className="line-clamp-2 text-white/65">{run.user_input || 'İstem kaydı yok.'}</p>
-              <p className="text-white/60">{new Date(run.created_at).toLocaleString('tr-TR')}</p>
-              <Link href="/runs" className="inline-flex text-xs text-neon">Tüm çalışmaları aç</Link>
-              {run.error_message ? <p className="text-red-200">Hata: {toFriendlyRunError(run.error_message)}</p> : null}
+      <section className="panel">
+        <h3 className="mb-3 text-lg font-semibold">Son Aktiviteler</h3>
+        {!hasData ? (
+          <div className="rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/75">
+            <p>Henüz aktivite yok. Onboarding adımlarıyla başlayabilirsiniz:</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              <li>İlk agent çalıştır</li>
+              <li>İlk proje oluştur</li>
+              <li>İlk çıktını kaydet</li>
+              <li>İlk sosyal içerik üret</li>
+            </ul>
+          </div>
+        ) : (
+          <div className="grid gap-3 lg:grid-cols-2">
+            <div className="space-y-2">
+              <p className="text-xs uppercase text-white/60">Son run'lar</p>
+              {(recentRunsRes.data ?? []).map((run) => (
+                <div key={run.id} className="rounded-lg border border-white/10 bg-black/20 p-3 text-sm">
+                  <p className="font-medium">{getRunAgentName(run.agent_types)}</p>
+                  <p className="text-xs text-white/65">{toDisplayStatus(run.status)} • {sanitizeUserFacingEngineLabel(run.model_name)}</p>
+                  <p className="line-clamp-2 text-white/75">{run.user_input || 'İstem kaydı yok.'}</p>
+                  {run.error_message ? <p className="text-xs text-red-200">{neutralizeVendorTerms(run.error_message)}</p> : null}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+            <div className="space-y-2">
+              <p className="text-xs uppercase text-white/60">Kaydedilenler ve kuyruk</p>
+              {(recentSavedRes.data ?? []).map((item) => (
+                <div key={item.id} className="rounded-lg border border-white/10 bg-black/20 p-3 text-sm">
+                  <p className="font-medium">{item.title ?? 'Kaydedilen çıktı'}</p>
+                  <p className="line-clamp-2 text-white/70">{item.content}</p>
+                </div>
+              ))}
+              {(queueRes.data ?? []).map((job) => (
+                <div key={job.id} className="rounded-lg border border-white/10 bg-black/20 p-3 text-xs">
+                  <p>{job.target_platform ?? 'Platform'} • {toQueueStatusLabel(job.status)}</p>
+                  <p className="text-white/65">{toQueueStateHint(job.status)} • {job.queued_at ? new Date(job.queued_at).toLocaleString('tr-TR') : 'Tarih yok'}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
     </main>
   );
@@ -187,9 +195,13 @@ export default async function DashboardPage() {
 
 function MetricCard({ title, value }: { title: string; value: string }) {
   return (
-    <article className="panel">
-      <h2 className="text-sm text-white/70">{title}</h2>
-      <p className="mt-2 text-2xl font-semibold">{value}</p>
+    <article className="rounded-xl border border-white/10 bg-black/20 p-3">
+      <h2 className="text-xs text-white/70">{title}</h2>
+      <p className="mt-1 text-xl font-semibold">{value}</p>
     </article>
   );
+}
+
+function InfoPill({ label, value }: { label: string; value: string }) {
+  return <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/80">{label}: {value}</p>;
 }

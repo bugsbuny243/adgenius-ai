@@ -57,8 +57,8 @@ const PROFILE_RESEARCH: AgentRunProfile = {
 
 const DEEP_AGENT_SLUGS = new Set(['yazilim', 'rapor']);
 const RESEARCH_AGENT_SLUGS = new Set(['arastirma']);
-const RESEARCH_MODES = new Set(['research']);
-const DEEP_MODES = new Set(['orchestrator', 'script', 'title-hook', 'seo', 'qa-safety']);
+const RESEARCH_MODES = new Set(['research', 'trend', 'benchmark']);
+const DEEP_MODES = new Set(['orchestrator', 'script', 'title-hook', 'seo', 'qa-safety', 'analysis']);
 
 function resolveRunProfile(agentSlug: string, agentMode?: string | null): AgentRunProfile {
   const normalizedSlug = agentSlug.trim().toLowerCase();

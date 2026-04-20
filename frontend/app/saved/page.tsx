@@ -26,7 +26,8 @@ export default async function SavedPage() {
     <main>
       <Nav />
       <section className="panel">
-        <h2 className="mb-3 text-xl font-semibold">Kaydedilen Çıktılar</h2>
+        <h2 className="mb-1 text-xl font-semibold">Kaydedilen Çıktılar</h2>
+        <p className="mb-3 text-sm text-white/70">Tekrar kullanım merkezi: kopyala, aç, sonuca git, yeniden çalıştır.</p>
         {error ? (
           <p className="text-sm text-red-300">Kayıtlar alınamadı: {error.message}</p>
         ) : data && data.length > 0 ? (

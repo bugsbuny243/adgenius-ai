@@ -28,44 +28,12 @@ export default async function SettingsPage() {
   return (
     <main>
       <Nav />
-      <section className="mb-4 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">
-        Profil, workspace, plan-kullanım ve oturum ayarları tek ekranda düzenli şekilde sunulur.
-      </section>
+      <section className="mb-4 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">Ayarlar merkezi: profil, çalışma alanı, plan, kullanım ve güvenli çıkış alanları ürünleşmiş düzenle sunulur.</section>
       <section className="grid gap-4 lg:grid-cols-2">
-        <article className="panel">
-          <h2 className="text-xl font-semibold">Profil</h2>
-          <div className="mt-3 space-y-2 text-sm text-white/80">
-            <p><span className="text-white/60">Ad:</span> {profile?.full_name ?? 'Belirtilmedi'}</p>
-            <p><span className="text-white/60">E-posta:</span> {profile?.email ?? 'Belirtilmedi'}</p>
-          </div>
-        </article>
-
-        <article className="panel">
-          <h2 className="text-xl font-semibold">Workspace</h2>
-          <div className="mt-3 space-y-2 text-sm text-white/80">
-            <p><span className="text-white/60">Ad:</span> {workspace.workspaceName}</p>
-            <p><span className="text-white/60">Kimlik:</span> {workspace.workspaceId}</p>
-          </div>
-        </article>
-
-        <article className="panel">
-          <h2 className="text-xl font-semibold">Plan & Kullanım</h2>
-          <div className="mt-3 space-y-2 text-sm text-white/80">
-            <p><span className="text-white/60">Plan:</span> {subscription?.plan_name ?? 'Ücretsiz'}</p>
-            <p><span className="text-white/60">Durum:</span> {subscription?.status ?? 'active'}</p>
-            <p><span className="text-white/60">Aylık limit:</span> {subscription?.run_limit ?? 30}</p>
-            <p><span className="text-white/60">Bu ay kullanım:</span> {usageCount ?? 0}</p>
-          </div>
-          <Link href="/upgrade" className="mt-4 inline-flex rounded-lg border border-neon/60 px-3 py-1.5 text-sm text-neon">Planı yükselt</Link>
-        </article>
-
-        <article className="panel">
-          <h2 className="text-xl font-semibold">Oturum</h2>
-          <p className="mt-1 text-sm text-white/70">Güvenli çıkış için aşağıdaki aksiyonu kullanın.</p>
-          <form action={signOutAction} className="mt-3">
-            <button type="submit" className="rounded-lg border border-white/20 px-4 py-2 text-sm hover:border-neon">Çıkış yap</button>
-          </form>
-        </article>
+        <article className="panel"><h2 className="text-xl font-semibold">Profil</h2><div className="mt-3 space-y-2 text-sm text-white/80"><p><span className="text-white/60">Ad:</span> {profile?.full_name ?? 'Belirtilmedi'}</p><p><span className="text-white/60">E-posta:</span> {profile?.email ?? 'Belirtilmedi'}</p></div></article>
+        <article className="panel"><h2 className="text-xl font-semibold">Çalışma Alanı</h2><div className="mt-3 space-y-2 text-sm text-white/80"><p><span className="text-white/60">Ad:</span> {workspace.workspaceName}</p><p><span className="text-white/60">Kimlik:</span> {workspace.workspaceId}</p></div></article>
+        <article className="panel"><h2 className="text-xl font-semibold">Plan</h2><div className="mt-3 space-y-2 text-sm text-white/80"><p><span className="text-white/60">Plan:</span> {subscription?.plan_name ?? 'Ücretsiz'}</p><p><span className="text-white/60">Durum:</span> {subscription?.status ?? 'active'}</p><p><span className="text-white/60">Aylık limit:</span> {subscription?.run_limit ?? 30}</p><p><span className="text-white/60">Bu ay kullanım:</span> {usageCount ?? 0}</p></div><Link href="/upgrade" className="mt-4 inline-flex rounded-lg border border-neon/60 px-3 py-1.5 text-sm text-neon">Planı yükselt</Link></article>
+        <article className="panel"><h2 className="text-xl font-semibold">Oturum</h2><p className="mt-1 text-sm text-white/70">Güvenli çıkış için aşağıdaki aksiyonu kullanın.</p><form action={signOutAction} className="mt-3"><button type="submit" className="rounded-lg border border-white/20 px-4 py-2 text-sm hover:border-neon">Çıkış yap</button></form></article>
       </section>
     </main>
   );

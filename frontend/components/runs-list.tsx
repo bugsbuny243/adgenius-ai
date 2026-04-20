@@ -26,7 +26,7 @@ function getAgentLabel(agentTypes: AgentTypeRelation | undefined): string {
 function statusLabel(status: string): string {
   if (status === 'completed') return 'Tamamlandı';
   if (status === 'processing') return 'İşleniyor';
-  if (status === 'pending') return 'Sırada';
+  if (status === 'pending') return 'Sıraya alındı';
   if (status === 'failed') return 'Başarısız';
   return 'Bilinmiyor';
 }
@@ -47,10 +47,7 @@ export function RunsList({ runs }: { runs: RunItem[] }) {
         const byAgent = agent === 'all' || getAgentLabel(run.agent_types) === agent;
         const createdTime = new Date(run.created_at).getTime();
         const now = Date.now();
-        const byDate =
-          dateRange === 'all' ||
-          (dateRange === 'today' && now - createdTime <= 24 * 60 * 60 * 1000) ||
-          (dateRange === 'week' && now - createdTime <= 7 * 24 * 60 * 60 * 1000);
+        const byDate = dateRange === 'all' || (dateRange === 'today' && now - createdTime <= 24 * 60 * 60 * 1000) || (dateRange === 'week' && now - createdTime <= 7 * 24 * 60 * 60 * 1000);
         return byStatus && byAgent && byDate;
       }),
     [runs, status, agent, dateRange]
@@ -60,28 +57,17 @@ export function RunsList({ runs }: { runs: RunItem[] }) {
 
   return (
     <div className="space-y-3 text-sm">
-      <div className="flex flex-wrap gap-2 rounded-lg border border-white/10 bg-black/20 p-2">
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-black/20 p-2">
         <select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded-lg border border-white/20 bg-black/30 px-3 py-2">
-          <option value="all">Durum: Tümü</option>
-          <option value="completed">Tamamlandı</option>
-          <option value="processing">İşleniyor</option>
-          <option value="pending">Bekliyor</option>
-          <option value="failed">Başarısız</option>
+          <option value="all">Durum: Tümü</option><option value="completed">Tamamlandı</option><option value="processing">İşleniyor</option><option value="pending">Sıraya alındı</option><option value="failed">Başarısız</option>
         </select>
-
         <select value={agent} onChange={(e) => setAgent(e.target.value)} className="rounded-lg border border-white/20 bg-black/30 px-3 py-2">
-          <option value="all">Agent: Tümü</option>
-          {agents.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
+          <option value="all">Agent: Tümü</option>{agents.map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
         <select value={dateRange} onChange={(e) => setDateRange(e.target.value as 'all' | 'today' | 'week')} className="rounded-lg border border-white/20 bg-black/30 px-3 py-2">
-          <option value="all">Tarih: Tümü</option>
-          <option value="today">Son 24 saat</option>
-          <option value="week">Son 7 gün</option>
+          <option value="all">Tarih: Tümü</option><option value="today">Son 24 saat</option><option value="week">Son 7 gün</option>
         </select>
+        <p className="ml-auto text-xs text-white/60">{filtered.length} kayıt</p>
       </div>
 
       {visible.map((run) => (
@@ -90,17 +76,18 @@ export function RunsList({ runs }: { runs: RunItem[] }) {
             <p className="font-medium">{getAgentLabel(run.agent_types)}</p>
             <span className="rounded border border-white/20 px-2 py-0.5 text-xs">{statusLabel(run.status)}</span>
           </div>
-          <p className="mt-1 line-clamp-2 text-white/70">{(run.user_input ?? 'İstem kaydı yok.').slice(0, 260)}</p>
-          <p className="mt-1 text-xs text-white/60">{new Date(run.created_at).toLocaleString('tr-TR')} • {sanitizeUserFacingEngineLabel(run.model_name)}</p>
+          <p className="mt-2 line-clamp-2 text-white/70">{(run.user_input ?? 'İstem kaydı yok.').slice(0, 260)}</p>
+          <div className="mt-1 flex flex-wrap gap-x-2 text-xs text-white/60">
+            <span>{new Date(run.created_at).toLocaleString('tr-TR')}</span>
+            <span>•</span>
+            <span>{sanitizeUserFacingEngineLabel(run.model_name)}</span>
+            {run.completed_at ? <><span>•</span><span>Tamamlanma: {new Date(run.completed_at).toLocaleString('tr-TR')}</span></> : null}
+          </div>
           <button onClick={() => setActive(run)} className="mt-2 rounded border border-white/20 px-2 py-1 hover:border-neon">Detay / yeniden çalıştır</button>
         </div>
       ))}
 
-      {visible.length < filtered.length ? (
-        <button onClick={() => setLimit((current) => current + 20)} className="rounded border border-white/20 px-3 py-1.5 text-sm hover:border-neon">
-          Daha fazla yükle
-        </button>
-      ) : null}
+      {visible.length < filtered.length ? <button onClick={() => setLimit((current) => current + 20)} className="rounded border border-white/20 px-3 py-1.5 text-sm hover:border-neon">Daha fazla yükle</button> : null}
 
       {active ? (
         <dialog open className="max-w-xl rounded-xl border border-white/20 bg-ink p-4 text-white">
@@ -109,8 +96,8 @@ export function RunsList({ runs }: { runs: RunItem[] }) {
           <p className="mb-2 text-xs text-white/60">Durum: {statusLabel(active.status)}</p>
           <p className="mb-2 text-xs text-white/60">Agent: {getAgentLabel(active.agent_types)}</p>
           <p className="mb-2 text-xs text-white/60">Motor: {sanitizeUserFacingEngineLabel(active.model_name)}</p>
-          <p className="text-sm">İstem:</p>
-          <pre className="whitespace-pre-wrap text-sm text-white/80">{active.user_input ?? '-'}</pre>
+          <p className="text-sm">Input özeti:</p>
+          <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-sm text-white/80">{active.user_input ?? '-'}</pre>
           {active.error_message ? <p className="mt-2 text-xs text-red-200">Hata: {active.error_message}</p> : null}
           <button onClick={() => setActive(null)} className="mt-3 rounded border border-white/20 px-3 py-1">Kapat</button>
         </dialog>

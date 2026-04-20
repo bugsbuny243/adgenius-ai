@@ -26,28 +26,16 @@ export default async function UpgradePage() {
       <Nav />
       <section className="panel space-y-4">
         <h2 className="text-2xl font-semibold">Plan ve Yükseltme Merkezi</h2>
-        <p className="text-sm text-white/70">Mevcut planınızı, kullanım seviyenizi ve limit durumunu tek ekranda takip edin.</p>
+        <p className="text-sm text-white/70">Kullanım baskısını görün, limit riskini öngörün ve doğru zamanda yükseltme kararı verin.</p>
 
         <div className="grid gap-4 md:grid-cols-3">
-          <article className="rounded-xl border border-white/10 bg-black/20 p-4">
-            <p className="text-xs text-white/60">Mevcut plan</p>
-            <p className="mt-1 text-lg font-semibold">{subscription?.plan_name ?? 'Ücretsiz'}</p>
-            <p className="text-xs text-white/60">Durum: {subscription?.status ?? 'active'}</p>
-          </article>
-          <article className="rounded-xl border border-white/10 bg-black/20 p-4">
-            <p className="text-xs text-white/60">Bu ay kullanım</p>
-            <p className="mt-1 text-lg font-semibold">{usedRuns} / {runLimit}</p>
-            <div className="mt-2 h-2 rounded-full bg-white/10"><div className="h-full rounded-full bg-neon" style={{ width: `${usagePercent}%` }} /></div>
-          </article>
-          <article className="rounded-xl border border-white/10 bg-black/20 p-4">
-            <p className="text-xs text-white/60">Dönem sonu</p>
-            <p className="mt-1 text-lg font-semibold">{subscription?.current_period_end ? new Date(subscription.current_period_end).toLocaleDateString('tr-TR') : 'Belirtilmedi'}</p>
-          </article>
+          <article className="rounded-xl border border-white/10 bg-black/20 p-4"><p className="text-xs text-white/60">Mevcut plan</p><p className="mt-1 text-lg font-semibold">{subscription?.plan_name ?? 'Ücretsiz'}</p><p className="text-xs text-white/60">Durum: {subscription?.status ?? 'active'}</p></article>
+          <article className="rounded-xl border border-white/10 bg-black/20 p-4"><p className="text-xs text-white/60">Bu ay kullanım</p><p className="mt-1 text-lg font-semibold">{usedRuns} / {runLimit}</p><div className="mt-2 h-2 rounded-full bg-white/10"><div className="h-full rounded-full bg-neon" style={{ width: `${usagePercent}%` }} /></div></article>
+          <article className="rounded-xl border border-white/10 bg-black/20 p-4"><p className="text-xs text-white/60">Dönem sonu</p><p className="mt-1 text-lg font-semibold">{subscription?.current_period_end ? new Date(subscription.current_period_end).toLocaleDateString('tr-TR') : 'Belirtilmedi'}</p></article>
         </div>
 
-        {nearLimit ? <div className="rounded-xl border border-amber-300/30 bg-amber-500/10 p-4 text-sm text-amber-100">Kullanım limitine yaklaştınız. Kesintisiz üretim için plan yükseltmeyi değerlendirin.</div> : null}
-
-        <div className="rounded-xl border border-amber-300/30 bg-amber-500/10 p-4 text-sm text-amber-100">Ödeme entegrasyonu henüz aktif değil. Bu sayfa şu an kullanım görünürlüğü ve plan kararı için güvenli bir fallback deneyimi sunar.</div>
+        {nearLimit ? <div className="rounded-xl border border-amber-300/30 bg-amber-500/10 p-4 text-sm text-amber-100">Kullanım limitine yaklaştınız. Operasyonun durmaması için yükseltme önerilir.</div> : null}
+        <div className="rounded-xl border border-white/15 bg-black/30 p-4 text-sm text-white/75">Ödeme entegrasyonu henüz aktif değil. Bu ekran şeffaf fallback olarak kullanım görünürlüğü sunar ve plan kararı almanızı kolaylaştırır.</div>
 
         <div className="flex flex-wrap gap-3">
           <Link href="/pricing" className="rounded-lg border border-white/20 px-4 py-2 text-sm hover:border-neon">Planları karşılaştır</Link>
