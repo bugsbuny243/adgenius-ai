@@ -7,9 +7,9 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 function getAgentBadge(slug: string): string {
-  if (slug === 'arastirma') return 'araştırma odaklı';
-  if (slug === 'yazilim' || slug === 'rapor') return 'derin analiz';
-  return 'hızlı';
+  if (slug === 'arastirma') return 'Araştırma destekli mod';
+  if (slug === 'yazilim' || slug === 'rapor') return 'Derin analiz modu';
+  return 'Hızlı mod';
 }
 
 export default async function AgentsPage() {
@@ -33,7 +33,7 @@ export default async function AgentsPage() {
     <main>
       <Nav />
       <section className="panel">
-        <h2 className="mb-4 text-2xl font-semibold">Agent Kataloğu</h2>
+        <h2 className="mb-4 text-2xl font-semibold">Agentlar</h2>
         {agents && agents.length > 0 ? (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {agents.map((agent) => (

@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getWorkspaceContext } from '@/lib/workspace';
 
-const SUPPORTED_SOCIAL_PLATFORMS = ['youtube'] as const;
+const SUPPORTED_SOCIAL_PLATFORMS = ['youtube', 'instagram', 'tiktok'] as const;
 
 function buildInternalUrl(pathname: string, headerList: Headers): string {
   const protocol = headerList.get('x-forwarded-proto') ?? 'http';
@@ -485,6 +485,12 @@ export async function queueSocialPublishAction(agentId: string, runIdParam: stri
   if (selectedPlatform === 'youtube') {
     payload.youtube_title = contentItem.youtube_title ?? null;
     payload.youtube_description = contentItem.youtube_description ?? null;
+  }
+  if (selectedPlatform === 'instagram') {
+    payload.instagram_caption = contentItem.instagram_caption ?? null;
+  }
+  if (selectedPlatform === 'tiktok') {
+    payload.tiktok_caption = contentItem.tiktok_caption ?? null;
   }
   const { error: queueError } = await serverSupabase.from('publish_jobs').insert({
     workspace_id: workspaceId,

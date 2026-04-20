@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 
 type SavedItem = {
   id: string;
@@ -14,6 +14,7 @@ type SavedItem = {
 export function SavedList({ items, onDelete }: { items: SavedItem[]; onDelete: (id: string) => Promise<void> }) {
   const [filter, setFilter] = useState('');
   const [active, setActive] = useState<SavedItem | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   const filtered = useMemo(() => {
     const q = filter.toLowerCase().trim();
@@ -61,12 +62,17 @@ export function SavedList({ items, onDelete }: { items: SavedItem[]; onDelete: (
               </a>
             ) : null}
             <button
+              disabled={isPending}
               onClick={() => {
-                void onDelete(item.id);
+                const approve = window.confirm('Bu kaydı silmek istediğinize emin misiniz?');
+                if (!approve) return;
+                startTransition(() => {
+                  void onDelete(item.id);
+                });
               }}
-              className="rounded border border-red-300/40 px-2 py-1 text-red-200"
+              className="rounded border border-red-300/40 px-2 py-1 text-red-200 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Sil
+              {isPending ? 'Siliniyor...' : 'Sil'}
             </button>
           </div>
         </div>

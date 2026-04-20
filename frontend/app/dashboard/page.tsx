@@ -15,10 +15,10 @@ function toDisplayStatus(status: string): string {
 }
 
 const QUICK_AGENTS = [
-  { slug: 'yazilim', label: 'Yazılım', mood: 'Derin analiz' },
-  { slug: 'sosyal', label: 'Sosyal Medya', mood: 'Hızlı' },
-  { slug: 'arastirma', label: 'Araştırma', mood: 'Araştırma odaklı' },
-  { slug: 'rapor', label: 'Rapor', mood: 'Derin analiz' }
+  { slug: 'yazilim', label: 'Yazılım', mood: 'Derin analiz modu' },
+  { slug: 'sosyal', label: 'Sosyal Medya', mood: 'Hızlı mod' },
+  { slug: 'arastirma', label: 'Araştırma', mood: 'Araştırma destekli mod' },
+  { slug: 'rapor', label: 'Rapor', mood: 'Derin analiz modu' }
 ] as const;
 
 export default async function DashboardPage() {
@@ -113,7 +113,7 @@ export default async function DashboardPage() {
               return (
                 <Link key={agent.id} href={`/agents/${agent.id}`} className="rounded-lg border border-white/10 p-3 hover:border-neon">
                   <p className="font-medium">{agent.name}</p>
-                  <p className="text-xs text-white/60">{quick?.mood ?? 'Hızlı mod'}</p>
+                  <p className="text-xs text-white/60">{quick?.mood ?? 'Koschei AI motoru'}</p>
                 </Link>
               );
             })}

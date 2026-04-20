@@ -119,16 +119,16 @@ export const agentEditorConfigs: Record<AgentEditorSlug, AgentEditorConfig> = {
   },
   sosyal: {
     slug: 'sosyal',
-    title: 'Koschei V5 • YouTube Agent Editörü',
+    title: 'Sosyal Medya Agent Editörü',
     shortHelp: 'Yalnızca YouTube için agent modu, kitle, ton ve hedef çıktıyı netleştirin.',
-    summaryDescription: 'YouTube odaklı agent çıktısı üretir ve Gemini yeteneklerini mod bazında çalıştırır.',
+    summaryDescription: 'YouTube, Instagram ve TikTok için sosyal içerik çıktısını mod bazında üretir.',
     placeholder: 'Örn: AI destekli üretkenlik videosu için araştırma + script + SEO paketi',
-    outputMode: 'Agent modu özeti + YouTube başlık + YouTube açıklama + CTA',
+    outputMode: 'Agent modu özeti + platforma uygun başlık/metin + CTA',
     sections: [
       {
         title: 'İçerik Çerçevesi',
         fields: [
-          { key: 'platform', label: 'Platform', type: 'select', options: ['YouTube'] },
+          { key: 'platform', label: 'Platform', type: 'select', options: ['YouTube', 'Instagram', 'TikTok'] },
           {
             key: 'agent_mode',
             label: 'Koschei Agent Modu',
@@ -170,7 +170,7 @@ export const agentEditorConfigs: Record<AgentEditorSlug, AgentEditorConfig> = {
       },
       {
         label: 'Research',
-        description: 'Gemini araştırma modu ile konu ve rakip çerçevesi çıkarır.',
+        description: 'Araştırma destekli mod ile konu ve rakip çerçevesi çıkarır.',
         state: {
           platform: 'YouTube',
           agent_mode: 'research',

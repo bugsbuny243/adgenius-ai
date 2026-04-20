@@ -39,11 +39,11 @@ type EditorMode = {
 };
 
 const KOSCHEI_MODES: EditorMode[] = [
-  { id: 'code-content', label: 'Kod & İçerik Ajanı', icon: Code2, active: true },
-  { id: 'visual', label: 'Görsel & Grafik', icon: ImageIcon },
-  { id: 'video', label: 'Video Prodüksiyon', icon: Clapperboard },
-  { id: 'music', label: 'Müzik & Ses', icon: Music2 },
-  { id: 'live', label: 'Canlı Etkileşim', icon: Radio }
+  { id: 'hizli', label: 'Hızlı mod', icon: Code2, active: true },
+  { id: 'derin', label: 'Derin analiz modu', icon: ImageIcon },
+  { id: 'arastirma', label: 'Araştırma destekli mod', icon: Clapperboard },
+  { id: 'editor', label: 'Canlı düzenleme', icon: Radio },
+  { id: 'taslak', label: 'Taslak odaklı', icon: Music2 }
 ];
 
 const TOOLBAR_ACTIONS = [
@@ -108,7 +108,7 @@ export function AgentEditorShell({ agentSlug, projects, runAction, initialMetada
         <aside className="flex h-full flex-col border-b border-white/10 bg-ink px-5 py-6 lg:border-b-0 lg:border-r lg:border-white/10 lg:px-6">
           <div>
             <p className="text-xs uppercase tracking-[0.32em] text-neon/75">Live Editor</p>
-            <h2 className="mt-2 text-2xl font-semibold text-white">KOSCHEI AI</h2>
+            <h2 className="mt-2 text-2xl font-semibold text-white">Koschei AI motoru</h2>
             <p className="mt-2 text-sm text-white/60">{config.shortHelp}</p>
           </div>
 
@@ -223,11 +223,11 @@ export function AgentEditorShell({ agentSlug, projects, runAction, initialMetada
             <div className="flex min-h-[420px] flex-col overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm">
               <div className="border-b border-slate-200 px-4 py-3">
                 <h3 className="text-sm font-semibold text-slate-800">Canlı Editör</h3>
-                <p className="mt-1 text-xs text-slate-500">Koschei çıktısı burada akacak. Şimdilik önizleme alanı placeholder içerir.</p>
+                <p className="mt-1 text-xs text-slate-500">Canlı preview yalnızca yapılandırılmış özeti gösterir. Final cevap burada simüle edilmez.</p>
               </div>
               <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4 text-sm leading-6 text-slate-700">
                 <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-slate-500">
-                  Koschei, seçtiğiniz moda göre metin, öneri ve içerik bloklarını bu alana gerçek zamanlı işler.
+                  Önizleme; görev özeti, içerik özeti, CTA ve ek notlardan derlenir.
                 </p>
                 {previewBlocks.map((block) => (
                   <article key={block.title} className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
@@ -241,7 +241,7 @@ export function AgentEditorShell({ agentSlug, projects, runAction, initialMetada
             <div className="flex h-full min-h-[420px] flex-col gap-4">
               <div className="overflow-y-auto rounded-2xl border border-slate-300 bg-white p-4 shadow-sm">
                 <h4 className="text-sm font-semibold text-slate-800">Ajan Ayarları</h4>
-                <p className="mt-1 text-xs text-slate-500">Mevcut yapı korunur: alanları düzenleyerek promptu detaylandırabilirsiniz.</p>
+                <p className="mt-1 text-xs text-slate-500">Alanları düzenleyerek komutu yapılandırın. Temiz ve tekrar kullanılabilir bir brief oluşturun.</p>
                 <div className="mt-4">
                   <AgentEditorRenderer config={config} state={editorState} onChange={handleFieldChange} />
                 </div>

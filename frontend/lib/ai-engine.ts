@@ -1,15 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 
-export type KoscheiModelAlias =
-  | 'koschei-fast'
-  | 'koschei-deep'
-  | 'koschei-research'
-  | 'koschei-orchestrator'
-  | 'koschei-script'
-  | 'koschei-title-hook'
-  | 'koschei-seo'
-  | 'koschei-thumbnail'
-  | 'koschei-qa-safety';
+export type KoscheiModelAlias = 'koschei-fast' | 'koschei-deep' | 'koschei-research';
 
 export type AgentRunProfile = {
   alias: KoscheiModelAlias;
@@ -17,7 +8,6 @@ export type AgentRunProfile = {
   enableResearchMode: boolean;
   maxOutputTokens: number;
   thinkingBudget?: number;
-  instructionSuffix?: string;
 };
 
 type RunTextOptions = {
@@ -49,7 +39,8 @@ const PROFILE_DEEP: AgentRunProfile = {
   alias: 'koschei-deep',
   displayLabel: 'Derin analiz modu',
   enableResearchMode: false,
-  maxOutputTokens: 4_096
+  maxOutputTokens: 4_096,
+  thinkingBudget: 2048
 };
 
 const PROFILE_RESEARCH: AgentRunProfile = {
@@ -60,92 +51,26 @@ const PROFILE_RESEARCH: AgentRunProfile = {
   thinkingBudget: 1536
 };
 
-const PROFILE_ORCHESTRATOR: AgentRunProfile = {
-  alias: 'koschei-orchestrator',
-  displayLabel: 'Koschei Orchestrator',
-  enableResearchMode: true,
-  maxOutputTokens: 8_192,
-  thinkingBudget: 3072,
-  instructionSuffix:
-    'Araştırma, script, başlık-hook, SEO, thumbnail ve QA/safety çıktısını ayrı başlıklarla tek yanıtta üret.'
-};
+function resolveRunProfile(agentSlug: string, agentMode?: string | null): AgentRunProfile {
+  const normalizedSlug = agentSlug.trim().toLowerCase();
+  const normalizedMode = typeof agentMode === 'string' ? agentMode.trim().toLowerCase() : '';
 
-const PROFILE_SCRIPT: AgentRunProfile = {
-  alias: 'koschei-script',
-  displayLabel: 'Koschei Script Agent',
-  enableResearchMode: false,
-  maxOutputTokens: 6_144,
-  thinkingBudget: 2304,
-  instructionSuffix: 'Yanıtı kısa intro, ana akış blokları ve kapanış CTA şeklinde video script formatında üret.'
-};
+  if (normalizedSlug === 'arastirma' || normalizedMode === 'research') return PROFILE_RESEARCH;
+  if (normalizedSlug === 'yazilim' || normalizedSlug === 'rapor') return PROFILE_DEEP;
 
-const PROFILE_TITLE_HOOK: AgentRunProfile = {
-  alias: 'koschei-title-hook',
-  displayLabel: 'Koschei Title & Hook Agent',
-  enableResearchMode: true,
-  maxOutputTokens: 2_048,
-  thinkingBudget: 1024,
-  instructionSuffix: 'Yanıtı yalnızca başlık ve ilk 10 saniye hook alternatifleri olarak ver.'
-};
+  if (['orchestrator', 'script', 'title-hook', 'seo', 'qa-safety'].includes(normalizedMode)) {
+    return PROFILE_DEEP;
+  }
 
-const PROFILE_SEO: AgentRunProfile = {
-  alias: 'koschei-seo',
-  displayLabel: 'Koschei SEO Agent',
-  enableResearchMode: true,
-  maxOutputTokens: 2_560,
-  thinkingBudget: 1280,
-  instructionSuffix: 'Yanıtı YouTube açıklama metni, etiket önerileri ve chapter planı olarak üret.'
-};
+  if (normalizedMode === 'thumbnail') {
+    return PROFILE_FAST;
+  }
 
-const PROFILE_THUMBNAIL: AgentRunProfile = {
-  alias: 'koschei-thumbnail',
-  displayLabel: 'Koschei Thumbnail Agent',
-  enableResearchMode: false,
-  maxOutputTokens: 1_536,
-  thinkingBudget: 768,
-  instructionSuffix: 'Yanıtı thumbnail konsepti, sahne, metin ve renk varyantlarıyla ver.'
-};
-
-const PROFILE_QA_SAFETY: AgentRunProfile = {
-  alias: 'koschei-qa-safety',
-  displayLabel: 'Koschei QA/Safety Agent',
-  enableResearchMode: false,
-  maxOutputTokens: 2_048,
-  thinkingBudget: 1024,
-  instructionSuffix: 'Yanıtı kalite kontrol listesi, riskler ve düzeltme önerileri formatında ver.'
-};
-
-function resolveModelAlias(agentSlug: string, agentMode?: string | null): AgentRunProfile {
-  const normalized = agentSlug.trim().toLowerCase();
-  const mode = typeof agentMode === 'string' ? agentMode.trim().toLowerCase() : '';
-
-  if (mode === 'orchestrator') return PROFILE_ORCHESTRATOR;
-  if (mode === 'research') return PROFILE_RESEARCH;
-  if (mode === 'script') return PROFILE_SCRIPT;
-  if (mode === 'title-hook') return PROFILE_TITLE_HOOK;
-  if (mode === 'seo') return PROFILE_SEO;
-  if (mode === 'thumbnail') return PROFILE_THUMBNAIL;
-  if (mode === 'qa-safety') return PROFILE_QA_SAFETY;
-
-  if (normalized === 'arastirma') return PROFILE_RESEARCH;
-  if (normalized === 'yazilim' || normalized === 'rapor') return PROFILE_DEEP;
   return PROFILE_FAST;
 }
 
 function resolveServerModel(alias: KoscheiModelAlias): string {
-  if (
-    alias === 'koschei-deep' ||
-    alias === 'koschei-research' ||
-    alias === 'koschei-orchestrator' ||
-    alias === 'koschei-script' ||
-    alias === 'koschei-title-hook' ||
-    alias === 'koschei-seo' ||
-    alias === 'koschei-thumbnail' ||
-    alias === 'koschei-qa-safety'
-  ) {
-    return 'gemini-2.5-pro';
-  }
-  return 'gemini-2.5-flash';
+  return alias === 'koschei-fast' ? 'gemini-2.5-flash' : 'gemini-2.5-pro';
 }
 
 function extractUsage(source: unknown): { inputTokens: number | null; outputTokens: number | null } {
@@ -165,53 +90,45 @@ function buildConfig(profile: AgentRunProfile, systemPrompt: string | null): Rec
     maxOutputTokens: profile.maxOutputTokens
   };
 
-  const composedPrompt = [systemPrompt?.trim(), profile.instructionSuffix?.trim()].filter(Boolean).join('\n\n');
-  if (composedPrompt) {
-    config.systemInstruction = composedPrompt;
+  if (systemPrompt?.trim()) {
+    config.systemInstruction = systemPrompt.trim();
   }
 
-  if (profile.alias === 'koschei-deep' || profile.thinkingBudget) {
+  if (profile.thinkingBudget) {
     config.thinkingConfig = {
-      thinkingBudget: profile.thinkingBudget ?? 2048
+      thinkingBudget: profile.thinkingBudget
     };
   }
 
   if (profile.enableResearchMode) {
     config.tools = [{ googleSearch: {} }];
-    config.thinkingConfig = {
-      thinkingBudget: 1536
-    };
   }
 
   return config;
 }
 
-export async function runTextWithAiEngine(options: RunTextOptions): Promise<AiRunResult> {
-  const profile = resolveModelAlias(options.agentSlug, options.agentMode);
+async function runInternal(options: RunTextOptions, stream: boolean): Promise<AiRunResult> {
+  const profile = resolveRunProfile(options.agentSlug, options.agentMode);
   const model = resolveServerModel(profile.alias);
 
   const client = new GoogleGenAI({ apiKey: options.apiKey });
-  const response = await client.models.generateContent({
-    model,
-    config: buildConfig(profile, options.systemPrompt),
-    contents: options.userInput
-  });
 
-  const text = (response.text ?? '').trim();
-  return {
-    text,
-    alias: profile.alias,
-    displayLabel: profile.displayLabel,
-    usage: extractUsage(response.usageMetadata)
-  };
-}
+  if (!stream) {
+    const response = await client.models.generateContent({
+      model,
+      config: buildConfig(profile, options.systemPrompt),
+      contents: options.userInput
+    });
 
-export async function runTextStreamWithAiEngine(options: RunTextOptions): Promise<AiRunResult> {
-  const profile = resolveModelAlias(options.agentSlug, options.agentMode);
-  const model = resolveServerModel(profile.alias);
+    return {
+      text: (response.text ?? '').trim(),
+      alias: profile.alias,
+      displayLabel: profile.displayLabel,
+      usage: extractUsage(response.usageMetadata)
+    };
+  }
 
-  const client = new GoogleGenAI({ apiKey: options.apiKey });
-  const stream = await client.models.generateContentStream({
+  const responseStream = await client.models.generateContentStream({
     model,
     config: buildConfig(profile, options.systemPrompt),
     contents: options.userInput
@@ -220,7 +137,7 @@ export async function runTextStreamWithAiEngine(options: RunTextOptions): Promis
   let text = '';
   let usage: { inputTokens: number | null; outputTokens: number | null } = { inputTokens: null, outputTokens: null };
 
-  for await (const chunk of stream) {
+  for await (const chunk of responseStream) {
     text += chunk.text ?? '';
     usage = extractUsage(chunk.usageMetadata);
   }
@@ -231,4 +148,12 @@ export async function runTextStreamWithAiEngine(options: RunTextOptions): Promis
     displayLabel: profile.displayLabel,
     usage
   };
+}
+
+export async function runTextWithAiEngine(options: RunTextOptions): Promise<AiRunResult> {
+  return runInternal(options, false);
+}
+
+export async function runTextStreamWithAiEngine(options: RunTextOptions): Promise<AiRunResult> {
+  return runInternal(options, true);
 }

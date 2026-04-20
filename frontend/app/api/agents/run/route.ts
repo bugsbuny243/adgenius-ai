@@ -41,7 +41,7 @@ function normalizePlatforms(value: unknown): SocialPlatform[] {
 
   const normalized = value
     .map((entry) => String(entry).toLowerCase().trim())
-    .filter((entry): entry is SocialPlatform => ['youtube'].includes(entry));
+    .filter((entry): entry is SocialPlatform => ['youtube', 'instagram', 'tiktok'].includes(entry));
 
   return normalized.length ? Array.from(new Set(normalized)) : ['youtube'];
 }
@@ -238,6 +238,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'run_not_found' }, { status: 404 });
   }
 
+
+  const runUpdatedAt = new Date(run.updated_at ?? run.created_at).getTime();
+  const runAgeMs = Date.now() - runUpdatedAt;
+  if ((run.status === 'pending' || run.status === 'processing') && runAgeMs > RUN_TIMEOUT_MS * 3) {
+    await serviceSupabase
+      .from('agent_runs')
+      .update({
+        status: 'failed',
+        error_message: 'Çalıştırma zamanında tamamlanamadı. Lütfen yeniden deneyin.',
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', runId)
+      .eq('workspace_id', membership.workspace_id)
+      .eq('user_id', user.id)
+      .in('status', ['pending', 'processing']);
+
+    return NextResponse.json({ ok: false, error: 'run_timeout' }, { status: 409 });
+  }
+
   if (run.status === 'completed' && run.result_text) {
     return NextResponse.json({ ok: true, runId, result: run.result_text, fromCache: true });
   }
@@ -375,7 +395,9 @@ export async function POST(request: Request) {
     if (agentType.slug === 'sosyal') {
       const preferredPlatform =
         requestEditorState && typeof requestEditorState.platform === 'string' ? requestEditorState.platform.toLowerCase() : null;
-      const platforms: SocialPlatform[] = preferredPlatform ? normalizePlatforms([preferredPlatform]) : ['youtube'];
+      const requestedPlatforms =
+        requestEditorState && typeof requestEditorState.platforms !== 'undefined' ? requestEditorState.platforms : null;
+      const platforms: SocialPlatform[] = normalizePlatforms([...(preferredPlatform ? [preferredPlatform] : []), ...(Array.isArray(requestedPlatforms) ? requestedPlatforms : [])]);
 
       const resolvedProjectId = resolveProjectIdFromMetadata(run.metadata) ?? projectId;
 
@@ -449,7 +471,6 @@ export async function POST(request: Request) {
             youtube_description: draft.youtubeDescription,
             instagram_caption: draft.instagramCaption,
             tiktok_caption: draft.tiktokCaption,
-            status: 'draft',
             updated_at: new Date().toISOString()
           })
           .eq('id', existingContentItem.id)
