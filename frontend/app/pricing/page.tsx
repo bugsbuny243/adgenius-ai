@@ -2,30 +2,9 @@ import Link from 'next/link';
 import { PublicSiteNav } from '@/components/public-site-nav';
 
 const plans = [
-  {
-    name: 'Ücretsiz',
-    badge: 'Başlangıç',
-    price: '₺0',
-    period: '/ay',
-    features: ['30 çalışma/ay', 'Temel agent erişimi', 'Kaydedilen çıktılar', 'Proje organizasyonu'],
-    cta: { href: '/signup', label: 'Ücretsiz Başla' }
-  },
-  {
-    name: 'Başlangıç',
-    badge: 'En dengeli plan',
-    price: '₺590',
-    period: '/ay',
-    features: ['300 çalışma/ay', 'Hızlı mod + Derin analiz modu', 'Araştırma destekli akış', 'Öncelikli işlem sırası'],
-    cta: { href: '/upgrade', label: 'Başlangıç Planını Seç' }
-  },
-  {
-    name: 'Pro',
-    badge: 'Ekipler için',
-    price: '₺1.490',
-    period: '/ay',
-    features: ['Yüksek kullanım limiti', 'Yoğun operasyon iş yükü', 'Geniş ekip üretim akışları', 'Öncelikli destek'],
-    cta: { href: '/upgrade', label: 'Pro Planına Geç' }
-  }
+  { name: 'Ücretsiz', badge: 'Başlangıç', price: '₺0', period: '/ay', features: ['30 çalışma/ay', 'Temel agent erişimi', 'Kaydedilen çıktılar', 'Proje organizasyonu'], cta: { href: '/signup', label: 'Ücretsiz Başla' } },
+  { name: 'Başlangıç', badge: 'En dengeli plan', price: '₺590', period: '/ay', features: ['300 çalışma/ay', 'Hızlı mod + Derin analiz modu', 'Araştırma destekli akış', 'Queue ve üretim operasyonu'], cta: { href: '/upgrade', label: 'Başlangıç Planını Seç' } },
+  { name: 'Pro', badge: 'Ekipler için', price: '₺1.490', period: '/ay', features: ['Yüksek kullanım limiti', 'Yoğun operasyon iş yükü', 'Gelişmiş içerik akışları', 'Öncelikli destek'], cta: { href: '/upgrade', label: 'Pro Planına Geç' } }
 ] as const;
 
 export default function PricingPage() {
@@ -35,7 +14,7 @@ export default function PricingPage() {
       <section className="space-y-3">
         <p className="text-sm uppercase tracking-[0.2em] text-lilac">Fiyatlandırma</p>
         <h1 className="text-4xl font-bold">Koschei AI ile ölçeklenen planlar</h1>
-        <p className="max-w-3xl text-white/75">Planlar net limitlerle sunulur. Kullanımınız arttıkça yükseltme kararını veriye göre rahatça alabilirsiniz.</p>
+        <p className="max-w-3xl text-white/75">Plan karşılaştırması net, değer önerisi güçlü ve yükseltme yolu şeffaf. Ekipler kullanım yoğunluğuna göre hızlıca plan seçebilir.</p>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-3">
@@ -54,15 +33,12 @@ export default function PricingPage() {
         <h2 className="text-2xl font-semibold">Özellik karşılaştırması</h2>
         <div className="mt-3 overflow-auto text-sm">
           <table className="w-full min-w-[640px] border-collapse">
-            <thead>
-              <tr className="text-left text-white/60">
-                <th className="border-b border-white/10 py-2">Özellik</th><th className="border-b border-white/10 py-2">Ücretsiz</th><th className="border-b border-white/10 py-2">Başlangıç</th><th className="border-b border-white/10 py-2">Pro</th>
-              </tr>
-            </thead>
+            <thead><tr className="text-left text-white/60"><th className="border-b border-white/10 py-2">Özellik</th><th className="border-b border-white/10 py-2">Ücretsiz</th><th className="border-b border-white/10 py-2">Başlangıç</th><th className="border-b border-white/10 py-2">Pro</th></tr></thead>
             <tbody className="text-white/80">
               <tr><td className="py-2">Aylık çalışma limiti</td><td>30</td><td>300</td><td>Yüksek</td></tr>
               <tr><td className="py-2">Araştırma destekli mod</td><td>Sınırlı</td><td>Var</td><td>Var</td></tr>
-              <tr><td className="py-2">Ekip operasyonu</td><td>Temel</td><td>Orta</td><td>Geniş</td></tr>
+              <tr><td className="py-2">Sosyal içerik stüdyosu</td><td>Temel</td><td>Gelişmiş</td><td>Gelişmiş</td></tr>
+              <tr><td className="py-2">Operasyon paneli</td><td>Temel</td><td>Geniş</td><td>Premium</td></tr>
             </tbody>
           </table>
         </div>
@@ -72,8 +48,8 @@ export default function PricingPage() {
         <h2 className="text-2xl font-semibold">Sık sorulan sorular</h2>
         <div className="mt-3 space-y-3 text-sm text-white/80">
           <p><strong>Plan yükseltince verilerim silinir mi?</strong> Hayır, mevcut proje ve çıktılarınız korunur.</p>
-          <p><strong>Ödeme entegrasyonu hazır mı?</strong> Bu sürümde ödeme adımı hazırlık modundadır; yükseltme sayfasında bu durum açıkça belirtilir.</p>
-          <p><strong>Hangi planı seçmeliyim?</strong> Günlük kullanım yoğunluğu düşükse Ücretsiz, düzenli operasyon varsa Başlangıç, ekip çalışması yoğunsa Pro plan önerilir.</p>
+          <p><strong>Ödeme akışı aktif değilse ne olur?</strong> Upgrade ekranında ödeme adımının hazırlıkta olduğu açıkça belirtilir, verileriniz etkilenmez.</p>
+          <p><strong>Hangi planı seçmeliyim?</strong> Günlük kullanım düşükse Ücretsiz, düzenli operasyon varsa Başlangıç, ekip yükü yüksekse Pro plan önerilir.</p>
         </div>
       </section>
     </main>

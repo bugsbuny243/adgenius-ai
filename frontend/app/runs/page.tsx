@@ -17,7 +17,8 @@ export default async function RunsPage() {
     <main>
       <Nav />
       <section className="panel">
-        <h2 className="mb-3 text-xl font-semibold">Çalıştırmalar</h2>
+        <h2 className="mb-1 text-xl font-semibold">Çalıştırmalar</h2>
+        <p className="mb-3 text-sm text-white/70">Run lifecycle görünümü: filtrele, detay aç, aynı girdiyle yeniden çalıştır.</p>
         {error ? (
           <p className="text-sm text-red-300">Run verisi alınamadı: {error.message}</p>
         ) : data && data.length > 0 ? (
