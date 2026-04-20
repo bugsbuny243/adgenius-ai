@@ -143,6 +143,7 @@ export default async function DashboardPage() {
               <div key={item.id} className="rounded-lg border border-white/10 px-3 py-2">
                 <p className="font-medium">{item.title ?? 'Kaydedilen çıktı'}</p>
                 <p className="line-clamp-2 text-white/70">{item.content}</p>
+                <Link href="/saved" className="mt-2 inline-flex text-xs text-neon">Kaydedilenlere git</Link>
               </div>
             ))}
           </div>
@@ -158,6 +159,7 @@ export default async function DashboardPage() {
               <p className="text-white/70">Motor: {sanitizeUserFacingEngineLabel(run.model_name)}</p>
               <p className="line-clamp-2 text-white/65">{run.user_input || 'İstem kaydı yok.'}</p>
               <p className="text-white/60">{new Date(run.created_at).toLocaleString('tr-TR')}</p>
+              <Link href="/runs" className="inline-flex text-xs text-neon">Tüm çalışmaları aç</Link>
               {run.error_message ? <p className="text-red-200">Hata: {toFriendlyRunError(run.error_message)}</p> : null}
             </div>
           ))}
