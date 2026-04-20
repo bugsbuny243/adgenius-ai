@@ -240,6 +240,32 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'workspace_not_found' }, { status: 404 });
   }
 
+  const monthKey = new Date().toISOString().slice(0, 7);
+
+  const [{ data: sub }, { data: counter }] = await Promise.all([
+    supabase.from('subscriptions')
+      .select('run_limit, status')
+      .eq('workspace_id', membership.workspace_id)
+      .eq('status', 'active')
+      .maybeSingle(),
+    supabase.from('usage_counters')
+      .select('runs_count')
+      .eq('workspace_id', membership.workspace_id)
+      .eq('month_key', monthKey)
+      .maybeSingle(),
+  ]);
+
+  const runLimit = sub?.run_limit ?? 30;
+  const runsCount = counter?.runs_count ?? 0;
+
+  if (runsCount >= runLimit) {
+    return NextResponse.json({
+      ok: false,
+      error: `Aylık ${runLimit} çalışma limitinize ulaştınız. Planınızı yükseltin.`,
+      upgrade: true
+    }, { status: 429 });
+  }
+
   const { data: run } = await supabase
     .from('agent_runs')
     .select('id, workspace_id, user_id, agent_type_id, metadata, status, result_text, error_message, created_at, updated_at')
@@ -411,6 +437,11 @@ export async function POST(request: Request) {
     if (updateError) {
       throw new Error(`run_update_failed:${updateError.message}`);
     }
+
+    await serviceSupabase.rpc('increment_usage_counter', {
+      p_workspace_id: membership.workspace_id,
+      p_month_key: monthKey,
+    });
 
     if (agentType.slug === 'sosyal') {
       const preferredPlatform =
