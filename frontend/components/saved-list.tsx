@@ -10,6 +10,7 @@ type SavedItem = {
   created_at: string;
   agent_run_id: string | null;
   agent_runs: Array<{ id: string; agent_type_id: string }> | null;
+  project_id?: string | null;
 };
 
 function createDedupedList(items: SavedItem[]): SavedItem[] {
@@ -58,6 +59,11 @@ export function SavedList({ items, onDelete }: { items: SavedItem[]; onDelete: (
               {agentTypeId && runId ? (
                 <Link href={`/agents/${agentTypeId}?run_id=${runId}`} className="rounded border border-neon/50 px-2 py-1 text-neon">
                   İlgili sonuca git
+                </Link>
+              ) : null}
+              {item.project_id ? (
+                <Link href={`/projects/${item.project_id}`} className="rounded border border-white/20 px-2 py-1">
+                  İlgili projeye git
                 </Link>
               ) : null}
               {agentTypeId && runId ? (

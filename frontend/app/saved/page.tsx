@@ -10,7 +10,7 @@ export default async function SavedPage() {
 
   const { data, error } = await supabase
     .from('saved_outputs')
-    .select('id, title, content, created_at, agent_run_id, agent_runs(id, agent_type_id)')
+    .select('id, title, content, created_at, agent_run_id, project_id, agent_runs(id, agent_type_id)')
     .eq('workspace_id', workspace.workspaceId)
     .order('created_at', { ascending: false })
     .limit(100);

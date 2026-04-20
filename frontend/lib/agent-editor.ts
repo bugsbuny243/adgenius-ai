@@ -58,6 +58,128 @@ export type EditorStarterPack = {
 
 const DEFAULT_AGENT_SLUG: AgentEditorSlug = 'icerik';
 
+const EMPTY_STARTER_PACK: EditorStarterPack = {
+  label: 'Boş başla',
+  description: 'Form alanlarını boş bırakır ve sıfırdan brief yazmanızı sağlar.',
+  state: {},
+  freeNotes: ''
+};
+
+const EXTRA_STARTER_PACKS: Partial<Record<AgentEditorSlug, EditorStarterPack[]>> = {
+  yazilim: [
+    {
+      label: 'Feature Ekleme',
+      description: 'Yeni özellik geliştirme planı için başlangıç.',
+      state: { gorev_tipi: 'feature', teknoloji_stack: 'Next.js + TypeScript', beklenen_cikti: 'Adım adım uygulama planı ve test senaryoları' },
+      freeNotes: 'Gerçekleme adımlarını küçük teslim parçalarına ayır.'
+    },
+    {
+      label: 'Kod Açıklama',
+      description: 'Mevcut kodu açıklama ve onboarding notu üretme.',
+      state: { gorev_tipi: 'explain', teknoloji_stack: 'TypeScript', beklenen_cikti: 'Kodun ne yaptığını sade dilde açıkla' },
+      freeNotes: 'Yeni ekip üyesi okuyacakmış gibi anlat.'
+    }
+  ],
+  sosyal: [
+    {
+      label: 'Kampanya Duyurusu',
+      description: 'Kampanya başlangıcı için platforma göre duyuru metni.',
+      state: { platform: 'Instagram', agent_mode: 'title-hook', format: 'short', ton: 'Enerjik', icerik_amaci: 'Kampanya dönüşümünü artırma' },
+      freeNotes: 'Hook cümlesi ilk satırda güçlü olsun.'
+    },
+    {
+      label: 'Haftalık Plan',
+      description: '1 haftalık içerik akışı ve başlık önerileri.',
+      state: { platform: 'YouTube', agent_mode: 'research', format: 'long-form', icerik_amaci: 'Haftalık yayın planı', ton: 'Planlı ve öğretici' },
+      freeNotes: 'Haftalık yayın takvimi mantığında öner.'
+    }
+  ],
+  eposta: [
+    {
+      label: 'Satış E-postası',
+      description: 'İlk temas satış e-postası taslağı.',
+      state: { eposta_turu: 'Satış', ton: 'Net ve güven veren', amac: 'Demo toplantısı planlamak' },
+      freeNotes: 'Kısa bir değer önerisi ve tek CTA kullan.'
+    },
+    {
+      label: 'Destek Yanıtı',
+      description: 'Müşteri sorununa hızlı ve sakin yanıt taslağı.',
+      state: { eposta_turu: 'Bilgilendirme', ton: 'Sakin ve çözüm odaklı', amac: 'Sorunu net adımlarla çözmek' },
+      freeNotes: 'Empati cümlesiyle başla, çözümü net maddelerle ver.'
+    }
+  ],
+  icerik: [
+    {
+      label: 'Sosyal Seri',
+      description: 'Aynı tema için çoklu sosyal post serisi.',
+      state: { icerik_turu: 'Rehber', uzunluk: 'Kısa', ton: 'Canlı ve anlaşılır', amac: 'Sosyal post serisi üretmek' },
+      freeNotes: '3-5 parçalık seri olacak şekilde yapılandır.'
+    },
+    {
+      label: 'SEO Giriş Taslağı',
+      description: 'SEO odaklı giriş ve ilk bölüm çerçevesi.',
+      state: { icerik_turu: 'Blog', uzunluk: 'Orta', ton: 'Uzman ama anlaşılır', amac: 'SEO uyumlu başlangıç üretmek' },
+      freeNotes: 'İlk 120 kelimede ana kelime doğal şekilde geçsin.'
+    }
+  ],
+  rapor: [
+    {
+      label: 'Yönetici Özeti',
+      description: 'Yönetim için kısa ve karar odaklı rapor.',
+      state: { rapor_turu: 'Stratejik', format: 'Anlatımsal', odak: 'Karar ve aksiyon önerileri' },
+      freeNotes: 'Her ana bölümde risk ve fırsatı birlikte belirt.'
+    },
+    {
+      label: 'Ekip Değerlendirme',
+      description: 'İç ekip performans değerlendirme raporu.',
+      state: { rapor_turu: 'Haftalık', format: 'Madde madde', odak: 'İç ekip koordinasyonu' },
+      freeNotes: 'Aksiyon sahiplerini rol bazında belirt.'
+    }
+  ],
+  arastirma: [
+    {
+      label: 'Trend Taraması',
+      description: 'Güncel pazar trendlerini hızlıca özetler.',
+      state: { derinlik: 'Orta', pazar_bolge: 'Global', amac: 'Yeni trend alanlarını belirlemek' },
+      freeNotes: 'Trendleri etki seviyesine göre sırala.'
+    },
+    {
+      label: 'Marka Karşılaştırma',
+      description: 'İki veya daha fazla markayı kıyaslar.',
+      state: { derinlik: 'Derin', pazar_bolge: 'Türkiye', amac: 'Marka konumlandırma farklarını çıkarmak' },
+      freeNotes: 'Karşılaştırmayı güçlü/zayıf yön tablosu gibi kurgula.'
+    }
+  ],
+  emlak: [
+    {
+      label: 'Mahalle Özeti',
+      description: 'Lokasyon avantajlarını öne çıkaran metin.',
+      state: { ilan_tipi: 'Kiralık', ton: 'Bilgilendirici', amac: 'Mahalle artılarını net göstermek' },
+      freeNotes: 'Ulaşım, sosyal alanlar ve hedef kitle uyumunu vurgula.'
+    },
+    {
+      label: 'Yatırım Metni',
+      description: 'Yatırım odaklı alıcılar için metin şablonu.',
+      state: { ilan_tipi: 'Satılık', ton: 'Veri odaklı', amac: 'Yatırım geri dönüş potansiyelini anlatmak' },
+      freeNotes: 'Kira çarpanı ve değer artışı notu ekle.'
+    }
+  ],
+  eticaret: [
+    {
+      label: 'Bullet Faydalar',
+      description: 'Fayda odaklı madde listesi üretimi.',
+      state: { platform: 'Amazon', ton: 'Net ve fayda odaklı', amac: 'Ürün faydalarını hızlı anlatmak' },
+      freeNotes: 'Her madde bir müşteri sorununu çözsün.'
+    },
+    {
+      label: 'Kampanya CTA',
+      description: 'Kampanya dönemine uygun CTA metni.',
+      state: { platform: 'Trendyol', ton: 'Aciliyet yaratan', amac: 'Kampanya dönüşümünü artırmak' },
+      freeNotes: 'Kısa, güçlü ve eylem çağrısı net olsun.'
+    }
+  ]
+};
+
 export const agentEditorConfigs: Record<AgentEditorSlug, AgentEditorConfig> = {
   yazilim: {
     slug: 'yazilim',
@@ -529,7 +651,9 @@ export function getAgentEditorConfig(slug?: string | null): AgentEditorConfig {
 }
 
 export function getAgentStarterPacks(slug?: string | null): EditorStarterPack[] {
-  return getAgentEditorConfig(slug).starterPacks;
+  const config = getAgentEditorConfig(slug);
+  const extras = EXTRA_STARTER_PACKS[config.slug] ?? [];
+  return [EMPTY_STARTER_PACK, ...config.starterPacks, ...extras].slice(0, 5);
 }
 
 export function buildDerivedPrompt(config: AgentEditorConfig, state: EditorState, freeNotes: string): string {

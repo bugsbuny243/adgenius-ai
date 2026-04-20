@@ -49,6 +49,15 @@ export default function PricingPage() {
           </article>
         ))}
       </section>
+
+      <section className="rounded-2xl border border-white/10 bg-black/20 p-5">
+        <h2 className="text-2xl font-semibold">Sık sorulan sorular</h2>
+        <div className="mt-3 space-y-3 text-sm text-white/80">
+          <p><strong>Plan yükseltince verilerim silinir mi?</strong> Hayır, mevcut proje ve çıktılarınız korunur.</p>
+          <p><strong>Ödeme entegrasyonu hazır mı?</strong> Bu sürümde ödeme adımı hazırlık modundadır; durum sayfada açıkça belirtilir.</p>
+          <p><strong>Ekip planı kimler için?</strong> Düzenli içerik/publish operasyonu yürüten ekipler için uygundur.</p>
+        </div>
+      </section>
     </main>
   );
 }
