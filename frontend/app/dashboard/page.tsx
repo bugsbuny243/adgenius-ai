@@ -14,6 +14,22 @@ function toDisplayStatus(status: string): string {
   return status;
 }
 
+function toFriendlyRunError(errorMessage: string): string {
+  const normalized = errorMessage.toLowerCase();
+  if (
+    normalized.includes('429') ||
+    normalized.includes('too many requests') ||
+    normalized.includes('resource_exhausted') ||
+    normalized.includes('depleted credits') ||
+    normalized.includes('billing') ||
+    normalized.includes('provider_quota_exceeded')
+  ) {
+    return 'AI servis limiti doldu veya proje kredisi bitti. Lütfen billing/quota ayarlarını kontrol edin.';
+  }
+
+  return neutralizeVendorTerms(errorMessage).slice(0, 220);
+}
+
 const QUICK_AGENTS = [
   { slug: 'yazilim', label: 'Yazılım', mood: 'Derin analiz' },
   { slug: 'sosyal', label: 'Sosyal Medya', mood: 'Hızlı' },
@@ -142,7 +158,7 @@ export default async function DashboardPage() {
               <p className="text-white/70">Motor: {sanitizeUserFacingEngineLabel(run.model_name)}</p>
               <p className="line-clamp-2 text-white/65">{run.user_input || 'İstem kaydı yok.'}</p>
               <p className="text-white/60">{new Date(run.created_at).toLocaleString('tr-TR')}</p>
-              {run.error_message ? <p className="text-red-200">Hata: {neutralizeVendorTerms(run.error_message)}</p> : null}
+              {run.error_message ? <p className="text-red-200">Hata: {toFriendlyRunError(run.error_message)}</p> : null}
             </div>
           ))}
         </div>

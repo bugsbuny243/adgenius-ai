@@ -19,13 +19,28 @@ type RunRequestBody = {
 
 const RUN_TIMEOUT_MS = 40_000;
 const FALLBACK_ENGINE_NAME = 'Koschei AI motoru';
+const QUOTA_ERROR_CODE = 'provider_quota_exceeded';
+const QUOTA_ERROR_MESSAGE = 'AI servis limiti doldu veya proje kredisi bitti. Lütfen billing/quota ayarlarını kontrol edin.';
+const MOCK_FALLBACK_FLAG = process.env.MOCK_AI_ON_FAILURE === 'true';
 
 function toRunFailureMessage(input: string): string {
   const code = input.trim().toLowerCase();
+  if (code === QUOTA_ERROR_CODE) return QUOTA_ERROR_MESSAGE;
   if (code === 'run_timeout') return 'Çalıştırma zaman aşımına uğradı.';
   if (code === 'empty_result') return 'AI motoru boş sonuç döndürdü.';
   if (code.startsWith('run_update_failed:')) return 'Çalıştırma kaydı güncellenemedi.';
-  return input || 'Çalıştırma sırasında beklenmeyen bir hata oluştu.';
+  return 'Çalıştırma sırasında beklenmeyen bir hata oluştu.';
+}
+
+function isQuotaOrBillingFailure(input: string): boolean {
+  const value = input.toLowerCase();
+  return (
+    value.includes('429') ||
+    value.includes('too many requests') ||
+    value.includes('resource_exhausted') ||
+    value.includes('depleted credits') ||
+    value.includes('billing')
+  );
 }
 
 function resolveProjectIdFromMetadata(metadata: unknown): string | null {
@@ -259,7 +274,8 @@ export async function POST(request: Request) {
   }
 
   if (run.status === 'failed' && run.error_message) {
-    return NextResponse.json({ ok: false, error: run.error_message }, { status: 409 });
+    const cachedErrorCode = isQuotaOrBillingFailure(run.error_message) ? QUOTA_ERROR_CODE : 'run_failed';
+    return NextResponse.json({ ok: false, error: cachedErrorCode }, { status: 409 });
   }
 
   const { data: agentType } = await supabase
@@ -478,7 +494,39 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, runId, result: resultText });
   } catch (error) {
-    const message = toRunFailureMessage(error instanceof Error ? error.message : 'unknown_error');
+    const rawMessage = error instanceof Error ? error.message : 'unknown_error';
+    const errorCode = isQuotaOrBillingFailure(rawMessage) ? QUOTA_ERROR_CODE : rawMessage;
+    const message = toRunFailureMessage(errorCode);
+
+    if (errorCode === QUOTA_ERROR_CODE && MOCK_FALLBACK_FLAG) {
+      const mockResult = [
+        '[MOCK_AI_ON_FAILURE etkin]',
+        'Bu içerik, AI sağlayıcısı kota/billing hatası verdiği için test amaçlı fallback olarak üretildi.',
+        '',
+        `Orijinal istem özeti: ${userInput.slice(0, 400)}`
+      ].join('\n');
+
+      await serviceSupabase
+        .from('agent_runs')
+        .update({
+          result_text: mockResult,
+          status: 'completed',
+          error_message: null,
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          metadata: {
+            ...(run.metadata ?? {}),
+            ...(requestMetadata ?? {}),
+            ai_engine: FALLBACK_ENGINE_NAME,
+            fallback_mode: 'mock_ai_on_failure'
+          }
+        })
+        .eq('id', runId)
+        .eq('user_id', user.id)
+        .eq('workspace_id', membership.workspace_id);
+
+      return NextResponse.json({ ok: true, runId, result: mockResult, fallback: true });
+    }
 
     await serviceSupabase
       .from('agent_runs')
@@ -497,6 +545,6 @@ export async function POST(request: Request) {
       .eq('user_id', user.id)
       .eq('workspace_id', membership.workspace_id);
 
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: errorCode === QUOTA_ERROR_CODE ? QUOTA_ERROR_CODE : 'run_failed' }, { status: 500 });
   }
 }
