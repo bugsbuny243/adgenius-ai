@@ -120,7 +120,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
         await supabase
           .from('content_items')
           .select(
-            'id, brief, platforms, youtube_title, youtube_description, instagram_caption, tiktok_caption, status, project_id, saved_output_id'
+            'id, brief, platforms, youtube_title, youtube_description, instagram_caption, tiktok_caption, project_id, saved_output_id'
           )
           .eq('workspace_id', workspaceId)
           .eq('user_id', userId)
@@ -240,9 +240,6 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
                       İçerik kaydı: <span className="text-white/85">{activeContentItem.id}</span>
                     </p>
                     <p>
-                      Durum: <span className="text-white/85">{activeContentItem.status ?? 'draft'}</span>
-                    </p>
-                    <p>
                       Proje bağlantısı:{' '}
                       <span className="text-white/85">{activeContentItem.project_id ? activeContentItem.project_id : 'Yok'}</span>
                     </p>
@@ -250,6 +247,8 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
                   <SocialOutputPanel
                     youtubeTitle={activeContentItem.youtube_title}
                     youtubeDescription={activeContentItem.youtube_description}
+                    instagramCaption={activeContentItem.instagram_caption}
+                    tiktokCaption={activeContentItem.tiktok_caption}
                   />
 
                   <form action={queueSocialPublish} className="flex flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-black/20 p-3">
@@ -257,6 +256,8 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
                     <input type="hidden" name="content_item_id" value={activeContentItem.id} />
                     <select name="target_platform" defaultValue="youtube" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm">
                       <option value="youtube">YouTube</option>
+                      <option value="instagram">Instagram</option>
+                      <option value="tiktok">TikTok</option>
                     </select>
                     <button className="rounded-lg border border-white/20 px-3 py-2 text-sm hover:border-neon">Yayın Kuyruğuna Ekle</button>
                   </form>

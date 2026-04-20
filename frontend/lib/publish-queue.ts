@@ -79,10 +79,24 @@ export function deriveQueuePreview(input: {
   };
 }
 
-export function sanitizeUserFacingEngineLabel(_: unknown): string {
-  return 'Varsayılan AI motoru';
+export function sanitizeUserFacingEngineLabel(value: unknown): string {
+  const normalized = typeof value === 'string' ? value.toLowerCase() : '';
+  if (normalized.includes('araştırma') || normalized.includes('research') || normalized.includes('koschei-research')) {
+    return 'Araştırma destekli mod';
+  }
+  if (normalized.includes('derin') || normalized.includes('deep') || normalized.includes('koschei-deep')) {
+    return 'Derin analiz modu';
+  }
+  if (normalized.includes('hızlı') || normalized.includes('hizli') || normalized.includes('fast') || normalized.includes('koschei-fast')) {
+    return 'Hızlı mod';
+  }
+  return 'Koschei AI motoru';
 }
 
 export function neutralizeVendorTerms(text: string): string {
-  return text.replace(/gemini/gi, 'AI motoru').replace(/google\s*genai/gi, 'AI motoru').replace(/google search/gi, 'araştırma modu');
+  return text
+    .replace(/gemini(-[a-z0-9.]+)?/gi, 'Koschei AI motoru')
+    .replace(/google\s*genai/gi, 'Koschei AI motoru')
+    .replace(/google search/gi, 'Araştırma destekli mod')
+    .replace(/model\s*:\s*[a-z0-9_.-]+/gi, 'mod: Koschei AI motoru');
 }
