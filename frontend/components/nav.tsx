@@ -11,7 +11,7 @@ const links = [
   { href: '/projects', label: 'Projeler' },
   { href: '/saved', label: 'Kaydedilenler' },
   { href: '/runs', label: 'Çalışmalar' },
-  { href: '/composer', label: 'Queue' },
+  { href: '/composer', label: 'Yayın Kuyruğu' },
   { href: '/settings', label: 'Ayarlar' }
 ] as const satisfies ReadonlyArray<{ href: Route; label: string }>;
 
@@ -33,6 +33,7 @@ export function Nav() {
       <div>
         <p className="text-xs uppercase tracking-[0.2em] text-lilac">Koschei</p>
         <h1 className="text-2xl font-semibold">Koschei AI</h1>
+        <p className="text-xs text-white/55">Operasyon paneli</p>
       </div>
 
       <div className="hidden flex-wrap items-center gap-2 md:flex">

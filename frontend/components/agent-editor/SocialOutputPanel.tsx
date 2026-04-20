@@ -1,16 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 
 type SocialOutputPanelProps = {
   youtubeTitle?: string | null;
   youtubeDescription?: string | null;
   instagramCaption?: string | null;
   tiktokCaption?: string | null;
-  agentId?: string;
-  runId?: string;
-  contentItemId?: string;
   projectId?: string | null;
 };
 
@@ -34,18 +30,21 @@ function CopyButton({ value }: { value: string }) {
 
 function PlatformCard({
   title,
-  platformKey,
-  blocks
+  blocks,
+  projectId
 }: {
   title: string;
-  platformKey: 'youtube' | 'instagram' | 'tiktok';
   blocks: Array<{ label: string; content: string | null | undefined; emptyText: string }>;
+  projectId?: string | null;
 }) {
   const available = blocks.some((block) => Boolean(block.content?.trim()));
 
   return (
     <div className="rounded-lg border border-white/10 bg-black/20 p-4">
-      <p className="mb-3 text-xs uppercase tracking-wide text-white/55">{title}</p>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <p className="text-xs uppercase tracking-wide text-white/55">{title}</p>
+        <span className="rounded border border-white/15 px-2 py-1 text-[11px] text-white/70">Stüdyo kartı</span>
+      </div>
       <div className="space-y-3">
         {blocks.map((block) => {
           const value = block.content?.trim() ?? '';
@@ -60,56 +59,48 @@ function PlatformCard({
           );
         })}
       </div>
-      {!available ? <p className="mt-3 text-xs text-amber-200">Bu platform için içerik üretilmedi; diğer platform çıktıları kullanılabilir.</p> : null}
-      {available ? (
-        <div className="mt-3 grid gap-2">
-          <p className="text-xs text-white/60">Varyant üretimi</p>
-          <div className="flex flex-wrap gap-2 text-xs">
-            <Link href={`?variant=${platformKey}-kisa`} className="rounded border border-white/20 px-2 py-1 hover:border-neon">Kısa versiyon</Link>
-            <Link href={`?variant=${platformKey}-hook`} className="rounded border border-white/20 px-2 py-1 hover:border-neon">Daha güçlü hook</Link>
-            <Link href={`?variant=${platformKey}-yumusak`} className="rounded border border-white/20 px-2 py-1 hover:border-neon">Daha yumuşak ton</Link>
+
+      {!available ? (
+        <p className="mt-3 rounded-md border border-white/10 bg-black/30 px-2 py-1 text-xs text-white/60">Bu platform için içerik üretilmedi. Diğer platform çıktıları kullanılabilir.</p>
+      ) : (
+        <div className="mt-3 space-y-2 text-xs">
+          <div className="flex flex-wrap gap-2">
+            <span className="rounded border border-white/20 px-2 py-1">Kısa versiyon</span>
+            <span className="rounded border border-white/20 px-2 py-1">Daha güçlü hook</span>
+            <span className="rounded border border-white/20 px-2 py-1">Daha yumuşak ton</span>
           </div>
+          <p className="text-white/60">Varyant üretmek için aynı girdiyi "Bu sonucu düzenle" üzerinden hızlıca tekrar çalıştırabilirsiniz.</p>
+          <p className="text-white/60">Projeye ekleme ve yayın kuyruğu aksiyonları aşağıdaki "Hızlı aksiyonlar" bölümünde görünür.</p>
+          <p className="text-white/55">Bağlı proje: {projectId ?? 'Henüz bağlanmadı'}</p>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }
 
-export function SocialOutputPanel({ youtubeTitle, youtubeDescription, instagramCaption, tiktokCaption, agentId, runId, contentItemId, projectId }: SocialOutputPanelProps) {
-  const actionContextAvailable = Boolean(agentId && runId && contentItemId);
-
+export function SocialOutputPanel({ youtubeTitle, youtubeDescription, instagramCaption, tiktokCaption, projectId }: SocialOutputPanelProps) {
   return (
     <div className="space-y-3">
       <div className="grid gap-3 lg:grid-cols-3">
-      <PlatformCard
-        title="YouTube"
-        platformKey="youtube"
-        blocks={[
-          { label: 'Başlık', content: youtubeTitle, emptyText: 'YouTube başlığı üretilemedi.' },
-          { label: 'Açıklama', content: youtubeDescription, emptyText: 'YouTube açıklaması üretilemedi.' }
-        ]}
-      />
-      <PlatformCard
-        title="Instagram"
-        platformKey="instagram"
-        blocks={[
-          { label: 'Caption', content: instagramCaption, emptyText: 'Instagram metni üretilemedi.' }
-        ]}
-      />
-      <PlatformCard
-        title="TikTok"
-        platformKey="tiktok"
-        blocks={[
-          { label: 'Caption', content: tiktokCaption, emptyText: 'TikTok metni üretilemedi.' }
-        ]}
-      />
+        <PlatformCard
+          title="YouTube"
+          projectId={projectId}
+          blocks={[
+            { label: 'Başlık', content: youtubeTitle, emptyText: 'YouTube başlığı üretilemedi.' },
+            { label: 'Açıklama', content: youtubeDescription, emptyText: 'YouTube açıklaması üretilemedi.' }
+          ]}
+        />
+        <PlatformCard
+          title="Instagram"
+          projectId={projectId}
+          blocks={[{ label: 'Caption', content: instagramCaption, emptyText: 'Instagram metni üretilemedi.' }]}
+        />
+        <PlatformCard
+          title="TikTok"
+          projectId={projectId}
+          blocks={[{ label: 'Caption', content: tiktokCaption, emptyText: 'TikTok metni üretilemedi.' }]}
+        />
       </div>
-      {actionContextAvailable ? (
-        <div className="rounded-lg border border-white/10 bg-black/20 p-3 text-xs text-white/70">
-          <p>Platform kartlarından içerik kopyalayabilir, ardından aşağıdaki aksiyonlarla projeye ekleme ve yayın kuyruğuna gönderim yapabilirsiniz.</p>
-          <p className="mt-1 text-white/55">Bağlı proje: {projectId ?? 'Henüz bağlanmadı'}</p>
-        </div>
-      ) : null}
     </div>
   );
 }

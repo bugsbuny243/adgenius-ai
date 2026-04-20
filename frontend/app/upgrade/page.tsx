@@ -31,7 +31,7 @@ export default async function UpgradePage() {
         <div className="grid gap-4 md:grid-cols-3">
           <article className="rounded-xl border border-white/10 bg-black/20 p-4">
             <p className="text-xs text-white/60">Mevcut plan</p>
-            <p className="mt-1 text-lg font-semibold">{subscription?.plan_name ?? 'free'}</p>
+            <p className="mt-1 text-lg font-semibold">{subscription?.plan_name ?? 'Ücretsiz'}</p>
             <p className="text-xs text-white/60">Durum: {subscription?.status ?? 'active'}</p>
           </article>
           <article className="rounded-xl border border-white/10 bg-black/20 p-4">

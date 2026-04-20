@@ -1,11 +1,15 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 
 type ResultPanelProps = {
   text: string;
   status: 'completed' | 'failed' | 'pending' | 'processing' | 'idle';
   agentSlug?: string;
+  projectHref?: string | null;
+  resultHref?: string | null;
+  rerunHref?: string | null;
 };
 
 function buildSections(agentSlug: string | undefined, text: string): Array<{ title: string; content: string }> {
@@ -27,7 +31,7 @@ function buildSections(agentSlug: string | undefined, text: string): Array<{ tit
   if (agentSlug === 'icerik') {
     return [
       { title: 'Başlık', content: lines[0] ?? 'Başlık bulunamadı.' },
-      { title: 'Outline', content: lines.slice(1, 7).join('\n') || 'Outline çıkarılamadı.' },
+      { title: 'Outline', content: lines.slice(1, 8).join('\n') || 'Outline çıkarılamadı.' },
       { title: 'Gövde', content: paragraph.slice(0, 2_200) }
     ];
   }
@@ -48,10 +52,18 @@ function buildSections(agentSlug: string | undefined, text: string): Array<{ tit
     ];
   }
 
+  if (agentSlug === 'sosyal') {
+    return [
+      { title: 'Platform Özeti', content: lines.slice(0, 4).join('\n') || 'Platform özeti bulunamadı.' },
+      { title: 'Öne Çıkan Mesaj', content: lines.slice(4, 12).join('\n') || paragraph.slice(0, 500) },
+      { title: 'CTA / Kapanış', content: lines.slice(12).join('\n') || 'CTA bilgisi bulunamadı.' }
+    ];
+  }
+
   return [{ title: 'Çıktı', content: paragraph }];
 }
 
-export function ResultPanel({ text, status, agentSlug }: ResultPanelProps) {
+export function ResultPanel({ text, status, agentSlug, projectHref, resultHref, rerunHref }: ResultPanelProps) {
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const isEmpty = !text.trim();
@@ -66,7 +78,7 @@ export function ResultPanel({ text, status, agentSlug }: ResultPanelProps) {
 
   return (
     <div className="rounded-lg border border-white/10 bg-black/20 p-4">
-      <div className="mb-3 flex items-center justify-between gap-2">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs uppercase tracking-wide text-white/50">Üretilen Çıktı</p>
         <button
           type="button"
@@ -78,6 +90,12 @@ export function ResultPanel({ text, status, agentSlug }: ResultPanelProps) {
         >
           {copied ? 'Kopyalandı' : 'Kopyala'}
         </button>
+      </div>
+
+      <div className="mb-3 flex flex-wrap gap-2 text-xs">
+        {projectHref ? <Link href={projectHref} className="rounded border border-white/20 px-2 py-1 hover:border-neon">Projeye ekle</Link> : <span className="rounded border border-white/10 px-2 py-1 text-white/50">Projeye ekle</span>}
+        {resultHref ? <Link href={resultHref} className="rounded border border-white/20 px-2 py-1 hover:border-neon">Kaydet</Link> : <span className="rounded border border-white/10 px-2 py-1 text-white/50">Kaydet</span>}
+        {rerunHref ? <Link href={rerunHref} className="rounded border border-white/20 px-2 py-1 hover:border-neon">Tekrar çalıştır</Link> : <span className="rounded border border-white/10 px-2 py-1 text-white/50">Tekrar çalıştır</span>}
       </div>
 
       {status === 'failed' ? <p className="rounded-lg border border-red-300/35 bg-red-500/10 px-3 py-2 text-sm text-red-100">Çalıştırma tamamlanamadı. Hata mesajını kontrol ederek yeniden deneyin.</p> : null}

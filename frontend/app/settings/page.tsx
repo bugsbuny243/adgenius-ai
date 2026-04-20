@@ -51,7 +51,7 @@ export default async function SettingsPage() {
         <article className="panel">
           <h2 className="text-xl font-semibold">Plan & Kullanım</h2>
           <div className="mt-3 space-y-2 text-sm text-white/80">
-            <p><span className="text-white/60">Plan:</span> {subscription?.plan_name ?? 'free'}</p>
+            <p><span className="text-white/60">Plan:</span> {subscription?.plan_name ?? 'Ücretsiz'}</p>
             <p><span className="text-white/60">Durum:</span> {subscription?.status ?? 'active'}</p>
             <p><span className="text-white/60">Aylık limit:</span> {subscription?.run_limit ?? 30}</p>
             <p><span className="text-white/60">Bu ay kullanım:</span> {usageCount ?? 0}</p>

@@ -245,9 +245,6 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
                     </p>
                   </div>
                   <SocialOutputPanel
-                    agentId={id}
-                    runId={activeRun.id}
-                    contentItemId={activeContentItem.id}
                     projectId={activeContentItem.project_id}
                     youtubeTitle={activeContentItem.youtube_title}
                     youtubeDescription={activeContentItem.youtube_description}
@@ -255,16 +252,20 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
                     tiktokCaption={activeContentItem.tiktok_caption}
                   />
 
-                  <form action={queueSocialPublish} className="flex flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-black/20 p-3">
-                    <input type="hidden" name="run_id" value={activeRun.id} />
-                    <input type="hidden" name="content_item_id" value={activeContentItem.id} />
-                    <select name="target_platform" defaultValue="youtube" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm">
-                      <option value="youtube">YouTube</option>
-                      <option value="instagram">Instagram</option>
-                      <option value="tiktok">TikTok</option>
-                    </select>
-                    <button className="rounded-lg border border-white/20 px-3 py-2 text-sm hover:border-neon">Yayın Kuyruğuna Ekle</button>
-                  </form>
+                  <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                    <p className="mb-2 text-xs uppercase tracking-wide text-white/50">Platform bazlı yayın hazırlığı</p>
+                    <div className="grid gap-2 md:grid-cols-3">
+                      {['youtube', 'instagram', 'tiktok'].map((platform) => (
+                        <form key={platform} action={queueSocialPublish} className="rounded-md border border-white/10 bg-black/25 p-2 text-sm">
+                          <input type="hidden" name="run_id" value={activeRun.id} />
+                          <input type="hidden" name="content_item_id" value={activeContentItem.id} />
+                          <input type="hidden" name="target_platform" value={platform} />
+                          <p className="mb-2 font-medium capitalize">{platform}</p>
+                          <button className="w-full rounded-lg border border-white/20 px-3 py-2 text-xs hover:border-neon">Queue'ye gönder</button>
+                        </form>
+                      ))}
+                    </div>
+                  </div>
 
                   <div className="rounded-lg border border-white/10 bg-black/20 p-3">
                     <p className="mb-1 text-xs uppercase tracking-wide text-white/50">Yayın Kuyruğu Geçmişi</p>
@@ -298,14 +299,14 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <ResultPanel agentSlug={agent.slug} text={resultText} status={activeRun.status as 'completed' | 'failed' | 'pending' | 'processing'} />
+                  <ResultPanel agentSlug={agent.slug} text={resultText} status={activeRun.status as 'completed' | 'failed' | 'pending' | 'processing'} projectHref='/projects' resultHref='/saved' rerunHref={`/agents/${id}?run_id=${activeRun.id}&edit_run_id=${activeRun.id}`} />
                   <p className="rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white/65">
                     Platform bazlı içerik blokları henüz kayda alınamadı. Ham çıktı aşağıda görüntüleniyor.
                   </p>
                 </div>
               )
             ) : (
-              <ResultPanel agentSlug={agent.slug} text={resultText} status={activeRun.status as 'completed' | 'failed' | 'pending' | 'processing'} />
+              <ResultPanel agentSlug={agent.slug} text={resultText} status={activeRun.status as 'completed' | 'failed' | 'pending' | 'processing'} projectHref='/projects' resultHref='/saved' rerunHref={`/agents/${id}?run_id=${activeRun.id}&edit_run_id=${activeRun.id}`} />
             )}
 
             <div className="rounded-lg border border-white/10 bg-black/20 p-3">

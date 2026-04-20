@@ -108,7 +108,7 @@ export default async function DashboardPage() {
       ) : null}
 
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <MetricCard title="Aktif plan" value={subscriptionRes.data?.plan_name ?? 'free'} />
+        <MetricCard title="Aktif plan" value={subscriptionRes.data?.plan_name ?? 'Ücretsiz'} />
         <MetricCard title="Toplam çalışma" value={String(runsRes.count ?? 0)} />
         <MetricCard title="Kaydedilen" value={String(savedRes.count ?? 0)} />
         <MetricCard title="Projeler" value={String(projectsRes.count ?? 0)} />
