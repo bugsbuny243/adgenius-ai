@@ -310,18 +310,26 @@ export async function POST(request: Request) {
       typeof requestMetadata.stream === 'boolean'
         ? requestMetadata.stream
         : agentType.slug === 'arastirma' || agentType.slug === 'rapor';
+    const requestEditorState =
+      requestMetadata && typeof requestMetadata === 'object' && 'editor_state' in requestMetadata
+        ? (requestMetadata.editor_state as Record<string, unknown>)
+        : null;
+    const selectedAgentMode =
+      requestEditorState && typeof requestEditorState.agent_mode === 'string' ? requestEditorState.agent_mode.trim().toLowerCase() : null;
 
     const aiRun = await Promise.race([
       shouldStream
         ? runTextStreamWithAiEngine({
             apiKey: modelApiKey,
             agentSlug: agentType.slug,
+            agentMode: selectedAgentMode,
             userInput,
             systemPrompt: agentType.system_prompt
           })
         : runTextWithAiEngine({
             apiKey: modelApiKey,
             agentSlug: agentType.slug,
+            agentMode: selectedAgentMode,
             userInput,
             systemPrompt: agentType.system_prompt
           }),
@@ -339,7 +347,8 @@ export async function POST(request: Request) {
     const normalizedMetadata = {
       ...(run.metadata ?? {}),
       ...(requestMetadata ?? {}),
-      ai_engine: aiRun.displayLabel
+      ai_engine: aiRun.displayLabel,
+      agent_mode: selectedAgentMode
     };
 
     const { error: updateError } = await serviceSupabase
@@ -364,10 +373,6 @@ export async function POST(request: Request) {
     }
 
     if (agentType.slug === 'sosyal') {
-      const requestEditorState =
-        requestMetadata && typeof requestMetadata === 'object' && 'editor_state' in requestMetadata
-          ? (requestMetadata.editor_state as Record<string, unknown>)
-          : null;
       const preferredPlatform =
         requestEditorState && typeof requestEditorState.platform === 'string' ? requestEditorState.platform.toLowerCase() : null;
       const platforms: SocialPlatform[] = preferredPlatform ? normalizePlatforms([preferredPlatform]) : ['youtube'];
