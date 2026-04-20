@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { getPublicEnv } from '@/lib/env';
 
-const PROTECTED_ROUTES = ['/dashboard', '/agents', '/projects', '/composer', '/runs', '/saved', '/connections'];
+const PROTECTED_ROUTES = ['/dashboard', '/agents', '/projects', '/composer', '/runs', '/saved', '/connections', '/settings', '/upgrade'];
 const AUTH_ROUTES = ['/signin', '/signup', '/login'];
 const SIGN_IN_ROUTE = '/signin';
 
