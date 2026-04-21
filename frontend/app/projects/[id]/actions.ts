@@ -130,12 +130,38 @@ export async function attachSavedOutputToProjectItemAction(projectId: string, fo
 
   const { workspaceId: currentWorkspaceId } = await getWorkspaceContext();
 
+  const [savedOutputRes, projectItemRes] = await Promise.all([
+    serverSupabase
+      .from('saved_outputs')
+      .select('id, metadata')
+      .eq('id', savedOutputId)
+      .eq('workspace_id', currentWorkspaceId)
+      .eq('user_id', currentUser.id)
+      .maybeSingle(),
+    serverSupabase
+      .from('project_items')
+      .select('id, saved_output_id')
+      .eq('id', projectItemId)
+      .eq('project_id', projectId)
+      .eq('workspace_id', currentWorkspaceId)
+      .eq('user_id', currentUser.id)
+      .maybeSingle()
+  ]);
+
+  if (!savedOutputRes.data || !projectItemRes.data) return;
+
+  const existingMetadata =
+    savedOutputRes.data.metadata && typeof savedOutputRes.data.metadata === 'object' && !Array.isArray(savedOutputRes.data.metadata)
+      ? (savedOutputRes.data.metadata as Record<string, unknown>)
+      : {};
+
   await serverSupabase
     .from('saved_outputs')
     .update({
       project_id: projectId,
       project_item_id: projectItemId,
       metadata: {
+        ...existingMetadata,
         source: 'project_detail_attach',
         attached_at: new Date().toISOString()
       },
@@ -144,6 +170,19 @@ export async function attachSavedOutputToProjectItemAction(projectId: string, fo
     .eq('id', savedOutputId)
     .eq('workspace_id', currentWorkspaceId)
     .eq('user_id', currentUser.id);
+
+  if (!projectItemRes.data.saved_output_id || projectItemRes.data.saved_output_id !== savedOutputId) {
+    await serverSupabase
+      .from('project_items')
+      .update({
+        saved_output_id: savedOutputId,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', projectItemId)
+      .eq('project_id', projectId)
+      .eq('workspace_id', currentWorkspaceId)
+      .eq('user_id', currentUser.id);
+  }
 
   revalidatePath(`/projects/${projectId}`);
   revalidatePath('/saved');

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Nav } from '@/components/nav';
 import { ProjectStatusBadge } from '@/components/projects/ProjectStatusBadge';
 import { getAppContextOrRedirect } from '@/lib/app-context';
+import { normalizeProjectStatus, projectStatusLabel } from '@/lib/project-status';
 import { createProjectAction } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -40,7 +41,7 @@ export default async function ProjectsPage() {
       <Nav />
       <section className="panel mb-4">
         <h2 className="mb-2 text-2xl font-semibold">Projects Workflow Board</h2>
-        <p className="mb-4 text-sm text-white/70">Koschei AI proje merkezini brief → revision → delivery akışıyla takip edin.</p>
+        <p className="mb-4 text-sm text-white/70">Koschei AI proje merkezinde status, brief, revision/delivery notları ve saved output akışını takip edin.</p>
         <form action={createProjectAction} className="grid gap-3 md:grid-cols-[1fr_2fr_auto]">
           <input name="name" required placeholder="Proje adı" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2" />
           <input name="description" placeholder="Kısa açıklama" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2" />
@@ -69,11 +70,13 @@ export default async function ProjectsPage() {
                   </div>
                   <p className="text-sm text-white/60">{project.description || 'Açıklama yok.'}</p>
                   <div className="mt-2 grid gap-1 text-xs text-white/60">
-                    <p>Toplam öğe: {itemStats[project.id]?.count ?? 0}</p>
+                    <p>Status: {projectStatusLabel(normalizeProjectStatus(project.status))}</p>
+                    <p>Brief: {hasBrief ? 'Hazır' : 'Bekliyor'}</p>
+                    <p>Revision notu: {hasRevision ? 'Var' : 'Yok'} • Delivery notu: {hasDelivery ? 'Var' : 'Yok'}</p>
                     <p>Toplam saved output: {savedCounts[project.id] ?? 0}</p>
-                    <p>Toplam social content: {contentCounts[project.id] ?? 0}</p>
-                    <p>Workflow sinyali: brief {hasBrief ? '✓' : '•'} / revision {hasRevision ? '✓' : '•'} / delivery {hasDelivery ? '✓' : '•'}</p>
+                    <p>Toplam öğe: {itemStats[project.id]?.count ?? 0}</p>
                     <p>Son aktivite: {new Date(lastActivity).toLocaleString('tr-TR')}</p>
+                    <p className="text-white/45">Social içerik (legacy): {contentCounts[project.id] ?? 0}</p>
                   </div>
                 </Link>
               );
