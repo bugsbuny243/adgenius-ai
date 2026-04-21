@@ -1,5 +1,13 @@
 const PUBLIC_ENV_KEYS = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY'] as const;
-const SERVER_ENV_KEYS = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'GEMINI_API_KEY'] as const;
+const SERVER_ENV_KEYS = [
+  'SUPABASE_URL',
+  'SUPABASE_ANON_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'GEMINI_API_KEY',
+  'GOOGLE_CLIENT_ID',
+  'GOOGLE_CLIENT_SECRET',
+  'GOOGLE_REDIRECT_URI'
+] as const;
 
 type PublicEnvKey = (typeof PUBLIC_ENV_KEYS)[number];
 type ServerEnvKey = (typeof SERVER_ENV_KEYS)[number];
@@ -28,7 +36,10 @@ export function getServerEnv(): Record<ServerEnvKey, string | null> {
     SUPABASE_URL: readServerEnv('SUPABASE_URL'),
     SUPABASE_ANON_KEY: readServerEnv('SUPABASE_ANON_KEY'),
     SUPABASE_SERVICE_ROLE_KEY: readServerEnv('SUPABASE_SERVICE_ROLE_KEY'),
-    GEMINI_API_KEY: readServerEnv('GEMINI_API_KEY')
+    GEMINI_API_KEY: readServerEnv('GEMINI_API_KEY'),
+    GOOGLE_CLIENT_ID: readServerEnv('GOOGLE_CLIENT_ID'),
+    GOOGLE_CLIENT_SECRET: readServerEnv('GOOGLE_CLIENT_SECRET'),
+    GOOGLE_REDIRECT_URI: readServerEnv('GOOGLE_REDIRECT_URI')
   };
 }
 
