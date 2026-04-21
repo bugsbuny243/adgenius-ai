@@ -43,7 +43,7 @@ export default async function DashboardPage() {
   monthStart.setUTCHours(0, 0, 0, 0);
 
   const [projectsRes, runsRes, savedRes, recentRunsRes, recentSavedRes, subscriptionRes, usageRes, agentsRes, queueRes, socialRes] = await Promise.all([
-    supabase.from('projects').select('id, name, created_at', { count: 'exact' }).eq('workspace_id', workspace.workspaceId).order('created_at', { ascending: false }).limit(5),
+    supabase.from('projects').select('id, name, status, created_at, updated_at', { count: 'exact' }).eq('workspace_id', workspace.workspaceId).order('updated_at', { ascending: false }).limit(8),
     supabase.from('agent_runs').select('id', { count: 'exact', head: true }).eq('workspace_id', workspace.workspaceId),
     supabase.from('saved_outputs').select('id', { count: 'exact', head: true }).eq('workspace_id', workspace.workspaceId),
     supabase
@@ -81,6 +81,13 @@ export default async function DashboardPage() {
   const percent = Math.min(100, Math.round((usedRuns / Math.max(1, runLimit)) * 100));
   const hasData = (runsRes.count ?? 0) > 0 || (projectsRes.count ?? 0) > 0 || (savedRes.count ?? 0) > 0;
   const nearLimit = percent >= 80;
+  const projectList = projectsRes.data ?? [];
+  const projectsInRevision = projectList.filter((project) => project.status === 'in_revision').length;
+  const projectsNearDelivery = projectList.filter((project) => project.status === 'near_delivery').length;
+  const recentlyUpdatedProjects = projectList
+    .slice()
+    .sort((a, b) => new Date(b.updated_at ?? b.created_at).getTime() - new Date(a.updated_at ?? a.created_at).getTime())
+    .slice(0, 3);
 
   return (
     <main>
@@ -142,8 +149,28 @@ export default async function DashboardPage() {
             <InfoPill label="Projeler" value={String(projectsRes.count ?? 0)} />
             <InfoPill label="Sosyal içerik" value={String(socialRes.count ?? 0)} />
             <InfoPill label="Queue öğesi" value={String(queueRes.count ?? 0)} />
+            <InfoPill label="Revision'daki proje" value={String(projectsInRevision)} />
+            <InfoPill label="Teslime yakın" value={String(projectsNearDelivery)} />
           </div>
         </article>
+      </section>
+
+      <section className="panel mb-4">
+        <h3 className="mb-3 text-lg font-semibold">Workflow görünümü</h3>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <InfoPill label="Projects in revision" value={String(projectsInRevision)} />
+          <InfoPill label="Projects near delivery" value={String(projectsNearDelivery)} />
+          <InfoPill label="Recently updated projects" value={String(recentlyUpdatedProjects.length)} />
+        </div>
+        <div className="mt-3 space-y-2">
+          {recentlyUpdatedProjects.length === 0 ? <p className="text-sm text-white/70">Güncel proje aktivitesi yok.</p> : null}
+          {recentlyUpdatedProjects.map((project) => (
+            <Link key={project.id} href={`/projects/${project.id}`} className="block rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm hover:border-neon">
+              <p className="font-medium">{project.name}</p>
+              <p className="text-xs text-white/60">{project.status ?? 'draft'} • {new Date(project.updated_at ?? project.created_at).toLocaleString('tr-TR')}</p>
+            </Link>
+          ))}
+        </div>
       </section>
 
       <section className="panel">
