@@ -29,7 +29,12 @@ function parseRunMetadata(source: unknown): { editorState: Record<string, unknow
     sourceProjectItemId: typeof metadata.source_project_item_id === 'string' ? metadata.source_project_item_id : '',
     parentOutputId: typeof metadata.parent_output_id === 'string' ? metadata.parent_output_id : '',
     targetItemType: typeof metadata.target_item_type === 'string' ? metadata.target_item_type : '',
-    revisionRound: typeof metadata.revision_round === 'number' ? String(metadata.revision_round) : ''
+    revisionRound:
+      typeof metadata.revision_round === 'number'
+        ? String(metadata.revision_round)
+        : typeof metadata.revision_round === 'string'
+          ? metadata.revision_round
+          : ''
   };
 }
 
@@ -386,7 +391,8 @@ export async function createProjectItemFromOutputAction(agentId: string, runIdPa
   const projectId = String(formData.get('project_id') ?? '').trim();
   const title = String(formData.get('title') ?? '').trim();
   const itemTypeRaw = String(formData.get('item_type') ?? '').trim();
-  const itemType = normalizeProjectItemType(itemTypeRaw || 'agent_output');
+  const requestedItemType = normalizeProjectItemType(itemTypeRaw || 'agent_output');
+  const itemType = ['agent_output', 'scope', 'draft', 'delivery_note'].includes(requestedItemType) ? requestedItemType : 'agent_output';
 
   if (!outputId || !projectId || !title) {
     redirect(`/agents/${agentId}?error=Proje öğesi için tüm alanları doldurun.`);
