@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { normalizeProjectItemType } from '@/lib/project-item-types';
 import { getWorkspaceContext } from '@/lib/workspace';
 
 const SUPPORTED_SOCIAL_PLATFORMS = ['youtube', 'instagram', 'tiktok'] as const;
@@ -14,16 +15,21 @@ function buildInternalUrl(pathname: string, headerList: Headers): string {
   return `${protocol}://${host}${pathname}`;
 }
 
-function parseRunMetadata(source: unknown): { editorState: Record<string, unknown>; freeNotes: string; derivedPrompt: string } {
+function parseRunMetadata(source: unknown): { editorState: Record<string, unknown>; freeNotes: string; derivedPrompt: string; workflowType: string; sourceProjectItemId: string; parentOutputId: string; targetItemType: string; revisionRound: string } {
   if (!source || typeof source !== 'object') {
-    return { editorState: {}, freeNotes: '', derivedPrompt: '' };
+    return { editorState: {}, freeNotes: '', derivedPrompt: '', workflowType: '', sourceProjectItemId: '', parentOutputId: '', targetItemType: '', revisionRound: '' };
   }
 
   const metadata = source as Record<string, unknown>;
   return {
     editorState: metadata.editor_state && typeof metadata.editor_state === 'object' ? (metadata.editor_state as Record<string, unknown>) : {},
     freeNotes: typeof metadata.free_notes === 'string' ? metadata.free_notes : '',
-    derivedPrompt: typeof metadata.derived_prompt === 'string' ? metadata.derived_prompt : ''
+    derivedPrompt: typeof metadata.derived_prompt === 'string' ? metadata.derived_prompt : '',
+    workflowType: typeof metadata.workflow_type === 'string' ? metadata.workflow_type : '',
+    sourceProjectItemId: typeof metadata.source_project_item_id === 'string' ? metadata.source_project_item_id : '',
+    parentOutputId: typeof metadata.parent_output_id === 'string' ? metadata.parent_output_id : '',
+    targetItemType: typeof metadata.target_item_type === 'string' ? metadata.target_item_type : '',
+    revisionRound: typeof metadata.revision_round === 'number' ? String(metadata.revision_round) : ''
   };
 }
 
@@ -63,7 +69,17 @@ export async function runAgentAction(agentId: string, formData: FormData) {
   const freeNotes = String(formData.get('free_notes') ?? '').trim();
   const editorStateRaw = String(formData.get('editor_state') ?? '').trim();
   const projectIdRaw = String(formData.get('project_id') ?? '').trim();
+  const sourceProjectItemIdRaw = String(formData.get('source_project_item_id') ?? '').trim();
+  const workflowTypeRaw = String(formData.get('workflow_type') ?? '').trim();
+  const parentOutputIdRaw = String(formData.get('parent_output_id') ?? '').trim();
+  const targetItemTypeRaw = String(formData.get('target_item_type') ?? '').trim();
+  const revisionRoundRaw = String(formData.get('revision_round') ?? '').trim();
   const projectId = projectIdRaw || null;
+  const sourceProjectItemId = sourceProjectItemIdRaw || null;
+  const workflowType = workflowTypeRaw || null;
+  const parentOutputId = parentOutputIdRaw || null;
+  const targetItemType = targetItemTypeRaw || null;
+  const revisionRound = revisionRoundRaw ? Number(revisionRoundRaw) : null;
 
   const prompt = derivedPrompt || rawPrompt;
 
@@ -136,6 +152,11 @@ export async function runAgentAction(agentId: string, formData: FormData) {
       user_input: prompt,
       metadata: {
         project_id: projectId,
+        source_project_item_id: sourceProjectItemId,
+        workflow_type: workflowType,
+        parent_output_id: parentOutputId,
+        revision_round: Number.isFinite(revisionRound) ? revisionRound : null,
+        target_item_type: targetItemType,
         editor_state: parsedEditorState,
         derived_prompt: derivedPrompt || prompt,
         free_notes: freeNotes,
@@ -166,7 +187,12 @@ export async function runAgentAction(agentId: string, formData: FormData) {
         metadata: {
           editor_state: parsedEditorState,
           derived_prompt: derivedPrompt || prompt,
-          free_notes: freeNotes
+          free_notes: freeNotes,
+          workflow_type: workflowType,
+          source_project_item_id: sourceProjectItemId,
+          parent_output_id: parentOutputId,
+          revision_round: Number.isFinite(revisionRound) ? revisionRound : null,
+          target_item_type: targetItemType
         }
       }),
       signal: AbortSignal.timeout(45_000)
@@ -272,6 +298,11 @@ export async function rerunAgentAction(agentId: string, formData: FormData) {
   runFormData.set('derived_prompt', parsed.derivedPrompt || sourceRun.user_input);
   runFormData.set('free_notes', parsed.freeNotes);
   runFormData.set('editor_state', JSON.stringify(parsed.editorState));
+  if (parsed.workflowType) runFormData.set('workflow_type', parsed.workflowType);
+  if (parsed.sourceProjectItemId) runFormData.set('source_project_item_id', parsed.sourceProjectItemId);
+  if (parsed.parentOutputId) runFormData.set('parent_output_id', parsed.parentOutputId);
+  if (parsed.targetItemType) runFormData.set('target_item_type', parsed.targetItemType);
+  if (parsed.revisionRound) runFormData.set('revision_round', parsed.revisionRound);
   const sourceProjectId =
     sourceRun.metadata && typeof sourceRun.metadata === 'object' && 'project_id' in sourceRun.metadata && typeof sourceRun.metadata.project_id === 'string'
       ? sourceRun.metadata.project_id
@@ -354,6 +385,8 @@ export async function createProjectItemFromOutputAction(agentId: string, runIdPa
   const outputId = String(formData.get('output_id') ?? '').trim();
   const projectId = String(formData.get('project_id') ?? '').trim();
   const title = String(formData.get('title') ?? '').trim();
+  const itemTypeRaw = String(formData.get('item_type') ?? '').trim();
+  const itemType = normalizeProjectItemType(itemTypeRaw || 'agent_output');
 
   if (!outputId || !projectId || !title) {
     redirect(`/agents/${agentId}?error=Proje öğesi için tüm alanları doldurun.`);
@@ -388,7 +421,7 @@ export async function createProjectItemFromOutputAction(agentId: string, runIdPa
     user_id: currentUserId,
     title,
     content: output.content,
-    item_type: 'agent_output'
+    item_type: itemType
   };
 
   const { error: withSavedOutputError } = await serverSupabase.from('project_items').insert({

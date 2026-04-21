@@ -43,11 +43,128 @@ function isQuotaOrBillingFailure(input: string): boolean {
   );
 }
 
-function resolveProjectIdFromMetadata(metadata: unknown): string | null {
-  if (!metadata || typeof metadata !== 'object') return null;
-  const value = (metadata as Record<string, unknown>).project_id;
-  return typeof value === 'string' && value.trim() ? value.trim() : null;
+
+function normalizeProviderError(input: unknown): string {
+  const message = input instanceof Error ? input.message : String(input ?? 'run_failed');
+  const normalized = message.trim().toLowerCase();
+  if (!normalized) return 'run_failed';
+  if (normalized === 'run_timeout') return 'run_timeout';
+  if (normalized === 'empty_result') return 'empty_result';
+  if (normalized.startsWith('run_update_failed:')) return normalized;
+  if (isQuotaOrBillingFailure(normalized)) return QUOTA_ERROR_CODE;
+  return 'run_failed';
 }
+
+function resolveWorkflowFieldsFromMetadata(metadata: unknown): {
+  projectId: string | null;
+  projectItemId: string | null;
+  workflowMetadata: Record<string, unknown>;
+} {
+  if (!metadata || typeof metadata !== 'object') {
+    return { projectId: null, projectItemId: null, workflowMetadata: {} };
+  }
+
+  const source = metadata as Record<string, unknown>;
+  const projectId = typeof source.project_id === 'string' && source.project_id.trim() ? source.project_id.trim() : null;
+  const projectItemId = typeof source.source_project_item_id === 'string' && source.source_project_item_id.trim() ? source.source_project_item_id.trim() : null;
+
+  return {
+    projectId,
+    projectItemId,
+    workflowMetadata: {
+      workflow_type: source.workflow_type ?? null,
+      source_project_item_id: source.source_project_item_id ?? null,
+      parent_output_id: source.parent_output_id ?? null,
+      revision_round: source.revision_round ?? null,
+      target_item_type: source.target_item_type ?? null
+    }
+  };
+}
+
+async function upsertSavedOutputForRun(
+  serviceSupabase: unknown,
+  payload: {
+    workspaceId: string;
+    userId: string;
+    runId: string;
+    title: string;
+    content: string;
+    projectId: string | null;
+    projectItemId: string | null;
+    metadata: Record<string, unknown>;
+  }
+): Promise<string | null> {
+  const db = serviceSupabase as {
+    from: (table: string) => {
+      select: (query: string) => {
+        eq: (column: string, value: string) => {
+          eq: (column: string, value: string) => {
+            eq: (column: string, value: string) => {
+              order: (column: string, opts: { ascending: boolean }) => {
+                limit: (count: number) => { maybeSingle: () => Promise<{ data: { id?: string } | null }> };
+              };
+            };
+          };
+        };
+      };
+      update: (value: unknown) => {
+        eq: (column: string, value: string) => {
+          eq: (column: string, value: string) => {
+            eq: (column: string, value: string) => Promise<unknown>;
+          };
+        };
+      };
+      insert: (value: unknown) => {
+        select: (query: string) => { maybeSingle: () => Promise<{ data: { id?: string } | null }> };
+      };
+    };
+  };
+
+  const existing = await db
+    .from('saved_outputs')
+    .select('id')
+    .eq('workspace_id', payload.workspaceId)
+    .eq('user_id', payload.userId)
+    .eq('agent_run_id', payload.runId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existing.data?.id) {
+    await db
+      .from('saved_outputs')
+      .update({
+        title: payload.title,
+        content: payload.content,
+        project_id: payload.projectId,
+        project_item_id: payload.projectItemId,
+        metadata: payload.metadata,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', existing.data.id)
+      .eq('workspace_id', payload.workspaceId)
+      .eq('user_id', payload.userId);
+    return existing.data.id;
+  }
+
+  const inserted = await db
+    .from('saved_outputs')
+    .insert({
+      workspace_id: payload.workspaceId,
+      user_id: payload.userId,
+      agent_run_id: payload.runId,
+      project_id: payload.projectId,
+      project_item_id: payload.projectItemId,
+      title: payload.title,
+      content: payload.content,
+      metadata: payload.metadata
+    })
+    .select('id')
+    .maybeSingle();
+
+  return inserted.data?.id ?? null;
+}
+
 
 function normalizePlatforms(value: unknown): SocialPlatform[] {
   if (!Array.isArray(value)) {
@@ -443,14 +560,29 @@ export async function POST(request: Request) {
       p_month_key: monthKey,
     });
 
+    const workflowFields = resolveWorkflowFieldsFromMetadata({ ...(run.metadata ?? {}), ...(requestMetadata ?? {}) });
+    const resolvedProjectId = workflowFields.projectId ?? projectId;
+
+    await upsertSavedOutputForRun(serviceSupabase, {
+      workspaceId: membership.workspace_id,
+      userId: user.id,
+      runId,
+      title: agentType.slug === 'sosyal' ? 'Sosyal medya çıktısı' : 'Agent çıktısı',
+      content: resultText,
+      projectId: resolvedProjectId,
+      projectItemId: workflowFields.projectItemId,
+      metadata: {
+        ...(workflowFields.workflowMetadata ?? {}),
+        source: 'agents_run_route'
+      }
+    });
+
     if (agentType.slug === 'sosyal') {
       const preferredPlatform =
         requestEditorState && typeof requestEditorState.platform === 'string' ? requestEditorState.platform.toLowerCase() : null;
       const requestedPlatforms =
         requestEditorState && typeof requestEditorState.platforms !== 'undefined' ? requestEditorState.platforms : null;
       const platforms: SocialPlatform[] = normalizePlatforms([...(preferredPlatform ? [preferredPlatform] : []), ...(Array.isArray(requestedPlatforms) ? requestedPlatforms : [])]);
-
-      const resolvedProjectId = resolveProjectIdFromMetadata(run.metadata) ?? projectId;
 
       const draft = normalizeSocialContentDraft({
         sourceBrief: userInput,
@@ -550,8 +682,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, runId, result: resultText });
   } catch (error) {
-    const rawMessage = error instanceof Error ? error.message : 'unknown_error';
-    const errorCode = isQuotaOrBillingFailure(rawMessage) ? QUOTA_ERROR_CODE : rawMessage;
+    const errorCode = normalizeProviderError(error);
     const message = toRunFailureMessage(errorCode);
 
     if (errorCode === QUOTA_ERROR_CODE && MOCK_FALLBACK_FLAG) {

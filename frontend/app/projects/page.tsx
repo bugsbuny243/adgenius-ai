@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Nav } from '@/components/nav';
+import { ProjectStatusBadge } from '@/components/projects/ProjectStatusBadge';
 import { getAppContextOrRedirect } from '@/lib/app-context';
 import { createProjectAction } from './actions';
 
@@ -9,7 +10,7 @@ export default async function ProjectsPage() {
   const { supabase, workspace, userId } = await getAppContextOrRedirect();
 
   const [{ data: projects, error }, { data: items, error: itemsError }, { data: savedOutputs }, { data: contentItems }] = await Promise.all([
-    supabase.from('projects').select('id, name, description, created_at, updated_at, workspace_id, user_id').eq('workspace_id', workspace.workspaceId).eq('user_id', userId).order('created_at', { ascending: false }),
+    supabase.from('projects').select('id, name, description, status, created_at, updated_at, workspace_id, user_id').eq('workspace_id', workspace.workspaceId).eq('user_id', userId).order('updated_at', { ascending: false }),
     supabase.from('project_items').select('project_id, item_type, created_at').eq('workspace_id', workspace.workspaceId).eq('user_id', userId),
     supabase.from('saved_outputs').select('id, project_id, created_at').eq('workspace_id', workspace.workspaceId).eq('user_id', userId),
     supabase.from('content_items').select('id, project_id, created_at').eq('workspace_id', workspace.workspaceId).eq('user_id', userId)
@@ -38,8 +39,8 @@ export default async function ProjectsPage() {
     <main>
       <Nav />
       <section className="panel mb-4">
-        <h2 className="mb-2 text-2xl font-semibold">Projeler</h2>
-        <p className="mb-4 text-sm text-white/70">Projeler artık çalışma merkezi olarak; öğe, kaydedilen çıktı ve sosyal içerik akışını birlikte gösterir.</p>
+        <h2 className="mb-2 text-2xl font-semibold">Projects Workflow Board</h2>
+        <p className="mb-4 text-sm text-white/70">Koschei AI proje merkezini brief → revision → delivery akışıyla takip edin.</p>
         <form action={createProjectAction} className="grid gap-3 md:grid-cols-[1fr_2fr_auto]">
           <input name="name" required placeholder="Proje adı" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2" />
           <input name="description" placeholder="Kısa açıklama" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2" />
@@ -53,29 +54,34 @@ export default async function ProjectsPage() {
           <p className="text-sm text-red-300">Projeler yüklenemedi: {error.message}</p>
         ) : projects && projects.length > 0 ? (
           <div className="grid gap-3 md:grid-cols-2">
-            {projects.map((project) => (
-              <Link key={project.id} href={`/projects/${project.id}`} className="block rounded-xl border border-white/10 bg-black/20 px-4 py-3 hover:border-neon">
-                <p className="font-medium">{project.name}</p>
-                <p className="text-sm text-white/60">{project.description || 'Açıklama yok.'}</p>
-                <div className="mt-2 grid gap-1 text-xs text-white/60">
-                  <p>Toplam öğe: {itemStats[project.id]?.count ?? 0}</p>
-                  <p>Toplam saved output: {savedCounts[project.id] ?? 0}</p>
-                  <p>Toplam social content: {contentCounts[project.id] ?? 0}</p>
-                  <p>İçerik tipleri: {Array.from(itemStats[project.id]?.types ?? []).join(', ') || 'Henüz yok'}</p>
-                  <p>Son aktivite: {new Date(itemStats[project.id]?.lastItemAt ?? project.updated_at ?? project.created_at).toLocaleString('tr-TR')}</p>
-                </div>
-              </Link>
-            ))}
+            {projects.map((project) => {
+              const types = itemStats[project.id]?.types ?? new Set<string>();
+              const hasBrief = types.has('brief');
+              const hasRevision = types.has('revision_note');
+              const hasDelivery = types.has('delivery_note');
+              const lastActivity = itemStats[project.id]?.lastItemAt ?? project.updated_at ?? project.created_at;
+
+              return (
+                <Link key={project.id} href={`/projects/${project.id}`} className="block rounded-xl border border-white/10 bg-black/20 px-4 py-3 hover:border-neon">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <p className="font-medium">{project.name}</p>
+                    <ProjectStatusBadge status={project.status} />
+                  </div>
+                  <p className="text-sm text-white/60">{project.description || 'Açıklama yok.'}</p>
+                  <div className="mt-2 grid gap-1 text-xs text-white/60">
+                    <p>Toplam öğe: {itemStats[project.id]?.count ?? 0}</p>
+                    <p>Toplam saved output: {savedCounts[project.id] ?? 0}</p>
+                    <p>Toplam social content: {contentCounts[project.id] ?? 0}</p>
+                    <p>Workflow sinyali: brief {hasBrief ? '✓' : '•'} / revision {hasRevision ? '✓' : '•'} / delivery {hasDelivery ? '✓' : '•'}</p>
+                    <p>Son aktivite: {new Date(lastActivity).toLocaleString('tr-TR')}</p>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         ) : (
           <div className="rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">
-            <p>Henüz proje yok. İlk çalışma merkezini şimdi açın:</p>
-            <ul className="mt-2 list-disc space-y-1 pl-5">
-              <li>İlk öğeni ekle</li>
-              <li>Bu proje için agent çalıştır</li>
-              <li>Sosyal içerik üret</li>
-              <li>Kaydedilen çıktıları projeye bağla</li>
-            </ul>
+            <p>Henüz proje yok. İlk workflow projesini şimdi açın.</p>
           </div>
         )}
       </section>
