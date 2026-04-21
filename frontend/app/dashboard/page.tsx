@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Nav } from '@/components/nav';
 import { getAppContextOrRedirect } from '@/lib/app-context';
 import { neutralizeVendorTerms, sanitizeUserFacingEngineLabel, toQueueStateHint, toQueueStatusLabel } from '@/lib/publish-queue';
+import { normalizeProjectStatus, projectStatusLabel } from '@/lib/project-status';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -29,9 +30,9 @@ function getRunAgentName(value: unknown): string {
 }
 
 const QUICK_ACTIONS = [
+  { href: '/projects', label: "Proje workflow'una dön" },
   { href: '/agents', label: 'Yeni çalışma başlat' },
-  { href: '/projects', label: 'Projeye bağlı çalışma başlat' },
-  { href: '/agents', label: 'Sosyal içerik üret' },
+  { href: '/saved', label: "Saved output'ları gözden geçir" },
   { href: '/runs', label: 'Haftalık rapor oluştur' }
 ] as const;
 
@@ -115,7 +116,7 @@ export default async function DashboardPage() {
           <div className="mt-3 grid gap-2 text-sm">
             <Link href="/projects" className="rounded-lg border border-white/15 px-3 py-2 hover:border-neon">Son projen üzerinden devam et</Link>
             <Link href="/saved" className="rounded-lg border border-white/15 px-3 py-2 hover:border-neon">Geçen çıktıyı yeniden işle</Link>
-            <Link href="/composer" className="rounded-lg border border-white/15 px-3 py-2 hover:border-neon">Sosyal içerik kuyruğunu gözden geçir</Link>
+            <Link href="/dashboard#workflow" className="rounded-lg border border-white/15 px-3 py-2 hover:border-neon">Workflow hedeflerini gözden geçir</Link>
             <Link href="/agents" className="rounded-lg border border-neon/40 px-3 py-2 text-neon hover:bg-neon/10">Yeni agent çalıştır</Link>
           </div>
         </article>
@@ -144,18 +145,19 @@ export default async function DashboardPage() {
         <article className="panel">
           <h3 className="mb-3 text-lg font-semibold">Operasyon Özeti</h3>
           <div className="grid gap-2 sm:grid-cols-2">
-            <InfoPill label="Toplam çalışma" value={String(runsRes.count ?? 0)} />
-            <InfoPill label="Kaydedilen çıktı" value={String(savedRes.count ?? 0)} />
             <InfoPill label="Projeler" value={String(projectsRes.count ?? 0)} />
-            <InfoPill label="Sosyal içerik" value={String(socialRes.count ?? 0)} />
-            <InfoPill label="Queue öğesi" value={String(queueRes.count ?? 0)} />
             <InfoPill label="Revision'daki proje" value={String(projectsInRevision)} />
             <InfoPill label="Teslime yakın" value={String(projectsNearDelivery)} />
+            <InfoPill label="Son güncellenen proje" value={String(recentlyUpdatedProjects.length)} />
+            <InfoPill label="Kaydedilen çıktı" value={String(savedRes.count ?? 0)} />
+            <InfoPill label="Toplam çalışma" value={String(runsRes.count ?? 0)} />
+            <InfoPill label="Queue öğesi" value={String(queueRes.count ?? 0)} />
+            <InfoPill label="Sosyal içerik (legacy)" value={String(socialRes.count ?? 0)} />
           </div>
         </article>
       </section>
 
-      <section className="panel mb-4">
+      <section id="workflow" className="panel mb-4">
         <h3 className="mb-3 text-lg font-semibold">Workflow görünümü</h3>
         <div className="grid gap-2 sm:grid-cols-3">
           <InfoPill label="Projects in revision" value={String(projectsInRevision)} />
@@ -167,7 +169,7 @@ export default async function DashboardPage() {
           {recentlyUpdatedProjects.map((project) => (
             <Link key={project.id} href={`/projects/${project.id}`} className="block rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm hover:border-neon">
               <p className="font-medium">{project.name}</p>
-              <p className="text-xs text-white/60">{project.status ?? 'draft'} • {new Date(project.updated_at ?? project.created_at).toLocaleString('tr-TR')}</p>
+              <p className="text-xs text-white/60">{projectStatusLabel(normalizeProjectStatus(project.status))} • {new Date(project.updated_at ?? project.created_at).toLocaleString('tr-TR')}</p>
             </Link>
           ))}
         </div>

@@ -49,7 +49,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   if (!project) notFound();
 
   const [{ data: items }, { data: outputs }] = await Promise.all([
-    supabase.from('project_items').select('id, item_type, title, content, created_at, parent_item_id, metadata').eq('project_id', project.id).eq('user_id', userId).eq('workspace_id', workspaceId).order('created_at', { ascending: false }),
+    supabase.from('project_items').select('id, item_type, title, content, parent_item_id, metadata, saved_output_id, created_at').eq('project_id', project.id).eq('user_id', userId).eq('workspace_id', workspaceId).order('created_at', { ascending: false }),
     supabase.from('saved_outputs').select('id, title, content, project_item_id, metadata, created_at').eq('project_id', project.id).eq('workspace_id', workspaceId).eq('user_id', userId).order('created_at', { ascending: false }).limit(12)
   ]);
 
