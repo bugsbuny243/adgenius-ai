@@ -9,8 +9,6 @@ export type WorkflowItemRecord = {
   metadata?: Record<string, unknown> | null;
   saved_output_id?: string | null;
   created_at: string;
-  parent_item_id?: string | null;
-  metadata?: Record<string, unknown> | null;
 };
 
 export function groupItemsByType(items: WorkflowItemRecord[]): Record<string, WorkflowItemRecord[]> {
