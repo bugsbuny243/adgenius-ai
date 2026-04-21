@@ -89,8 +89,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <select id="status" name="status" defaultValue={project.status ?? 'draft'} className="rounded-lg border border-white/20 bg-black/30 px-3 py-2">
             <option value="draft">Draft</option>
             <option value="in_progress">In Progress</option>
-            <option value="in_revision">In Revision</option>
-            <option value="near_delivery">Near Delivery</option>
+            <option value="revision">Revision</option>
             <option value="delivered">Delivered</option>
           </select>
           <button type="submit" className="rounded-lg border border-white/20 px-3 py-2">Güncelle</button>
