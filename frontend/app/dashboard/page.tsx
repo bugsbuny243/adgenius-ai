@@ -82,8 +82,8 @@ export default async function DashboardPage() {
   const hasData = (runsRes.count ?? 0) > 0 || (projectsRes.count ?? 0) > 0 || (savedRes.count ?? 0) > 0;
   const nearLimit = percent >= 80;
   const projectList = projectsRes.data ?? [];
-  const projectsInRevision = projectList.filter((project) => project.status === 'in_revision').length;
-  const projectsNearDelivery = projectList.filter((project) => project.status === 'near_delivery').length;
+  const projectsInRevision = projectList.filter((project) => project.status === 'revision').length;
+  const projectsNearDelivery = projectList.filter((project) => project.status === 'in_progress').length;
   const recentlyUpdatedProjects = projectList
     .slice()
     .sort((a, b) => new Date(b.updated_at ?? b.created_at).getTime() - new Date(a.updated_at ?? a.created_at).getTime())
@@ -159,7 +159,7 @@ export default async function DashboardPage() {
         <h3 className="mb-3 text-lg font-semibold">Workflow görünümü</h3>
         <div className="grid gap-2 sm:grid-cols-3">
           <InfoPill label="Projects in revision" value={String(projectsInRevision)} />
-          <InfoPill label="Projects near delivery" value={String(projectsNearDelivery)} />
+          <InfoPill label="Projects in progress" value={String(projectsNearDelivery)} />
           <InfoPill label="Recently updated projects" value={String(recentlyUpdatedProjects.length)} />
         </div>
         <div className="mt-3 space-y-2">

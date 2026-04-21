@@ -47,16 +47,16 @@ begin
 end $$;
 
 create index if not exists projects_workspace_user_status_idx
-  on public.projects (workspace_id, user_id, status, updated_at desc);
+  on public.projects (workspace_id, user_id, status);
 
-create index if not exists project_items_project_type_created_idx
+create index if not exists project_items_project_type_created_desc_idx
   on public.project_items (project_id, item_type, created_at desc);
 
-create index if not exists project_items_project_parent_idx
-  on public.project_items (project_id, parent_item_id, created_at desc);
+create index if not exists project_items_parent_item_id_idx
+  on public.project_items (parent_item_id);
 
-create index if not exists saved_outputs_project_created_idx
+create index if not exists saved_outputs_project_created_desc_idx
   on public.saved_outputs (project_id, created_at desc);
 
-create index if not exists saved_outputs_project_item_created_idx
-  on public.saved_outputs (project_item_id, created_at desc);
+create index if not exists saved_outputs_project_item_id_idx
+  on public.saved_outputs (project_item_id);
