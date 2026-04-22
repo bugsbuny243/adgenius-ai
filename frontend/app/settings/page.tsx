@@ -5,7 +5,23 @@ import { getAppContextOrRedirect } from '@/lib/app-context';
 
 export const dynamic = 'force-dynamic';
 
-export default async function SettingsPage() {
+type SettingsPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+const GOOGLE_STATUS_BANNERS: Record<string, { tone: 'success' | 'error'; message: string }> = {
+  connected: { tone: 'success', message: 'Google hesabı başarıyla bağlandı.' },
+  failed: { tone: 'error', message: 'Google bağlantısı tamamlanamadı. Lütfen tekrar deneyin.' },
+  expired: { tone: 'error', message: 'Google bağlantı oturumu süresi doldu. Lütfen yeniden başlatın.' },
+  workspace_required: { tone: 'error', message: 'Google bağlantısı için geçerli bir çalışma alanı gerekli.' }
+};
+
+export default async function SettingsPage({ searchParams }: SettingsPageProps) {
+  const params = (await searchParams) ?? {};
+  const googleStatusParam = params.google;
+  const googleStatus = Array.isArray(googleStatusParam) ? googleStatusParam[0] : googleStatusParam;
+  const googleBanner = googleStatus ? GOOGLE_STATUS_BANNERS[googleStatus] : null;
+
   const { supabase, workspace, userId } = await getAppContextOrRedirect();
 
   const monthStart = new Date();
@@ -28,6 +44,17 @@ export default async function SettingsPage() {
   return (
     <main>
       <Nav />
+      {googleBanner ? (
+        <section
+          className={`mb-4 rounded-xl border p-3 text-sm ${
+            googleBanner.tone === 'success'
+              ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+              : 'border-rose-400/40 bg-rose-500/10 text-rose-200'
+          }`}
+        >
+          {googleBanner.message}
+        </section>
+      ) : null}
       <section className="mb-4 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">Ayarlar merkezi: profil, çalışma alanı, plan, kullanım ve güvenli çıkış alanları ürünleşmiş düzenle sunulur.</section>
       <section className="grid gap-4 lg:grid-cols-2">
         <article className="panel"><h2 className="text-xl font-semibold">Profil</h2><div className="mt-3 space-y-2 text-sm text-white/80"><p><span className="text-white/60">Ad:</span> {profile?.full_name ?? 'Belirtilmedi'}</p><p><span className="text-white/60">E-posta:</span> {profile?.email ?? 'Belirtilmedi'}</p></div></article>

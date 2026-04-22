@@ -25,7 +25,7 @@ export async function getAppContextOrRedirect(): Promise<AppContext> {
   const workspace = await getWorkspaceContextOrNull();
 
   if (!workspace) {
-    throw new Error('Çalışma alanı bulunamadı.');
+    redirect('/signin?error=workspace_required');
   }
 
   return { userId: user.id, workspace, supabase };
