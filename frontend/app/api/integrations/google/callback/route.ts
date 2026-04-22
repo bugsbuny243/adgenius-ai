@@ -80,7 +80,15 @@ export async function GET(request: Request) {
   const code = callbackUrl.searchParams.get('code')?.trim();
   const state = callbackUrl.searchParams.get('state')?.trim();
 
-  if (!code || !state) {
+  if (!code) {
+    console.warn('[google-callback] missing authorization code');
+    const response = NextResponse.redirect(failRedirect);
+    response.cookies.set(clearStateCookie());
+    return response;
+  }
+
+  if (!state) {
+    console.warn('[google-callback] missing state');
     const response = NextResponse.redirect(failRedirect);
     response.cookies.set(clearStateCookie());
     return response;
@@ -108,7 +116,8 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser();
 
   if (!user || user.id !== storedState.userId) {
-    const response = NextResponse.redirect(buildSigninRedirect(appOrigin, 'auth_required'));
+    console.warn('[google-callback] missing or mismatched user session');
+    const response = NextResponse.redirect(buildSigninRedirect(appOrigin, 'failed'));
     response.cookies.set(clearStateCookie());
     return response;
   }
@@ -121,18 +130,30 @@ export async function GET(request: Request) {
     .maybeSingle();
 
   if (!membership?.workspace_id) {
+    console.warn('[google-callback] missing workspace membership', {
+      userId: user.id,
+      workspaceId: storedState.workspaceId
+    });
     const response = NextResponse.redirect(buildAppRedirect(appOrigin, 'workspace_required'));
     response.cookies.set(clearStateCookie());
     return response;
   }
 
   try {
-    const tokenPayload = await exchangeGoogleCodeForTokens({
-      clientId,
-      clientSecret,
-      redirectUri,
-      code
-    });
+    let tokenPayload;
+    try {
+      tokenPayload = await exchangeGoogleCodeForTokens({
+        clientId,
+        clientSecret,
+        redirectUri,
+        code
+      });
+    } catch (error) {
+      console.error('[google-callback] token exchange failed', { error });
+      const response = NextResponse.redirect(failRedirect);
+      response.cookies.set(clearStateCookie());
+      return response;
+    }
     const normalizedTokens = normalizeGoogleTokenPayload(tokenPayload);
 
     const [profile, channelId] = await Promise.all([
@@ -192,6 +213,10 @@ export async function GET(request: Request) {
     });
 
     if (upsertError) {
+      console.error('[google-callback] oauth_connections upsert failed', {
+        code: upsertError.code,
+        message: upsertError.message
+      });
       const response = NextResponse.redirect(failRedirect);
       response.cookies.set(clearStateCookie());
       return response;
@@ -200,7 +225,8 @@ export async function GET(request: Request) {
     const response = NextResponse.redirect(buildAppRedirect(appOrigin, 'connected'));
     response.cookies.set(clearStateCookie());
     return response;
-  } catch {
+  } catch (error) {
+    console.error('[google-callback] unexpected callback failure', { error });
     const response = NextResponse.redirect(failRedirect);
     response.cookies.set(clearStateCookie());
     return response;
