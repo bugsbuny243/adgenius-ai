@@ -6,7 +6,8 @@ const SERVER_ENV_KEYS = [
   'GEMINI_API_KEY',
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
-  'GOOGLE_REDIRECT_URI'
+  'GOOGLE_REDIRECT_URI',
+  'APP_ORIGIN'
 ] as const;
 
 type PublicEnvKey = (typeof PUBLIC_ENV_KEYS)[number];
@@ -39,7 +40,8 @@ export function getServerEnv(): Record<ServerEnvKey, string | null> {
     GEMINI_API_KEY: readServerEnv('GEMINI_API_KEY'),
     GOOGLE_CLIENT_ID: readServerEnv('GOOGLE_CLIENT_ID'),
     GOOGLE_CLIENT_SECRET: readServerEnv('GOOGLE_CLIENT_SECRET'),
-    GOOGLE_REDIRECT_URI: readServerEnv('GOOGLE_REDIRECT_URI')
+    GOOGLE_REDIRECT_URI: readServerEnv('GOOGLE_REDIRECT_URI'),
+    APP_ORIGIN: readServerEnv('APP_ORIGIN')
   };
 }
 

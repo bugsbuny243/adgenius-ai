@@ -12,6 +12,7 @@ import { createSupabaseServerClient } from '@/lib/supabase-server';
 
 const GOOGLE_STATE_COOKIE = 'koschei_google_oauth_state';
 const STATE_TTL_MS = 10 * 60 * 1000;
+const DEFAULT_APP_ORIGIN = 'https://tradepigloball.co';
 
 type StoredOAuthState = {
   state: string;
@@ -36,8 +37,12 @@ function decodeStateCookie(cookieValue: string | undefined): StoredOAuthState | 
   }
 }
 
-function buildAppRedirect(origin: string, status: string): URL {
-  return new URL(`/settings?google=${status}`, origin);
+function buildAppRedirect(appOrigin: string, status: string): URL {
+  return new URL(`/settings?google=${status}`, appOrigin);
+}
+
+function buildSigninRedirect(appOrigin: string, status: string): URL {
+  return new URL(`/signin?google=${status}`, appOrigin);
 }
 
 function clearStateCookie() {
@@ -58,11 +63,13 @@ export async function GET(request: Request) {
     GOOGLE_CLIENT_SECRET: clientSecret,
     GOOGLE_REDIRECT_URI: redirectUri,
     SUPABASE_URL: supabaseUrl,
-    SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey
+    SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
+    APP_ORIGIN: appOriginEnv
   } = getServerEnv();
 
   const callbackUrl = new URL(request.url);
-  const failRedirect = buildAppRedirect(callbackUrl.origin, 'failed');
+  const appOrigin = appOriginEnv ?? DEFAULT_APP_ORIGIN;
+  const failRedirect = buildAppRedirect(appOrigin, 'failed');
 
   if (!clientId || !clientSecret || !redirectUri || !supabaseUrl || !serviceRoleKey) {
     const response = NextResponse.redirect(failRedirect);
@@ -90,7 +97,7 @@ export async function GET(request: Request) {
 
   const isExpired = Date.now() - new Date(storedState.createdAt).getTime() > STATE_TTL_MS;
   if (isExpired) {
-    const response = NextResponse.redirect(buildAppRedirect(callbackUrl.origin, 'expired'));
+    const response = NextResponse.redirect(buildAppRedirect(appOrigin, 'expired'));
     response.cookies.set(clearStateCookie());
     return response;
   }
@@ -101,7 +108,7 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser();
 
   if (!user || user.id !== storedState.userId) {
-    const response = NextResponse.redirect(buildAppRedirect(callbackUrl.origin, 'auth_required'));
+    const response = NextResponse.redirect(buildSigninRedirect(appOrigin, 'auth_required'));
     response.cookies.set(clearStateCookie());
     return response;
   }
@@ -114,7 +121,7 @@ export async function GET(request: Request) {
     .maybeSingle();
 
   if (!membership?.workspace_id) {
-    const response = NextResponse.redirect(buildAppRedirect(callbackUrl.origin, 'workspace_required'));
+    const response = NextResponse.redirect(buildAppRedirect(appOrigin, 'workspace_required'));
     response.cookies.set(clearStateCookie());
     return response;
   }
@@ -190,7 +197,7 @@ export async function GET(request: Request) {
       return response;
     }
 
-    const response = NextResponse.redirect(buildAppRedirect(callbackUrl.origin, 'connected'));
+    const response = NextResponse.redirect(buildAppRedirect(appOrigin, 'connected'));
     response.cookies.set(clearStateCookie());
     return response;
   } catch {

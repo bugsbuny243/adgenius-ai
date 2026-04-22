@@ -7,6 +7,7 @@ import { getWorkspaceContextOrNull } from '@/lib/workspace';
 
 const GOOGLE_STATE_COOKIE = 'koschei_google_oauth_state';
 const STATE_TTL_SECONDS = 60 * 10;
+const DEFAULT_APP_ORIGIN = 'https://tradepigloball.co';
 
 type GoogleOAuthStatePayload = {
   state: string;
@@ -19,8 +20,9 @@ function encodeStateCookie(payload: GoogleOAuthStatePayload): string {
   return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
 }
 
-export async function GET(request: Request) {
-  const { GOOGLE_CLIENT_ID: clientId, GOOGLE_REDIRECT_URI: redirectUri } = getServerEnv();
+export async function GET() {
+  const { GOOGLE_CLIENT_ID: clientId, GOOGLE_REDIRECT_URI: redirectUri, APP_ORIGIN: appOriginEnv } = getServerEnv();
+  const appOrigin = appOriginEnv ?? DEFAULT_APP_ORIGIN;
 
   if (!clientId || !redirectUri) {
     return NextResponse.json({ ok: false, error: 'missing_google_environment' }, { status: 500 });
@@ -28,7 +30,7 @@ export async function GET(request: Request) {
 
   const workspace = await getWorkspaceContextOrNull();
   if (!workspace) {
-    return NextResponse.redirect(new URL('/signin?google=auth_required', request.url));
+    return NextResponse.redirect(new URL('/signin?google=auth_required', appOrigin));
   }
 
   const state = randomBytes(32).toString('hex');
