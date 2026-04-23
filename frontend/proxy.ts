@@ -21,6 +21,16 @@ export async function proxy(request: NextRequest) {
 
   const { NEXT_PUBLIC_SUPABASE_URL: supabaseUrl, NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseAnonKey } = getPublicEnv();
 
+  const buildSignInRedirect = () => {
+    const url = request.nextUrl.clone();
+    url.pathname = SIGN_IN_ROUTE;
+    const nextPath = `${request.nextUrl.pathname}${request.nextUrl.search}`;
+    if (nextPath && nextPath !== SIGN_IN_ROUTE) {
+      url.searchParams.set('next', nextPath);
+    }
+    return url;
+  };
+
   const isProtectedRoute = PROTECTED_ROUTES.some((route) => request.nextUrl.pathname.startsWith(route));
   const isAuthRoute = AUTH_ROUTES.some((route) => request.nextUrl.pathname.startsWith(route));
   const isLoginRoute = request.nextUrl.pathname === '/login';
@@ -33,9 +43,7 @@ export async function proxy(request: NextRequest) {
 
   if (!supabaseUrl || !supabaseAnonKey) {
     if (isProtectedRoute) {
-      const url = request.nextUrl.clone();
-      url.pathname = SIGN_IN_ROUTE;
-      return NextResponse.redirect(url);
+      return NextResponse.redirect(buildSignInRedirect());
     }
 
     return response;
@@ -61,9 +69,7 @@ export async function proxy(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (isProtectedRoute && !user) {
-      const url = request.nextUrl.clone();
-      url.pathname = SIGN_IN_ROUTE;
-      return NextResponse.redirect(url);
+      return NextResponse.redirect(buildSignInRedirect());
     }
 
     if (isAuthRoute && user) {
@@ -78,9 +84,7 @@ export async function proxy(request: NextRequest) {
     });
 
     if (isProtectedRoute) {
-      const url = request.nextUrl.clone();
-      url.pathname = SIGN_IN_ROUTE;
-      return NextResponse.redirect(url);
+      return NextResponse.redirect(buildSignInRedirect());
     }
   }
 

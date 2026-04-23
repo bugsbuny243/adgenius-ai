@@ -7,13 +7,12 @@ import {
   fetchYouTubeChannelId,
   normalizeGoogleTokenPayload
 } from '@/lib/google-oauth';
+import { resolveAppOrigin } from '@/lib/app-origin';
 import { getServerEnv } from '@/lib/env';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 
 const GOOGLE_STATE_COOKIE = 'koschei_google_oauth_state';
 const STATE_TTL_MS = 10 * 60 * 1000;
-const DEFAULT_APP_ORIGIN = 'https://tradepigloball.co';
-
 type StoredOAuthState = {
   state: string;
   userId: string;
@@ -68,7 +67,7 @@ export async function GET(request: Request) {
   } = getServerEnv();
 
   const callbackUrl = new URL(request.url);
-  const appOrigin = appOriginEnv ?? DEFAULT_APP_ORIGIN;
+  const appOrigin = resolveAppOrigin({ appOrigin: appOriginEnv, requestUrl: callbackUrl.origin });
   const failRedirect = buildAppRedirect(appOrigin, 'failed');
 
   if (!clientId || !clientSecret || !redirectUri || !supabaseUrl || !serviceRoleKey) {
