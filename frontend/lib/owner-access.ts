@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
-import { getWorkspaceContext } from '@/lib/workspace';
+import { getWorkspaceContextOrNull } from '@/lib/workspace';
 import { isSuperOwner } from '@/lib/auth/super-owner';
 
 export const OWNER_ROLES = ['owner', 'admin'] as const;
@@ -25,7 +25,11 @@ export async function getOwnerAccessContextOrRedirect(): Promise<OwnerAccessCont
   }
 
   const hasSuperOwnerAccess = isSuperOwner(user.id, user.email ?? null);
-  const workspace = await getWorkspaceContext();
+  const workspace = await getWorkspaceContextOrNull();
+
+  if (!workspace) {
+    redirect('/signin?error=workspace_required');
+  }
 
   if (!hasSuperOwnerAccess) {
     const { data: membership, error } = await supabase
