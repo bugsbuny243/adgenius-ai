@@ -8,7 +8,7 @@ export default async function OwnerLayout({ children }: { children: React.ReactN
   const context = await getOwnerAccessContextOrRedirect();
 
   return (
-    <OwnerShell workspaceName={context.workspaceName} role={context.role}>
+    <OwnerShell workspaceName={context.workspaceName} role={context.role} isSuperOwner={context.isSuperOwner}>
       {children}
     </OwnerShell>
   );

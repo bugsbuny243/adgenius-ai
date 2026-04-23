@@ -13,6 +13,10 @@ const SERVER_ENV_KEYS = [
 type PublicEnvKey = (typeof PUBLIC_ENV_KEYS)[number];
 type ServerEnvKey = (typeof SERVER_ENV_KEYS)[number];
 
+const OWNER_ENV_KEYS = ['OWNER_USER_ID', 'OWNER_EMAIL'] as const;
+
+type OwnerEnvKey = (typeof OWNER_ENV_KEYS)[number];
+
 function hasValue(value: string | undefined): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
@@ -60,5 +64,13 @@ export function getEnvDiagnostics() {
     missingServerEnv,
     publicReady: missingPublicEnv.length === 0,
     serverReady: isServerRuntime ? missingServerEnv.length === 0 : true
+  };
+}
+
+
+export function getOwnerEnv(): Record<OwnerEnvKey, string | null> {
+  return {
+    OWNER_USER_ID: hasValue(process.env.OWNER_USER_ID) ? process.env.OWNER_USER_ID as string : null,
+    OWNER_EMAIL: hasValue(process.env.OWNER_EMAIL) ? process.env.OWNER_EMAIL as string : null
   };
 }

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { assertOwnerAccessOrThrow } from '@/lib/owner-access';
+import { requireOwnerOrSuperOwner } from '@/lib/owner-access';
 
 export async function POST(request: Request) {
-  const context = await assertOwnerAccessOrThrow();
+  const context = await requireOwnerOrSuperOwner();
   const payload = (await request.json()) as {
     slot_name?: string;
     page_path?: string;
