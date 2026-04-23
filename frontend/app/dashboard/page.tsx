@@ -190,7 +190,7 @@ export default async function DashboardPage() {
         ) : (
           <div className="grid gap-3 lg:grid-cols-2">
             <div className="space-y-2">
-              <p className="text-xs uppercase text-white/60">Son run'lar</p>
+              <p className="text-xs uppercase text-white/60">Son run’lar</p>
               {(recentRunsRes.data ?? []).map((run) => (
                 <div key={run.id} className="rounded-lg border border-white/10 bg-black/20 p-3 text-sm">
                   <p className="font-medium">{getRunAgentName(run.agent_types)}</p>

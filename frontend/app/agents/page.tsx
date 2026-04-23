@@ -25,7 +25,7 @@ export default async function AgentsPage() {
       <Nav />
       <section className="panel">
         <h2 className="mb-2 text-2xl font-semibold">Agentlar</h2>
-        <p className="mb-4 text-sm text-white/70">Her agent üretim akışına göre hazır presetlerle, mod badge'leriyle ve hızlı CTA'larla gelir.</p>
+        <p className="mb-4 text-sm text-white/70">Her agent üretim akışına göre hazır presetlerle, mod badge’leriyle ve hızlı CTA’larla gelir.</p>
         {agents && agents.length > 0 ? (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {agents.map((agent) => (

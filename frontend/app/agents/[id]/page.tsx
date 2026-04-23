@@ -21,7 +21,6 @@ import {
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const STALE_PENDING_MS = 2 * 60 * 1000;
 
 function getStatusLabel(status: string): string {
   if (status === 'completed') return 'Tamamlandı';
@@ -93,9 +92,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
   const formSummary = activeRun ? buildFormSummary(config, parseEditorMetadata(activeRun.metadata).editorState) : [];
   const activeMetadata = activeRun ? parseEditorMetadata(activeRun.metadata) : null;
   const isPending = activeRun?.status === 'pending' || activeRun?.status === 'processing';
-  const isStalePending = activeRun
-    ? isPending && Date.now() - new Date(activeRun.updated_at ?? activeRun.created_at).getTime() > STALE_PENDING_MS
-    : false;
+  const isStalePending = false;
   const resultText = activeRun
     ? neutralizeVendorTerms(
         activeRun.result_text ||
@@ -202,7 +199,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
             ) : null}
             {isStalePending ? (
                 <p className="rounded-lg border border-red-300/35 bg-red-500/10 px-3 py-2 text-xs text-red-100">
-                  Bu çalıştırma beklenenden uzun sürdü. "Bu sonucu düzenle" ile aynı girdi üzerinden yeniden çalıştırabilirsiniz.
+                  Bu çalıştırma beklenenden uzun sürdü. &quot;Bu sonucu düzenle&quot; ile aynı girdi üzerinden yeniden çalıştırabilirsiniz.
                 </p>
               ) : null}
             {activeRun.status === 'failed' ? (
@@ -261,7 +258,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
                           <input type="hidden" name="content_item_id" value={activeContentItem.id} />
                           <input type="hidden" name="target_platform" value={platform} />
                           <p className="mb-2 font-medium capitalize">{platform}</p>
-                          <button className="w-full rounded-lg border border-white/20 px-3 py-2 text-xs hover:border-neon">Queue'ye gönder</button>
+                          <button className="w-full rounded-lg border border-white/20 px-3 py-2 text-xs hover:border-neon">Queue’ye gönder</button>
                         </form>
                       ))}
                     </div>

@@ -64,7 +64,7 @@ function PlatformCard({ title, blocks, projectId }: { title: string; blocks: Arr
           <div className="flex flex-wrap gap-2">
             <span className="rounded border border-white/20 px-2 py-1">Projeye ekle</span>
             <span className="rounded border border-white/20 px-2 py-1">Kaydet</span>
-            <span className="rounded border border-white/20 px-2 py-1">Queue'ye gönder</span>
+            <span className="rounded border border-white/20 px-2 py-1">Queue’ye gönder</span>
             <span className="rounded border border-neon/40 px-2 py-1 text-neon">Farklı versiyon üret</span>
           </div>
           <p className="text-white/55">Bağlı proje: {projectId ?? 'Henüz bağlanmadı'}</p>

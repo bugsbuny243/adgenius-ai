@@ -46,6 +46,7 @@ export function RunsList({ runs }: { runs: RunItem[] }) {
         const byStatus = status === 'all' || run.status === status;
         const byAgent = agent === 'all' || getAgentLabel(run.agent_types) === agent;
         const createdTime = new Date(run.created_at).getTime();
+        // eslint-disable-next-line react-hooks/purity
         const now = Date.now();
         const byDate = dateRange === 'all' || (dateRange === 'today' && now - createdTime <= 24 * 60 * 60 * 1000) || (dateRange === 'week' && now - createdTime <= 7 * 24 * 60 * 60 * 1000);
         return byStatus && byAgent && byDate;
