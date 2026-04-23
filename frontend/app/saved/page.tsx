@@ -33,7 +33,7 @@ export default async function SavedPage() {
         ) : data && data.length > 0 ? (
           <SavedList items={data} onDelete={onDelete} />
         ) : (
-          <p className="text-sm text-white/70">Henüz kaydedilen çıktı yok.</p>
+          <p className="text-sm text-white/70">Kaydedilmiş çıktı bulunmuyor. Agent sonucundan “Kaydet” ile bu alanı doldurabilirsiniz.</p>
         )}
       </section>
     </main>

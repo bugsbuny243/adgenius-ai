@@ -115,3 +115,21 @@ export async function fetchYouTubeChannelId(accessToken: string): Promise<string
   const payload = (await response.json()) as { items?: Array<{ id?: string }> };
   return payload.items?.[0]?.id ?? null;
 }
+
+export async function fetchBloggerBlogId(accessToken: string): Promise<string | null> {
+  const url = new URL('https://www.googleapis.com/blogger/v3/users/self/blogs');
+  url.searchParams.set('maxResults', '1');
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`
+    }
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const payload = (await response.json()) as { items?: Array<{ id?: string }> };
+  return payload.items?.[0]?.id ?? null;
+}

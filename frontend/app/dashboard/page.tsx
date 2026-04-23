@@ -102,7 +102,7 @@ export default async function DashboardPage() {
             <MetricCard title="Aktif plan" value={subscriptionRes.data?.plan_name ?? 'Ücretsiz'} />
             <MetricCard title="Kullanım" value={`${usedRuns} / ${runLimit}`} />
             <MetricCard title="Kalan hak" value={String(remaining)} />
-            <MetricCard title="Son çalışma" value={recentRunsRes.data?.[0] ? new Date(recentRunsRes.data[0].created_at).toLocaleDateString('tr-TR') : 'Henüz yok'} />
+            <MetricCard title="Son çalışma" value={recentRunsRes.data?.[0] ? new Date(recentRunsRes.data[0].created_at).toLocaleDateString('tr-TR') : 'Kayıt yok'} />
           </div>
           <div className="mt-3 h-2 rounded-full bg-white/10">
             <div className="h-full rounded-full bg-neon" style={{ width: `${percent}%` }} />
@@ -165,7 +165,7 @@ export default async function DashboardPage() {
           <InfoPill label="Recently updated projects" value={String(recentlyUpdatedProjects.length)} />
         </div>
         <div className="mt-3 space-y-2">
-          {recentlyUpdatedProjects.length === 0 ? <p className="text-sm text-white/70">Güncel proje aktivitesi yok.</p> : null}
+          {recentlyUpdatedProjects.length === 0 ? <p className="text-sm text-white/70">Güncel proje aktivitesi görünmüyor; proje oluşturup ilk öğeyi ekleyin.</p> : null}
           {recentlyUpdatedProjects.map((project) => (
             <Link key={project.id} href={`/projects/${project.id}`} className="block rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm hover:border-neon">
               <p className="font-medium">{project.name}</p>
@@ -179,7 +179,7 @@ export default async function DashboardPage() {
         <h3 className="mb-3 text-lg font-semibold">Son Aktiviteler</h3>
         {!hasData ? (
           <div className="rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/75">
-            <p>Henüz aktivite yok. Onboarding adımlarıyla başlayabilirsiniz:</p>
+            <p>Aktivite görünmüyor. Başlangıç için önerilen akış:</p>
             <ul className="mt-2 list-disc space-y-1 pl-5">
               <li>İlk agent çalıştır</li>
               <li>İlk proje oluştur</li>

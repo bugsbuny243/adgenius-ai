@@ -139,6 +139,22 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
           .limit(10)
       : { data: [] };
 
+  const { data: googleConnection } = await supabase
+    .from('oauth_connections')
+    .select('status, metadata')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', userId)
+    .eq('provider', 'google')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const googleMetadata =
+    googleConnection?.metadata && typeof googleConnection.metadata === 'object' && !Array.isArray(googleConnection.metadata)
+      ? (googleConnection.metadata as Record<string, unknown>)
+      : {};
+  const youtubeConnected = googleConnection?.status === 'active';
+  const bloggerConnected = youtubeConnected && typeof googleMetadata.bloggerBlogId === 'string';
+
 
   const [{ data: linkedProject }, { data: linkedSavedOutput }] = await Promise.all([
     activeContentItem?.project_id
@@ -247,6 +263,8 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
                     youtubeDescription={activeContentItem.youtube_description}
                     instagramCaption={activeContentItem.instagram_caption}
                     tiktokCaption={activeContentItem.tiktok_caption}
+                    youtubeConnected={youtubeConnected}
+                    bloggerConnected={bloggerConnected}
                   />
 
                   <div className="rounded-lg border border-white/10 bg-black/20 p-3">
@@ -290,7 +308,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
                         })}
                       </div>
                     ) : (
-                      <p className="text-sm text-white/65">Henüz bu içerik için yayın kuyruğu kaydı bulunmuyor.</p>
+                      <p className="text-sm text-white/65">Bu içerik için yayın kuyruğu kaydı bulunmuyor. Önce platform kartından kuyruğa gönderin.</p>
                     )}
                   </div>
                 </div>
@@ -378,7 +396,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
             ) : null}
           </div>
         ) : (
-          <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/70">Henüz bu agent için çalıştırma bulunmuyor. Editörü doldurup ilk çalıştırmayı başlatabilirsiniz.</p>
+          <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/70">Bu agent için run kaydı bulunmuyor. Editörü doldurup ilk çalıştırmayı başlatabilirsiniz.</p>
         )}
       </section>
 

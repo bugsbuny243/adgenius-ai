@@ -8,6 +8,8 @@ type SocialOutputPanelProps = {
   instagramCaption?: string | null;
   tiktokCaption?: string | null;
   projectId?: string | null;
+  youtubeConnected?: boolean;
+  bloggerConnected?: boolean;
 };
 
 function CopyButton({ value }: { value: string }) {
@@ -74,9 +76,13 @@ function PlatformCard({ title, blocks, projectId }: { title: string; blocks: Arr
   );
 }
 
-export function SocialOutputPanel({ youtubeTitle, youtubeDescription, instagramCaption, tiktokCaption, projectId }: SocialOutputPanelProps) {
+export function SocialOutputPanel({ youtubeTitle, youtubeDescription, instagramCaption, tiktokCaption, projectId, youtubeConnected, bloggerConnected }: SocialOutputPanelProps) {
   return (
     <div className="space-y-3">
+      <div className="rounded-lg border border-white/10 bg-black/20 p-3 text-xs text-white/70">
+        <p className="font-medium text-white/85">Yayın bağlantı durumu</p>
+        <p className="mt-1">YouTube: {youtubeConnected ? 'Bağlı' : 'Bağlı değil'} • Blogger: {bloggerConnected ? 'Bağlı' : 'Bağlı değil'}</p>
+      </div>
       <div className="grid gap-3 lg:grid-cols-3">
         <PlatformCard title="YouTube kartı" projectId={projectId} blocks={[{ label: 'Başlık', content: youtubeTitle, emptyText: 'YouTube başlığı üretilemedi.' }, { label: 'Açıklama', content: youtubeDescription, emptyText: 'YouTube açıklaması üretilemedi.' }]} />
         <PlatformCard title="Instagram kartı" projectId={projectId} blocks={[{ label: 'Caption', content: instagramCaption, emptyText: 'Instagram metni üretilemedi.' }]} />

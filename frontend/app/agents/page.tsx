@@ -48,7 +48,7 @@ export default async function AgentsPage() {
               </div>
             ))}
           </div>
-        ) : <p className="text-sm text-white/70">Henüz agent tanımı bulunmuyor.</p>}
+        ) : <p className="text-sm text-white/70">Bu workspace için kullanılabilir agent tanımı bulunmuyor.</p>}
       </section>
     </main>
   );

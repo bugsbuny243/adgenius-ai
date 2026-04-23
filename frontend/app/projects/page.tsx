@@ -84,7 +84,7 @@ export default async function ProjectsPage() {
           </div>
         ) : (
           <div className="rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">
-            <p>Henüz proje yok. İlk workflow projesini şimdi açın.</p>
+            <p>Proje bulunmuyor. Yukarıdaki formdan ilk workflow projenizi oluşturun ve agent çıktılarıyla besleyin.</p>
           </div>
         )}
       </section>

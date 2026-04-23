@@ -62,7 +62,7 @@ export function ResultPanel({ text, status, agentSlug, projectHref, resultHref, 
 
       {status === 'failed' ? <p className="rounded-lg border border-red-300/35 bg-red-500/10 px-3 py-2 text-sm text-red-100">Çalıştırma tamamlanamadı. Hata mesajını kontrol ederek yeniden deneyin.</p> : null}
       {(status === 'pending' || status === 'processing') && <p className="rounded-lg border border-amber-300/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">Çıktı hazırlanıyor. Durum güncellendiğinde içerik burada görünecek.</p>}
-      {status === 'idle' ? <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-white/70">Henüz bir sonuç üretilmedi.</p> : null}
+      {status === 'idle' ? <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-white/70">Bu oturum için sonuç kaydı bulunmuyor.</p> : null}
 
       {!isEmpty ? (
         <div className="mt-3 space-y-2">
