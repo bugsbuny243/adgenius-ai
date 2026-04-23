@@ -35,7 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/articles" className="transition hover:text-neon">
                 Yazılar
               </Link>
-              <Link href="/privacy-policy" className="transition hover:text-neon">
+              <Link href="/privacy" className="transition hover:text-neon">
                 Gizlilik Politikası
               </Link>
               <Link href="/terms" className="transition hover:text-neon">

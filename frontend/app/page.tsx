@@ -87,7 +87,7 @@ export default function HomePage() {
         <p>
           Yasal ve güven sayfaları: <Link href="/about" className="text-neon hover:underline">Hakkımızda</Link>,{' '}
           <Link href="/contact" className="text-neon hover:underline">İletişim</Link>,{' '}
-          <Link href="/privacy-policy" className="text-neon hover:underline">Gizlilik Politikası</Link>,{' '}
+          <Link href="/privacy" className="text-neon hover:underline">Gizlilik Politikası</Link>,{' '}
           <Link href="/terms" className="text-neon hover:underline">Kullanım Koşulları</Link> ve{' '}
           <Link href="/cookies" className="text-neon hover:underline">Çerez Politikası</Link>.
         </p>
