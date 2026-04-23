@@ -6,7 +6,7 @@ const links = [
   { href: '/contact', label: 'İletişim' },
   { href: '/articles', label: 'Yazılar' },
   { href: '/pricing', label: 'Fiyatlandırma' },
-  { href: '/privacy-policy', label: 'Gizlilik' },
+  { href: '/privacy', label: 'Gizlilik Politikası' },
   { href: '/terms', label: 'Kullanım Koşulları' },
   { href: '/login', label: 'Giriş' }
 ] as const;
