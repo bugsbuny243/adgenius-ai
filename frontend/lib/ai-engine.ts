@@ -91,6 +91,15 @@ function extractUsage(source: unknown): { inputTokens: number | null; outputToke
   };
 }
 
+function extractFallbackTextFromCandidates(source: unknown): string {
+  if (!source || typeof source !== 'object') return '';
+  const candidates = (source as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }).candidates;
+  if (!Array.isArray(candidates) || candidates.length === 0) return '';
+  const parts = candidates[0]?.content?.parts;
+  if (!Array.isArray(parts)) return '';
+  return parts.map((part) => (typeof part.text === 'string' ? part.text : '')).join('').trim();
+}
+
 function buildConfig(profile: AgentRunProfile, systemPrompt: string | null): Record<string, unknown> {
   const config: Record<string, unknown> = {
     maxOutputTokens: profile.maxOutputTokens,
@@ -126,8 +135,10 @@ async function runInternal(options: RunTextOptions, stream: boolean): Promise<Ai
       contents: options.userInput
     });
 
+    const fallbackText = extractFallbackTextFromCandidates(response);
+
     return {
-      text: (response.text ?? '').trim(),
+      text: (response.text ?? fallbackText ?? '').trim(),
       alias: profile.alias,
       displayLabel: profile.displayLabel,
       usage: extractUsage(response.usageMetadata)
