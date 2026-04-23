@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { assertOwnerAccessOrThrow } from '@/lib/owner-access';
+import { requireOwnerOrSuperOwner } from '@/lib/owner-access';
 
 const VALID_STATUSES = ['pending', 'processing', 'paid', 'failed', 'refunded', 'cancelled'];
 
 export async function POST(request: Request) {
-  const context = await assertOwnerAccessOrThrow();
+  const context = await requireOwnerOrSuperOwner();
   const payload = (await request.json()) as {
     reference?: string;
     amount?: number;
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const context = await assertOwnerAccessOrThrow();
+  const context = await requireOwnerOrSuperOwner();
   const payload = (await request.json()) as { payment_id?: string; status?: string; notes?: string };
 
   if (!payload.payment_id || !VALID_STATUSES.includes(payload.status ?? '')) {
