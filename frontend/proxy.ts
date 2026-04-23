@@ -6,7 +6,7 @@ const PROTECTED_ROUTES = ['/dashboard', '/agents', '/projects', '/composer', '/r
 const AUTH_ROUTES = ['/signin', '/signup', '/login'];
 const SIGN_IN_ROUTE = '/signin';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   type CookieToSet = {
     name: string;
     value: string;
@@ -72,7 +72,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
   } catch (error) {
-    console.error('[middleware] auth guard failed', {
+    console.error('[proxy] auth guard failed', {
       pathname: request.nextUrl.pathname,
       error
     });

@@ -44,6 +44,7 @@ export function AgentEditorShell({ agentSlug, projects, runAction, initialMetada
 
     try {
       const parsed = JSON.parse(raw) as { editorState?: EditorState; freeNotes?: string; selectedPackIndex?: number; selectedProjectId?: string };
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (parsed.editorState && typeof parsed.editorState === 'object') setEditorState(parsed.editorState);
       if (typeof parsed.freeNotes === 'string') setFreeNotes(parsed.freeNotes);
       if (typeof parsed.selectedProjectId === 'string') setSelectedProjectId(parsed.selectedProjectId);

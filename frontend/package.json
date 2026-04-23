@@ -6,8 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "start:validated": "node scripts/validate-runtime-env.mjs && next start"
+    "lint": "eslint . --max-warnings=0",
+    "start:validated": "node scripts/validate-runtime-env.mjs && next start",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@google/genai": "^0.14.0",
