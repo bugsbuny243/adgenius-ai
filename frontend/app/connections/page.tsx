@@ -1,24 +1,100 @@
+import Link from 'next/link';
 import { Nav } from '@/components/nav';
+import { bloggerConnector } from '@/lib/connectors/blogger';
 import { youtubeConnector } from '@/lib/connectors/youtube';
+import type { ConnectorStatus } from '@/lib/connectors/types';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ConnectionsPage() {
-  const statuses = await Promise.all([youtubeConnector.getStatus()]);
+type ConnectionsPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+const GOOGLE_STATUS_BANNERS: Record<string, { tone: 'success' | 'error'; message: string }> = {
+  connected: { tone: 'success', message: 'Google bağlantısı tamamlandı. YouTube ve Blogger erişimi güncellendi.' },
+  disconnected: { tone: 'success', message: 'Google bağlantısı kaldırıldı.' },
+  failed: { tone: 'error', message: 'Bağlantı tamamlanamadı. Lütfen tekrar deneyin.' },
+  expired: { tone: 'error', message: 'Bağlantı oturumu zaman aşımına uğradı. Tekrar bağlanın.' },
+  workspace_required: { tone: 'error', message: 'Geçerli bir çalışma alanı bulunamadı.' }
+};
+
+function formatDate(value: string | null | undefined): string {
+  if (!value) return '—';
+  return new Date(value).toLocaleString('tr-TR');
+}
+
+function formatScopeSummary(scopes: string[] | undefined): string {
+  if (!scopes?.length) return 'Scope bilgisi yok';
+  const compact = scopes.map((scope) => scope.split('/').pop() ?? scope);
+  return compact.slice(0, 3).join(', ');
+}
+
+function ConnectionCard({ item }: { item: ConnectorStatus }) {
+  const isConnected = item.state === 'connected';
+  const platformLabel = item.platform === 'youtube' ? 'YouTube' : item.platform === 'blogger' ? 'Blogger' : item.platform;
+
+  return (
+    <article className="rounded-2xl border border-white/10 bg-black/30 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-lg font-semibold">{platformLabel}</h3>
+        <span className={`rounded-md border px-2 py-1 text-xs ${isConnected ? 'border-emerald-300/40 bg-emerald-500/10 text-emerald-200' : 'border-white/20 text-white/70'}`}>
+          {isConnected ? 'Bağlı' : 'Bağlı değil'}
+        </span>
+      </div>
+
+      <p className="mt-3 text-sm text-white/70">{isConnected ? 'Yayın hazırlığında bu hesabı kullanabilirsiniz.' : 'Bağlantıyı açarak yayın hazırlığı ve hesap doğrulaması akışını aktif edebilirsiniz.'}</p>
+
+      <div className="mt-4 grid gap-2 text-sm text-white/80">
+        <p><span className="text-white/55">Hesap:</span> {item.accountLabel ?? item.providerAccountId ?? '—'}</p>
+        <p><span className="text-white/55">Bağlantı tarihi:</span> {formatDate(item.connectedAt)}</p>
+        <p><span className="text-white/55">Son senkron:</span> {formatDate(item.lastSyncedAt)}</p>
+        {item.channelId ? <p><span className="text-white/55">Channel ID:</span> {item.channelId}</p> : null}
+        {item.blogId ? <p><span className="text-white/55">Blog ID:</span> {item.blogId}</p> : null}
+        <p><span className="text-white/55">Scope özeti:</span> {formatScopeSummary(item.scopes)}</p>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {isConnected ? (
+          <>
+            <Link href="/api/integrations/google/connect" className="rounded-lg border border-neon/50 px-3 py-2 text-xs text-neon hover:bg-neon/10">Yeniden bağlan</Link>
+            <form action="/api/integrations/google/disconnect" method="post">
+              <button type="submit" className="rounded-lg border border-white/25 px-3 py-2 text-xs hover:border-red-300/40 hover:text-red-200">Bağlantıyı kaldır</button>
+            </form>
+          </>
+        ) : (
+          <Link href="/api/integrations/google/connect" className="rounded-lg border border-neon/50 px-3 py-2 text-xs text-neon hover:bg-neon/10">Google ile bağlan</Link>
+        )}
+      </div>
+    </article>
+  );
+}
+
+export default async function ConnectionsPage({ searchParams }: ConnectionsPageProps) {
+  const params = (await searchParams) ?? {};
+  const googleStatusParam = params.google;
+  const googleStatus = Array.isArray(googleStatusParam) ? googleStatusParam[0] : googleStatusParam;
+  const googleBanner = googleStatus ? GOOGLE_STATUS_BANNERS[googleStatus] : null;
+
+  const statuses = await Promise.all([youtubeConnector.getStatus(), bloggerConnector.getStatus()]);
 
   return (
     <main>
       <Nav />
+      {googleBanner ? (
+        <section className={`mb-4 rounded-xl border p-3 text-sm ${googleBanner.tone === 'success' ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' : 'border-rose-400/40 bg-rose-500/10 text-rose-200'}`}>
+          {googleBanner.message}
+        </section>
+      ) : null}
       <section className="panel">
-        <h2 className="mb-4 text-xl font-semibold">Bağlantılar</h2>
-        <div className="grid gap-3 md:grid-cols-1">
-          {statuses.map((item) => (
-            <article key={item.platform} className="rounded-xl border border-white/10 p-4">
-              <p className="text-lg font-semibold capitalize">{item.platform}</p>
-              <p className="text-sm text-white/70">Durum: {item.label}</p>
-              <p className="mt-2 text-xs text-white/50">Gerçek OAuth yakında eklenecek.</p>
-            </article>
-          ))}
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-semibold">Bağlantılar</h2>
+            <p className="text-sm text-white/70">YouTube ve Blogger bağlantılarını tek merkezde yönetin.</p>
+          </div>
+          <Link href="/settings" className="rounded-lg border border-white/20 px-3 py-2 text-xs hover:border-neon">Ayar özetine dön</Link>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          {statuses.map((item) => <ConnectionCard key={item.platform} item={item} />)}
         </div>
       </section>
     </main>

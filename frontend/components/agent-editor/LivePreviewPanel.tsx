@@ -5,9 +5,10 @@ type LivePreviewPanelProps = {
   helpText: string;
   blocks: Array<{ title: string; content: string }>;
   derivedPrompt: string;
+  checklist?: string[];
 };
 
-export function LivePreviewPanel({ title, helpText, blocks, derivedPrompt }: LivePreviewPanelProps) {
+export function LivePreviewPanel({ title, helpText, blocks, derivedPrompt, checklist }: LivePreviewPanelProps) {
   const filledBlockCount = blocks.filter((block) => !block.content.includes('Henüz belirtilmedi')).length;
   const completionRate = Math.round((filledBlockCount / Math.max(1, blocks.length)) * 100);
 
@@ -37,9 +38,9 @@ export function LivePreviewPanel({ title, helpText, blocks, derivedPrompt }: Liv
       <details className="rounded-lg border border-white/10 bg-black/25 p-3">
         <summary className="cursor-pointer text-xs uppercase tracking-wide text-white/70">Hızlı kalite kontrol listesi</summary>
         <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-white/75">
-          <li>Hedef kitle ve amaç birlikte net yazıldı mı?</li>
-          <li>Ton ve format birbiriyle uyumlu mu?</li>
-          <li>Kısıtlar, yasaklar veya kapsam dışı alanlar belirtildi mi?</li>
+          {(checklist?.length ? checklist : ['Hedef kitle ve amaç birlikte net yazıldı mı?', 'Ton ve format birbiriyle uyumlu mu?', 'Kısıtlar, yasaklar veya kapsam dışı alanlar belirtildi mi?']).map((item) => (
+            <li key={item}>{item}</li>
+          ))}
         </ul>
       </details>
 

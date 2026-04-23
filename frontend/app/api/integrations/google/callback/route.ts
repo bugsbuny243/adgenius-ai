@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import {
   exchangeGoogleCodeForTokens,
+  fetchBloggerBlogId,
   fetchGoogleUserProfile,
   fetchYouTubeChannelId,
   normalizeGoogleTokenPayload
@@ -37,7 +38,7 @@ function decodeStateCookie(cookieValue: string | undefined): StoredOAuthState | 
 }
 
 function buildAppRedirect(appOrigin: string, status: string): URL {
-  return new URL(`/settings?google=${status}`, appOrigin);
+  return new URL(`/connections?google=${status}`, appOrigin);
 }
 
 function buildSigninRedirect(appOrigin: string, status: string): URL {
@@ -155,9 +156,10 @@ export async function GET(request: Request) {
     }
     const normalizedTokens = normalizeGoogleTokenPayload(tokenPayload);
 
-    const [profile, channelId] = await Promise.all([
+    const [profile, channelId, blogId] = await Promise.all([
       fetchGoogleUserProfile(normalizedTokens.accessToken),
-      fetchYouTubeChannelId(normalizedTokens.accessToken)
+      fetchYouTubeChannelId(normalizedTokens.accessToken),
+      fetchBloggerBlogId(normalizedTokens.accessToken)
     ]);
 
     const providerAccountId = profile?.sub ?? profile?.email ?? user.id;
@@ -182,7 +184,7 @@ export async function GET(request: Request) {
         ? (existing.metadata as Record<string, unknown>)
         : {};
 
-    const mergedMetadata = {
+    const mergedMetadata: Record<string, unknown> = {
       ...existingMetadata,
       googleProfile: {
         sub: profile?.sub ?? null,
@@ -191,6 +193,8 @@ export async function GET(request: Request) {
       },
       connectedAt: new Date().toISOString()
     };
+    mergedMetadata.youtubeChannelId = channelId;
+    mergedMetadata.bloggerBlogId = blogId;
 
     const payload = {
       workspace_id: storedState.workspaceId,

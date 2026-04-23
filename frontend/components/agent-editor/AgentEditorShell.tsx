@@ -26,6 +26,18 @@ function getModeBadge(agentSlug: string): string {
   return 'Hızlı mod';
 }
 
+function getAgentChecklist(agentSlug: string): string[] {
+  if (agentSlug === 'yazilim') return ['Kök neden, çözüm ve test adımları ayrı yazıldı mı?', 'Kısıtlar teknik olarak uygulanabilir mi?', 'Patch planı geri dönüş adımı içeriyor mu?'];
+  if (agentSlug === 'sosyal') return ['Platform, mod ve format eşleşiyor mu?', 'Hook cümlesi ilk satırda güçlü mü?', 'CTA tek ve net mi?'];
+  if (agentSlug === 'eposta') return ['Konu satırı kısa ve net mi?', 'Giriş, değer önerisini ilk 2 cümlede veriyor mu?', 'CTA tek adımlı ve ölçülebilir mi?'];
+  if (agentSlug === 'icerik') return ['Başlık ile amaç uyumlu mu?', 'Bölüm yapısı SEO niyetine uygun mu?', 'İlk bölüm okuyucuyu içeri çekiyor mu?'];
+  if (agentSlug === 'rapor') return ['Özet karar vericiye uygun mu?', 'Risk ve aksiyonlar birlikte verildi mi?', 'Metrik anlatımı bağlam içeriyor mu?'];
+  if (agentSlug === 'arastirma') return ['Bulgular kaynak/kanıt diliyle yazıldı mı?', 'Trend ve karşılaştırma net ayrıldı mı?', 'Sonuç öneriye dönüştü mü?'];
+  if (agentSlug === 'emlak') return ['Lokasyon avantajı ilk blokta mı?', 'Hedef müşteri dili doğru mu?', 'İletişim çağrısı net mi?'];
+  if (agentSlug === 'eticaret') return ['Ürün faydaları müşteri problemini çözüyor mu?', 'Platform formatına uygun mu?', 'CTA satın alma adımını açık söylüyor mu?'];
+  return [];
+}
+
 export function AgentEditorShell({ agentSlug, projects, runAction, initialMetadata }: AgentEditorShellProps) {
   const config = useMemo(() => getAgentEditorConfig(agentSlug), [agentSlug]);
   const [editorState, setEditorState] = useState<EditorState>(initialMetadata?.editorState ?? {});
@@ -175,6 +187,7 @@ export function AgentEditorShell({ agentSlug, projects, runAction, initialMetada
           helpText="Bu panel final cevabı simüle etmez; yalnızca yapılandırılmış özet ve çalıştırma isteğini gösterir."
           blocks={previewBlocks}
           derivedPrompt={derivedPrompt}
+          checklist={getAgentChecklist(agentSlug)}
         />
       </div>
 

@@ -4,8 +4,8 @@ export const tiktokConnector: ConnectorAdapter = {
   async getStatus() {
     return {
       platform: 'tiktok',
-      state: 'coming_soon',
-      label: 'Coming soon',
+      state: 'not_connected',
+      label: 'Bağlanmadı',
       connectedAt: null
     };
   },

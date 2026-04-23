@@ -1,10 +1,16 @@
-export type ConnectorPlatform = 'youtube' | 'instagram' | 'tiktok';
+export type ConnectorPlatform = 'youtube' | 'blogger' | 'instagram' | 'tiktok';
 
 export type ConnectorStatus = {
   platform: ConnectorPlatform;
-  state: 'not_connected' | 'coming_soon' | 'connected';
+  state: 'not_connected' | 'connected';
   label: string;
   connectedAt: string | null;
+  accountLabel?: string | null;
+  providerAccountId?: string | null;
+  channelId?: string | null;
+  blogId?: string | null;
+  scopes?: string[];
+  lastSyncedAt?: string | null;
 };
 
 export type ConnectorValidation = {

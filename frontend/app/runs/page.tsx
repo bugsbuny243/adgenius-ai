@@ -24,7 +24,7 @@ export default async function RunsPage() {
         ) : data && data.length > 0 ? (
           <RunsList runs={data} />
         ) : (
-          <p className="text-sm text-white/70">Henüz çalıştırma yok.</p>
+          <p className="text-sm text-white/70">Run kaydı bulunmuyor. Agents ekranından ilk çalıştırmayı başlatarak durum akışını burada izleyebilirsiniz.</p>
         )}
       </section>
     </main>
