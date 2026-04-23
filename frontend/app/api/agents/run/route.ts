@@ -55,6 +55,27 @@ function normalizeProviderError(input: unknown): string {
   return 'run_failed';
 }
 
+function toSafeRuntimeErrorMessage(input: unknown): string {
+  const raw = input instanceof Error ? input.message : String(input ?? '').trim();
+  const normalized = raw.toLowerCase();
+
+  if (!raw) return 'Çalıştırma sırasında beklenmeyen bir hata oluştu.';
+  if (normalized === 'run_timeout' || normalized.includes('timeout') || normalized.includes('aborted')) {
+    return 'Çalıştırma zaman aşımına uğradı.';
+  }
+  if (normalized === 'empty_result') {
+    return 'AI motoru boş sonuç döndürdü.';
+  }
+  if (normalized.startsWith('run_update_failed:')) {
+    return 'Çalıştırma kaydı güncellenemedi.';
+  }
+  if (isQuotaOrBillingFailure(normalized)) {
+    return QUOTA_ERROR_MESSAGE;
+  }
+
+  return raw.length > 220 ? `${raw.slice(0, 220)}…` : raw;
+}
+
 function resolveWorkflowFieldsFromMetadata(metadata: unknown): {
   projectId: string | null;
   projectItemId: string | null;
@@ -376,6 +397,19 @@ export async function POST(request: Request) {
   const runsCount = counter?.runs_count ?? 0;
 
   if (runsCount >= runLimit) {
+    await serviceSupabase
+      .from('agent_runs')
+      .update({
+        status: 'failed',
+        error_message: `Aylık ${runLimit} çalışma limitinize ulaştınız. Planınızı yükseltin.`,
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', runId)
+      .eq('workspace_id', membership.workspace_id)
+      .eq('user_id', user.id)
+      .in('status', ['pending', 'processing']);
+
     return NextResponse.json({
       ok: false,
       error: `Aylık ${runLimit} çalışma limitinize ulaştınız. Planınızı yükseltin.`,
@@ -438,7 +472,7 @@ export async function POST(request: Request) {
 
   if (run.status === 'failed' && run.error_message) {
     const cachedErrorCode = isQuotaOrBillingFailure(run.error_message) ? QUOTA_ERROR_CODE : 'run_failed';
-    return NextResponse.json({ ok: false, error: cachedErrorCode }, { status: 409 });
+    return NextResponse.json({ ok: false, error: cachedErrorCode, message: run.error_message }, { status: 409 });
   }
 
   const { data: agentType } = await supabase
@@ -684,6 +718,8 @@ export async function POST(request: Request) {
   } catch (error) {
     const errorCode = normalizeProviderError(error);
     const message = toRunFailureMessage(errorCode);
+    const safeRuntimeMessage = toSafeRuntimeErrorMessage(error);
+    const finalMessage = errorCode === 'run_failed' ? safeRuntimeMessage : message;
 
     if (errorCode === QUOTA_ERROR_CODE && MOCK_FALLBACK_FLAG) {
       const mockResult = [
@@ -719,7 +755,7 @@ export async function POST(request: Request) {
       .from('agent_runs')
       .update({
         status: 'failed',
-        error_message: message,
+        error_message: finalMessage,
         completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         metadata: {
@@ -732,6 +768,10 @@ export async function POST(request: Request) {
       .eq('user_id', user.id)
       .eq('workspace_id', membership.workspace_id);
 
-    return NextResponse.json({ ok: false, error: errorCode === QUOTA_ERROR_CODE ? QUOTA_ERROR_CODE : 'run_failed' }, { status: 500 });
+    return NextResponse.json({
+      ok: false,
+      error: errorCode === QUOTA_ERROR_CODE ? QUOTA_ERROR_CODE : 'run_failed',
+      message: finalMessage
+    }, { status: 500 });
   }
 }

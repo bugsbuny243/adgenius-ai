@@ -38,7 +38,12 @@ function parseRunMetadata(source: unknown): { editorState: Record<string, unknow
   };
 }
 
-function toUserFacingRunError(errorCode: string): string {
+function toUserFacingRunError(errorCode: string, fallbackMessage?: string): string {
+  const fallback = typeof fallbackMessage === 'string' ? fallbackMessage.trim() : '';
+  if (fallback) {
+    return fallback.length > 240 ? `${fallback.slice(0, 240)}…` : fallback;
+  }
+
   const normalized = errorCode.trim().toLowerCase();
   if (
     normalized === 'provider_quota_exceeded' ||
@@ -204,8 +209,8 @@ export async function runAgentAction(agentId: string, formData: FormData) {
     });
 
     if (!runResponse.ok) {
-      const payload = (await runResponse.json().catch(() => null)) as { error?: string } | null;
-      const message = toUserFacingRunError(payload?.error ?? '');
+      const payload = (await runResponse.json().catch(() => null)) as { error?: string; message?: string } | null;
+      const message = toUserFacingRunError(payload?.error ?? '', payload?.message);
 
       await serverSupabase
         .from('agent_runs')
@@ -229,7 +234,7 @@ export async function runAgentAction(agentId: string, formData: FormData) {
     }
 
     const message = error instanceof Error ? error.message : 'Çalıştırma başlatma hatası.';
-    const safeMessage = toUserFacingRunError(message);
+    const safeMessage = toUserFacingRunError(message, message);
     const isTimeout = message.toLowerCase().includes('timeout') || message.toLowerCase().includes('aborted');
 
     const { data: latestRun } = await serverSupabase
