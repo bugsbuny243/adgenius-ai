@@ -4,7 +4,7 @@ export type KoscheiModelAlias = 'koschei-fast' | 'koschei-deep' | 'koschei-resea
 
 export type AgentRunProfile = {
   alias: KoscheiModelAlias;
-  displayLabel: 'Hızlı mod' | 'Derin analiz modu' | 'Araştırma destekli mod';
+  displayLabel: 'Koschei AI motoru';
   enableResearchMode: boolean;
   maxOutputTokens: number;
   thinkingBudget?: number;
@@ -31,7 +31,7 @@ export type AiRunResult = {
 
 const PROFILE_FAST: AgentRunProfile = {
   alias: 'koschei-fast',
-  displayLabel: 'Hızlı mod',
+  displayLabel: 'Koschei AI motoru',
   enableResearchMode: false,
   maxOutputTokens: 2_048,
   temperature: 0.8
@@ -39,7 +39,7 @@ const PROFILE_FAST: AgentRunProfile = {
 
 const PROFILE_DEEP: AgentRunProfile = {
   alias: 'koschei-deep',
-  displayLabel: 'Derin analiz modu',
+  displayLabel: 'Koschei AI motoru',
   enableResearchMode: false,
   maxOutputTokens: 4_096,
   thinkingBudget: 2_048,
@@ -48,7 +48,7 @@ const PROFILE_DEEP: AgentRunProfile = {
 
 const PROFILE_RESEARCH: AgentRunProfile = {
   alias: 'koschei-research',
-  displayLabel: 'Araştırma destekli mod',
+  displayLabel: 'Koschei AI motoru',
   enableResearchMode: true,
   maxOutputTokens: 4_096,
   thinkingBudget: 1_536,
@@ -91,13 +91,71 @@ function extractUsage(source: unknown): { inputTokens: number | null; outputToke
   };
 }
 
-function extractFallbackTextFromCandidates(source: unknown): string {
-  if (!source || typeof source !== 'object') return '';
-  const candidates = (source as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }).candidates;
-  if (!Array.isArray(candidates) || candidates.length === 0) return '';
-  const parts = candidates[0]?.content?.parts;
+function collectTextParts(parts: unknown): string {
   if (!Array.isArray(parts)) return '';
-  return parts.map((part) => (typeof part.text === 'string' ? part.text : '')).join('').trim();
+
+  return parts
+    .map((part) => {
+      if (!part || typeof part !== 'object') return '';
+      const entry = part as Record<string, unknown>;
+      if (typeof entry.text === 'string') return entry.text;
+      if (typeof entry.inlineData === 'string') return entry.inlineData;
+      return '';
+    })
+    .join('')
+    .trim();
+}
+
+function extractTextFromResponse(source: unknown): string {
+  if (!source || typeof source !== 'object') return '';
+
+  const response = source as Record<string, unknown>;
+
+  if (typeof response.text === 'string' && response.text.trim()) {
+    return response.text.trim();
+  }
+
+  const candidates = Array.isArray(response.candidates) ? response.candidates : [];
+  const candidateText = candidates
+    .map((candidate) => {
+      if (!candidate || typeof candidate !== 'object') return '';
+      const content = (candidate as { content?: { parts?: unknown } }).content;
+      return collectTextParts(content?.parts);
+    })
+    .join('\n')
+    .trim();
+
+  if (candidateText) {
+    return candidateText;
+  }
+
+  const output = collectTextParts(response.output);
+  if (output) {
+    return output;
+  }
+
+  return '';
+}
+
+function normalizeProviderError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error ?? 'run_failed');
+  const normalized = raw.toLowerCase();
+
+  if (
+    normalized.includes('429') ||
+    normalized.includes('resource_exhausted') ||
+    normalized.includes('quota') ||
+    normalized.includes('billing') ||
+    normalized.includes('depleted credits')
+  ) {
+    return 'provider_quota_exceeded';
+  }
+
+  if (normalized.includes('rate limit') || normalized.includes('too many requests')) {
+    return 'provider_rate_limited';
+  }
+
+  return 'provider_error';
 }
 
 function buildConfig(profile: AgentRunProfile, systemPrompt: string | null): Record<string, unknown> {
@@ -128,47 +186,52 @@ async function runInternal(options: RunTextOptions, stream: boolean): Promise<Ai
   const model = resolveServerModel(profile.alias);
   const client = new GoogleGenAI({ apiKey: options.apiKey });
 
-  if (!stream) {
-    const response = await client.models.generateContent({
+  try {
+    if (!stream) {
+      const response = await client.models.generateContent({
+        model,
+        config: buildConfig(profile, options.systemPrompt),
+        contents: options.userInput
+      });
+
+      return {
+        text: extractTextFromResponse(response),
+        alias: profile.alias,
+        displayLabel: profile.displayLabel,
+        usage: extractUsage(response.usageMetadata)
+      };
+    }
+
+    const responseStream = await client.models.generateContentStream({
       model,
       config: buildConfig(profile, options.systemPrompt),
       contents: options.userInput
     });
 
-    const fallbackText = extractFallbackTextFromCandidates(response);
+    let text = '';
+    let usage: { inputTokens: number | null; outputTokens: number | null } = { inputTokens: null, outputTokens: null };
+
+    for await (const chunk of responseStream) {
+      const chunkText = extractTextFromResponse(chunk);
+      if (chunkText) {
+        text += chunkText;
+      }
+      const usageChunk = extractUsage((chunk as { usageMetadata?: unknown }).usageMetadata);
+      usage = {
+        inputTokens: usageChunk.inputTokens ?? usage.inputTokens,
+        outputTokens: usageChunk.outputTokens ?? usage.outputTokens
+      };
+    }
 
     return {
-      text: (response.text ?? fallbackText ?? '').trim(),
+      text: text.trim(),
       alias: profile.alias,
       displayLabel: profile.displayLabel,
-      usage: extractUsage(response.usageMetadata)
+      usage
     };
+  } catch (error) {
+    throw new Error(normalizeProviderError(error));
   }
-
-  const responseStream = await client.models.generateContentStream({
-    model,
-    config: buildConfig(profile, options.systemPrompt),
-    contents: options.userInput
-  });
-
-  let text = '';
-  let usage: { inputTokens: number | null; outputTokens: number | null } = { inputTokens: null, outputTokens: null };
-
-  for await (const chunk of responseStream) {
-    text += chunk.text ?? '';
-    const usageChunk = extractUsage(chunk.usageMetadata);
-    usage = {
-      inputTokens: usageChunk.inputTokens ?? usage.inputTokens,
-      outputTokens: usageChunk.outputTokens ?? usage.outputTokens
-    };
-  }
-
-  return {
-    text: text.trim(),
-    alias: profile.alias,
-    displayLabel: profile.displayLabel,
-    usage
-  };
 }
 
 export async function runTextWithAiEngine(options: RunTextOptions): Promise<AiRunResult> {

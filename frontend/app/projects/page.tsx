@@ -40,8 +40,8 @@ export default async function ProjectsPage() {
     <main>
       <Nav />
       <section className="panel mb-4">
-        <h2 className="mb-2 text-2xl font-semibold">Projects Workflow Board</h2>
-        <p className="mb-4 text-sm text-white/70">Koschei AI proje merkezinde status, brief, revision/delivery notları ve saved output akışını takip edin.</p>
+        <h2 className="mb-2 text-2xl font-semibold">Projeler (ikincil alan)</h2>
+        <p className="mb-4 text-sm text-white/70">Bu alan çekirdek akış dışında kalır. Öncelikle Agentlar ekranından çalışma üretmeniz önerilir.</p>
         <form action={createProjectAction} className="grid gap-3 md:grid-cols-[1fr_2fr_auto]">
           <input name="name" required placeholder="Proje adı" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2" />
           <input name="description" placeholder="Kısa açıklama" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2" />
@@ -84,7 +84,7 @@ export default async function ProjectsPage() {
           </div>
         ) : (
           <div className="rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">
-            <p>Proje bulunmuyor. Yukarıdaki formdan ilk workflow projenizi oluşturun ve agent çıktılarıyla besleyin.</p>
+            <p>Henüz proje yok. İstersen daha sonra proje akışını kullanabilirsin. Önce bir agent çalıştırarak başlamanı öneririz.</p>
           </div>
         )}
       </section>
