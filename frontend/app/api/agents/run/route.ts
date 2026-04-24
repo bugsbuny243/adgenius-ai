@@ -39,7 +39,10 @@ function isQuotaOrBillingFailure(input: string): boolean {
     value.includes('too many requests') ||
     value.includes('resource_exhausted') ||
     value.includes('depleted credits') ||
-    value.includes('billing')
+    value.includes('billing') ||
+    value.includes('rate limit') ||
+    value.includes('insufficient_quota') ||
+    value.includes('quota')
   );
 }
 
@@ -304,10 +307,10 @@ export async function POST(request: Request) {
     SUPABASE_URL: url,
     SUPABASE_ANON_KEY: anonKey,
     SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
-    GEMINI_API_KEY: modelApiKey
+    OPENAI_API_KEY: openAiApiKey
   } = getServerEnv();
 
-  if (!url || !anonKey || !serviceRoleKey || !modelApiKey) {
+  if (!url || !anonKey || !serviceRoleKey || !openAiApiKey) {
     console.error('[agents/run] Required server environment is missing.');
     return NextResponse.json({ ok: false, error: 'missing_environment' }, { status: 500 });
   }
@@ -537,14 +540,14 @@ export async function POST(request: Request) {
     const aiRun = await Promise.race([
       shouldStream
         ? runTextStreamWithAiEngine({
-            apiKey: modelApiKey,
+            apiKey: openAiApiKey,
             agentSlug: agentType.slug,
             agentMode: selectedAgentMode,
             userInput,
             systemPrompt: agentType.system_prompt
           })
         : runTextWithAiEngine({
-            apiKey: modelApiKey,
+            apiKey: openAiApiKey,
             agentSlug: agentType.slug,
             agentMode: selectedAgentMode,
             userInput,
