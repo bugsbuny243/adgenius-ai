@@ -10,6 +10,7 @@ type OwnerShellProps = {
 
 const OWNER_LINKS = [
   { href: '/owner', label: 'Overview' },
+  { href: '/owner/unity', label: 'Unity Bridge' },
   { href: '/owner/ads', label: 'Ads' },
   { href: '/owner/payments', label: 'Payments' },
   { href: '/owner/users', label: 'Users & Projects' },
