@@ -20,16 +20,18 @@ type RunRequestBody = {
 const RUN_TIMEOUT_MS = 40_000;
 const FALLBACK_ENGINE_NAME = 'Koschei AI motoru';
 const QUOTA_ERROR_CODE = 'provider_quota_exceeded';
-const QUOTA_ERROR_MESSAGE = 'AI servis limiti doldu veya proje kredisi bitti. Lütfen billing/quota ayarlarını kontrol edin.';
+const QUOTA_ERROR_MESSAGE = 'Kullanım limiti dolduğu için çalışma başlatılamadı.';
+const RATE_LIMIT_ERROR_CODE = 'provider_rate_limited';
 const MOCK_FALLBACK_FLAG = process.env.MOCK_AI_ON_FAILURE === 'true';
 
 function toRunFailureMessage(input: string): string {
   const code = input.trim().toLowerCase();
   if (code === QUOTA_ERROR_CODE) return QUOTA_ERROR_MESSAGE;
-  if (code === 'run_timeout') return 'Çalıştırma zaman aşımına uğradı.';
-  if (code === 'empty_result') return 'AI motoru boş sonuç döndürdü.';
-  if (code.startsWith('run_update_failed:')) return 'Çalıştırma kaydı güncellenemedi.';
-  return 'Çalıştırma sırasında beklenmeyen bir hata oluştu.';
+  if (code === RATE_LIMIT_ERROR_CODE) return 'Geçici servis yoğunluğu oluştu. Birkaç dakika sonra tekrar deneyin.';
+  if (code === 'run_timeout') return 'Geçici servis yoğunluğu oluştu. Birkaç dakika sonra tekrar deneyin.';
+  if (code === 'empty_result') return 'Çalışma tamamlanamadı. Geçerli bir sonuç üretilemedi.';
+  if (code.startsWith('run_update_failed:')) return 'Çalışma tamamlanamadı. Sonuç kaydı yazılırken sorun oluştu.';
+  return 'Çalışma tamamlanamadı. Lütfen birkaç dakika sonra tekrar deneyin.';
 }
 
 function isQuotaOrBillingFailure(input: string): boolean {
@@ -54,7 +56,9 @@ function normalizeProviderError(input: unknown): string {
   if (normalized === 'run_timeout') return 'run_timeout';
   if (normalized === 'empty_result') return 'empty_result';
   if (normalized.startsWith('run_update_failed:')) return normalized;
-  if (isQuotaOrBillingFailure(normalized)) return QUOTA_ERROR_CODE;
+  if (normalized === RATE_LIMIT_ERROR_CODE) return RATE_LIMIT_ERROR_CODE;
+  if (isQuotaOrBillingFailure(normalized) || normalized === QUOTA_ERROR_CODE) return QUOTA_ERROR_CODE;
+  if (normalized.includes('too many requests') || normalized.includes('rate limit')) return RATE_LIMIT_ERROR_CODE;
   return 'run_failed';
 }
 
@@ -70,13 +74,16 @@ function toSafeRuntimeErrorMessage(input: unknown): string {
     return 'AI motoru boş sonuç döndürdü.';
   }
   if (normalized.startsWith('run_update_failed:')) {
-    return 'Çalıştırma kaydı güncellenemedi.';
+    return 'Çalışma tamamlanamadı. Sonuç kaydı yazılırken sorun oluştu.';
   }
-  if (isQuotaOrBillingFailure(normalized)) {
+  if (isQuotaOrBillingFailure(normalized) || normalized === QUOTA_ERROR_CODE) {
     return QUOTA_ERROR_MESSAGE;
   }
+  if (normalized.includes('too many requests') || normalized.includes('rate limit') || normalized === RATE_LIMIT_ERROR_CODE) {
+    return 'Geçici servis yoğunluğu oluştu. Birkaç dakika sonra tekrar deneyin.';
+  }
 
-  return raw.length > 220 ? `${raw.slice(0, 220)}…` : raw;
+  return 'Çalışma tamamlanamadı. Lütfen birkaç dakika sonra tekrar deneyin.';
 }
 
 function resolveWorkflowFieldsFromMetadata(metadata: unknown): {
@@ -404,7 +411,7 @@ export async function POST(request: Request) {
       .from('agent_runs')
       .update({
         status: 'failed',
-        error_message: `Aylık ${runLimit} çalışma limitinize ulaştınız. Planınızı yükseltin.`,
+        error_message: QUOTA_ERROR_MESSAGE,
         completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
@@ -415,7 +422,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: false,
-      error: `Aylık ${runLimit} çalışma limitinize ulaştınız. Planınızı yükseltin.`,
+      error: QUOTA_ERROR_CODE,
       upgrade: true
     }, { status: 429 });
   }
@@ -475,7 +482,7 @@ export async function POST(request: Request) {
 
   if (run.status === 'failed' && run.error_message) {
     const cachedErrorCode = isQuotaOrBillingFailure(run.error_message) ? QUOTA_ERROR_CODE : 'run_failed';
-    return NextResponse.json({ ok: false, error: cachedErrorCode, message: run.error_message }, { status: 409 });
+    return NextResponse.json({ ok: false, error: cachedErrorCode, message: toRunFailureMessage(cachedErrorCode) }, { status: 409 });
   }
 
   const { data: agentType } = await supabase

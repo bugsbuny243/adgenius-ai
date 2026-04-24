@@ -53,8 +53,8 @@ export default async function ComposerPage() {
     <main>
       <Nav />
       <section className="panel mb-4">
-        <h2 className="mb-1 text-xl font-semibold">Sosyal İçerik Stüdyosu</h2>
-        <p className="mb-3 text-sm text-white/65">İçerik üret, varyantlarını incele ve yayın hazırlık kuyruğuna gönder.</p>
+        <h2 className="mb-1 text-xl font-semibold">Yayın Kuyruğu (ikincil alan)</h2>
+        <p className="mb-3 text-sm text-white/65">Sosyal içerik hazırlığı bu alanda yönetilir. Çekirdek akış için önce Agentlar ekranını kullanın.</p>
         <form action={createContentJobAction} className="space-y-3">
           <label className="block text-sm">
             Proje
@@ -107,7 +107,7 @@ export default async function ComposerPage() {
               ))}
             </div>
           ) : (
-            <div className="rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-white/70">Henüz içerik işi yok. İlk içerik briefinizi oluşturup yayın hazırlık akışını başlatın.</div>
+            <div className="rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-white/70">Henüz yayın kuyruğu yok. Önce sosyal içerik üret.</div>
           )}
         </article>
 
@@ -163,7 +163,7 @@ export default async function ComposerPage() {
             </div>
           ) : (
             <div className="rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-white/70">
-              Kuyruk şu an boş. İçerik üretip platform seçerek gönderiyi “yayın hazırlığında” durumuna alabilirsiniz.
+              Henüz yayın kuyruğu yok. Önce sosyal içerik üret.
             </div>
           )}
         </article>
