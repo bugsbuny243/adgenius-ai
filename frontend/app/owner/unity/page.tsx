@@ -14,7 +14,7 @@ const DEFAULT_PROMPT = 'Create a colorful mobile puzzle game with quick sessions
 
 export default function OwnerUnityBridgePage() {
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
-  const [appName, setAppName] = useState('Koschei Mobile Prototype');
+  const [appName, setAppName] = useState('Koschei Mobile Game');
 
   const selectedTemplate = useMemo(() => selectUnityTemplateForPrompt(prompt), [prompt]);
   const packageName = useMemo(() => normalizePackageName(appName), [appName]);
@@ -31,10 +31,10 @@ export default function OwnerUnityBridgePage() {
     [appName, packageName, prompt, selectedTemplate.slug]
   );
 
-  const mockBuildPayload = useMemo(
+  const buildPayloadPreview = useMemo(
     () =>
       createMockUnityBuildJobPayload({
-        unityGameProjectId: 'mock-project-id',
+        unityGameProjectId: 'plan-project-id',
         appName,
         packageName,
         userPrompt: prompt,
@@ -49,7 +49,7 @@ export default function OwnerUnityBridgePage() {
       <header className="panel">
         <h2 className="text-xl font-semibold">Koschei Unity Bridge</h2>
         <p className="mt-2 text-sm text-white/80">
-          This is a planning layer. Real Unity build execution will run in a separate Unity worker.
+          Unity build hazırlığı bu ekranda planlanır. Build çalıştırma süreci ayrı Unity worker katmanında yürür.
         </p>
       </header>
 
@@ -67,7 +67,7 @@ export default function OwnerUnityBridgePage() {
       </section>
 
       <section className="panel grid gap-3">
-        <h3 className="text-base font-semibold">Mock planner</h3>
+        <h3 className="text-base font-semibold">Unity Build Planı</h3>
         <label className="grid gap-2 text-sm">
           <span>App name</span>
           <input
@@ -102,19 +102,19 @@ export default function OwnerUnityBridgePage() {
               ))}
             </ul>
           ) : (
-            <p className="mt-2 text-emerald-200">Draft validation passed for mock planning payload.</p>
+            <p className="mt-2 text-emerald-200">Taslak doğrulaması tamamlandı. Build payload preview hazır.</p>
           )}
         </div>
       </section>
 
       <section className="panel grid gap-3">
-        <h3 className="text-base font-semibold">Generated game brief (mock)</h3>
+        <h3 className="text-base font-semibold">Generated game brief</h3>
         <pre className="overflow-auto rounded-lg border border-white/10 bg-black/30 p-3 text-xs">{JSON.stringify(gameBrief, null, 2)}</pre>
       </section>
 
       <section className="panel grid gap-3">
-        <h3 className="text-base font-semibold">Mock build job payload</h3>
-        <pre className="overflow-auto rounded-lg border border-white/10 bg-black/30 p-3 text-xs">{JSON.stringify(mockBuildPayload, null, 2)}</pre>
+        <h3 className="text-base font-semibold">Build payload preview</h3>
+        <pre className="overflow-auto rounded-lg border border-white/10 bg-black/30 p-3 text-xs">{JSON.stringify(buildPayloadPreview, null, 2)}</pre>
       </section>
     </section>
   );

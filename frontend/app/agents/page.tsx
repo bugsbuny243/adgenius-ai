@@ -10,19 +10,19 @@ const agents = [
   {
     name: 'Koschei Channel Planner',
     what: 'Video serisi akışı, bölüm başlıkları ve yayın takvimi hazırlar.',
-    status: 'Aktif',
+    status: 'Hazır',
     requirement: 'Kullanıcı onayı gerektirir'
   },
   {
     name: 'Koschei Game Factory',
     what: 'Oyun fikrini görev planına çevirir, build hattı için üretim adımlarını yönetir.',
-    status: 'Beta',
+    status: 'Aktif',
     requirement: 'Build kredisi gerekebilir'
   },
   {
     name: 'Koschei Publisher Assistant',
     what: 'Mağaza açıklamaları, sürüm notu taslakları ve yayın kontrol listesi oluşturur.',
-    status: 'Beta',
+    status: 'Yayın akışı',
     requirement: 'Kullanıcı onayı gerektirir'
   },
   {

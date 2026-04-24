@@ -2,40 +2,22 @@ import { PublicSiteNav } from '@/components/public-site-nav';
 
 const plans = [
   {
-    name: 'Koschei Starter',
+    name: 'Koschei Game Factory',
     price: '499 TL / ay',
-    status: 'Erken Erişim',
-    features: ['Temel ajan kütüphanesi', 'İçerik planlama akışları', 'Görev ve taslak yönetimi']
+    status: 'Aktif',
+    features: ['Prompttan oyun üretimi', 'Unity repo gönderimi', 'Build ve AAB süreci yönetimi']
   },
   {
-    name: 'Koschei Creator',
+    name: 'Koschei Game Factory Pro',
     price: '1.999 TL / ay',
-    status: 'Erken Erişim',
-    features: ['Gelişmiş ajan akışları', 'Yayın hazırlığı araçları', 'Operasyon paneli ve raporlama']
+    status: 'Hazır',
+    features: ['Gelişmiş build kuyruğu', 'Takım bazlı build operasyonu', 'Yayın hazırlığı ve onay yönetimi']
   },
   {
     name: 'Koschei Studio',
     price: '6.999 TL / ay',
-    status: 'Erken Erişim',
+    status: 'Aktif',
     features: ['Takım iş akışları', 'Yoğun üretim süreçleri', 'Öncelikli destek ve yönetim görünümü']
-  },
-  {
-    name: 'Koschei Game Lite',
-    price: '2.999 TL / ay',
-    status: 'Erken Erişim',
-    features: ['Prompttan oyun fikri', 'Template tabanlı üretim', 'Temel build hazırlığı']
-  },
-  {
-    name: 'Koschei Game Factory',
-    price: '14.999 TL / ay',
-    status: 'Erken Erişim',
-    features: ['Genişletilmiş build hattı', 'APK/AAB üretim süreci', 'Yayın öncesi kontrol listeleri']
-  },
-  {
-    name: 'Koschei Game Factory Pro',
-    price: '29.999 TL / ay',
-    status: 'Erken Erişim',
-    features: ['Yüksek hacimli build kuyruğu', 'Takım odaklı oyun üretimi', 'Operasyon ve onay yönetimi']
   }
 ] as const;
 
@@ -47,7 +29,7 @@ export default function PricingPage() {
       <section className="space-y-3">
         <p className="text-sm uppercase tracking-[0.2em] text-lilac">Fiyatlandırma</p>
         <h1 className="text-4xl font-bold">Koschei Planları</h1>
-        <p className="max-w-2xl text-white/75">Tüm paketler erken erişim aşamasında olup ajan kütüphanesi odaklı yapıdadır.</p>
+        <p className="max-w-2xl text-white/75">Paketler üretim odaklı ajan ve oyun workflow süreçleri için hazırlanmıştır.</p>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -71,7 +53,7 @@ export default function PricingPage() {
           <li>Game build işlemleri için build kredisi gereklidir.</li>
           <li>Mağaza ve yayınlama işlemleri kullanıcı onayı gerektirir.</li>
           <li>Platform onayları garanti edilmez.</li>
-          <li>Fiyatlar erken erişim tahminidir.</li>
+          <li>Fiyatlar ürün kapsamına göre güncellenebilir.</li>
         </ul>
       </section>
     </main>
