@@ -98,7 +98,7 @@ export function neutralizeVendorTerms(text: string): string {
     .replace(/gemini(-[a-z0-9.]+)?/gi, 'Koschei AI motoru')
     .replace(/google\s*genai/gi, 'Koschei AI motoru')
     .replace(/openai/gi, 'Koschei AI motoru')
-    .replace(/gpt-?5(\.1|\s*mini|\s*nano)?/gi, 'Koschei AI motoru')
+    .replace(/gpt-?5(\.[0-9]+|\s*mini|\s*nano)?/gi, 'Koschei AI motoru')
     .replace(/google search/gi, 'Araştırma destekli mod')
     .replace(/model\s*:\s*[a-z0-9_.-]+/gi, 'mod: Koschei AI motoru');
 }

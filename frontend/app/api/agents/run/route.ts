@@ -20,18 +20,18 @@ type RunRequestBody = {
 const RUN_TIMEOUT_MS = 40_000;
 const FALLBACK_ENGINE_NAME = 'Koschei AI motoru';
 const QUOTA_ERROR_CODE = 'provider_quota_exceeded';
-const QUOTA_ERROR_MESSAGE = 'Kullanım limiti dolduğu için çalışma başlatılamadı.';
+const QUOTA_ERROR_MESSAGE = 'Kullanım limiti veya kredi durumu nedeniyle çalışma başlatılamadı.';
 const RATE_LIMIT_ERROR_CODE = 'provider_rate_limited';
 const MOCK_FALLBACK_FLAG = process.env.MOCK_AI_ON_FAILURE === 'true';
 
 function toRunFailureMessage(input: string): string {
   const code = input.trim().toLowerCase();
   if (code === QUOTA_ERROR_CODE) return QUOTA_ERROR_MESSAGE;
-  if (code === RATE_LIMIT_ERROR_CODE) return 'Geçici servis yoğunluğu oluştu. Birkaç dakika sonra tekrar deneyin.';
-  if (code === 'run_timeout') return 'Geçici servis yoğunluğu oluştu. Birkaç dakika sonra tekrar deneyin.';
-  if (code === 'empty_result') return 'Çalışma tamamlanamadı. Geçerli bir sonuç üretilemedi.';
-  if (code.startsWith('run_update_failed:')) return 'Çalışma tamamlanamadı. Sonuç kaydı yazılırken sorun oluştu.';
-  return 'Çalışma tamamlanamadı. Lütfen birkaç dakika sonra tekrar deneyin.';
+  if (code === RATE_LIMIT_ERROR_CODE) return 'Geçici servis yoğunluğu oluştu. Lütfen biraz sonra tekrar deneyin.';
+  if (code === 'run_timeout') return 'Geçici servis yoğunluğu oluştu. Lütfen biraz sonra tekrar deneyin.';
+  if (code === 'empty_result') return 'Çalışma tamamlanamadı. Lütfen girdiyi sadeleştirip tekrar deneyin.';
+  if (code.startsWith('run_update_failed:')) return 'Çalışma tamamlandı ancak sonuç kaydı yazılırken sorun oluştu.';
+  return 'Çalışma tamamlanamadı. Lütfen girdiyi sadeleştirip tekrar deneyin.';
 }
 
 function isQuotaOrBillingFailure(input: string): boolean {
@@ -57,6 +57,10 @@ function normalizeProviderError(input: unknown): string {
   if (normalized === 'empty_result') return 'empty_result';
   if (normalized.startsWith('run_update_failed:')) return normalized;
   if (normalized === RATE_LIMIT_ERROR_CODE) return RATE_LIMIT_ERROR_CODE;
+  if (normalized.includes('parse') || normalized.includes('invalid response') || normalized.includes('incomplete')) return 'parse_failure';
+  if (normalized.includes('timed out') || normalized.includes('timeout') || normalized.includes('aborted') || normalized.includes('etimedout')) {
+    return 'run_timeout';
+  }
   if (isQuotaOrBillingFailure(normalized) || normalized === QUOTA_ERROR_CODE) return QUOTA_ERROR_CODE;
   if (normalized.includes('too many requests') || normalized.includes('rate limit')) return RATE_LIMIT_ERROR_CODE;
   return 'run_failed';
@@ -74,16 +78,16 @@ function toSafeRuntimeErrorMessage(input: unknown): string {
     return 'AI motoru boş sonuç döndürdü.';
   }
   if (normalized.startsWith('run_update_failed:')) {
-    return 'Çalışma tamamlanamadı. Sonuç kaydı yazılırken sorun oluştu.';
+    return 'Çalışma tamamlandı ancak sonuç kaydı yazılırken sorun oluştu.';
   }
   if (isQuotaOrBillingFailure(normalized) || normalized === QUOTA_ERROR_CODE) {
     return QUOTA_ERROR_MESSAGE;
   }
   if (normalized.includes('too many requests') || normalized.includes('rate limit') || normalized === RATE_LIMIT_ERROR_CODE) {
-    return 'Geçici servis yoğunluğu oluştu. Birkaç dakika sonra tekrar deneyin.';
+    return 'Geçici servis yoğunluğu oluştu. Lütfen biraz sonra tekrar deneyin.';
   }
 
-  return 'Çalışma tamamlanamadı. Lütfen birkaç dakika sonra tekrar deneyin.';
+  return 'Çalışma tamamlanamadı. Lütfen girdiyi sadeleştirip tekrar deneyin.';
 }
 
 function resolveWorkflowFieldsFromMetadata(metadata: unknown): {
@@ -313,11 +317,10 @@ export async function POST(request: Request) {
   const {
     SUPABASE_URL: url,
     SUPABASE_ANON_KEY: anonKey,
-    SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
-    OPENAI_API_KEY: openAiApiKey
+    SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey
   } = getServerEnv();
 
-  if (!url || !anonKey || !serviceRoleKey || !openAiApiKey) {
+  if (!url || !anonKey || !serviceRoleKey) {
     console.error('[agents/run] Required server environment is missing.');
     return NextResponse.json({ ok: false, error: 'missing_environment' }, { status: 500 });
   }
@@ -547,14 +550,12 @@ export async function POST(request: Request) {
     const aiRun = await Promise.race([
       shouldStream
         ? runTextStreamWithAiEngine({
-            apiKey: openAiApiKey,
             agentSlug: agentType.slug,
             agentMode: selectedAgentMode,
             userInput,
             systemPrompt: agentType.system_prompt
           })
         : runTextWithAiEngine({
-            apiKey: openAiApiKey,
             agentSlug: agentType.slug,
             agentMode: selectedAgentMode,
             userInput,
