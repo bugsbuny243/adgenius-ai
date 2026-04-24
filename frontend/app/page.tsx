@@ -4,8 +4,8 @@ import { PublicSiteNav } from '@/components/public-site-nav';
 const agentLibrary = [
   { name: 'Blogger Agent', desc: 'Blog içeriği, SEO başlığı ve yayın hazırlığı oluşturur.', status: 'Aktif' },
   { name: 'YouTube Channel Planner', desc: 'Video serisi planı, bölüm akışı ve yayın takvimi çıkarır.', status: 'Aktif' },
-  { name: 'Game Factory Lite', desc: 'Oyun fikrini temel görev planına çevirir, hızlı prototip akışı önerir.', status: 'Beta' },
-  { name: 'Play Publisher Assistant', desc: 'Mağaza metinleri, sürüm notları ve yayın öncesi kontrol listesi üretir.', status: 'Beta' },
+  { name: 'Game Factory', desc: 'Prompttan oyun üret, Unity build al, AAB çıktısını yönet.', status: 'Aktif' },
+  { name: 'Play Publisher Assistant', desc: 'Mağaza metinleri, sürüm notları ve yayın öncesi kontrol listesi üretir.', status: 'Yayın akışı' },
   { name: 'Sheets Agent', desc: 'Tablo tabanlı iş takibi, içerik planı ve operasyon listeleri düzenler.', status: 'Aktif' },
   { name: 'Gmail Business Assistant', desc: 'İş e-postalarını taslaklar, yanıt önerileri ve takip aksiyonları hazırlar.', status: 'Aktif' },
   { name: 'SEO / Indexing Agent', desc: 'Teknik SEO kontrolü, başlık önerileri ve indeksleme hazırlığı yapar.', status: 'Yakında' },
@@ -69,7 +69,7 @@ export default function HomePage() {
 
       <section className="rounded-2xl border border-white/10 bg-black/20 p-6 space-y-3">
         <h2 className="text-2xl font-semibold">Game Factory</h2>
-        <p className="text-white/75">Tek panelden fikirden build sürecine kadar oyun üretim hattını yönet.</p>
+        <p className="text-white/75">Prompttan oyun üret, Unity build al, AAB çıktısını yönet.</p>
         <ul className="list-disc space-y-1 pl-5 text-white/75">
           <li>Prompttan oyun fikri</li>
           <li>Template seçimi</li>

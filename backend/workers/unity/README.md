@@ -1,12 +1,12 @@
-# Unity Worker Contract (Foundation)
+# Unity Worker Contract
 
-This folder defines the contract for the first Unity Bridge worker integration.
+This folder defines the contract for Unity Bridge worker integration.
 
-## Non-goals for this phase
+## Scope boundaries
 
 - Unity must **not** run inside Next.js.
-- This foundation does **not** implement real Unity execution yet.
-- This foundation does **not** implement Google Play upload yet.
+- Unity execution is handled by this worker service, separate from the web runtime.
+- Google Play publishing is managed by the release workflow integration layer.
 
 ## Runtime location
 
@@ -38,8 +38,8 @@ The worker will:
 
 ## Artifact handling (future)
 
-- Worker will upload APK/AAB artifacts in a later phase.
-- For this foundation, artifact fields can remain empty or mock-populated.
+- Worker upload süreçlerinde APK/AAB artifact üretimi desteklenir.
+- Artifact alanları üretim çıktısına göre doldurulur; sonuç yoksa alanlar boş kalabilir.
 
 ## Job status and logs
 
