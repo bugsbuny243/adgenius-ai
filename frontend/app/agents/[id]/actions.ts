@@ -53,17 +53,17 @@ function toUserFacingRunError(errorCode: string, fallbackMessage?: string): stri
     normalized.includes('depleted credits') ||
     normalized.includes('billing')
   ) {
-    return 'AI servis limiti doldu veya proje kredisi bitti. Lütfen billing/quota ayarlarını kontrol edin.';
+    return 'Kullanım limiti veya kredi durumu nedeniyle çalışma başlatılamadı.';
   }
   if (errorCode === 'workspace_not_found') return 'Çalışma alanı bulunamadı.';
   if (errorCode === 'agent_not_found') return 'Agent bulunamadı.';
   if (errorCode === 'invalid_payload') return 'Çalıştırma verisi doğrulanamadı.';
   if (errorCode === 'invalid_user' || errorCode === 'missing_token') return 'Oturum doğrulanamadı.';
   if (errorCode === 'run_not_found') return 'Çalıştırma kaydı bulunamadı.';
-  if (errorCode === 'empty_result') return 'AI motoru boş sonuç döndürdü. Lütfen tekrar deneyin.';
-  if (errorCode === 'run_timeout') return 'Çalıştırma zaman aşımına uğradı. Lütfen tekrar deneyin.';
+  if (errorCode === 'empty_result' || errorCode === 'parse_failure') return 'Çalışma tamamlanamadı. Lütfen girdiyi sadeleştirip tekrar deneyin.';
+  if (errorCode === 'run_timeout') return 'Geçici servis yoğunluğu oluştu. Lütfen biraz sonra tekrar deneyin.';
   if (errorCode === 'missing_environment') return 'Sunucu yapılandırması eksik. Lütfen yöneticinizle iletişime geçin.';
-  return 'Çalıştırma sırasında hata oluştu. Lütfen tekrar deneyin.';
+  return 'Çalışma tamamlanamadı. Lütfen girdiyi sadeleştirip tekrar deneyin.';
 }
 
 function isRedirectControlFlowError(error: unknown): boolean {

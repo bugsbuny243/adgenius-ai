@@ -1,8 +1,10 @@
 import OpenAI from 'openai';
+import { getServerEnv } from '@/lib/env';
 
 export type KoscheiModelAlias = 'koschei-fast' | 'koschei-deep' | 'koschei-research';
 
-type OpenAiModelName = 'gpt-5-mini' | 'gpt-5.1' | 'gpt-5-nano';
+type OpenAiModelName = string;
+type ReasoningEffort = NonNullable<AgentRunProfile['reasoningEffort']>;
 
 export type AgentRunProfile = {
   alias: KoscheiModelAlias;
@@ -15,7 +17,6 @@ export type AgentRunProfile = {
 };
 
 type RunTextOptions = {
-  apiKey: string;
   agentSlug: string;
   agentMode?: string | null;
   userInput: string;
@@ -35,29 +36,37 @@ export type AiRunResult = {
 const PROFILE_FAST: AgentRunProfile = {
   alias: 'koschei-fast',
   displayLabel: 'Hızlı mod',
-  model: 'gpt-5-mini',
+  model: process.env.OPENAI_MODEL_FAST?.trim() || 'gpt-5-mini',
   enableResearchMode: false,
   maxOutputTokens: 2_048,
   temperature: 0.8
 };
 
+function resolveReasoningEffort(): ReasoningEffort {
+  const configured = process.env.OPENAI_REASONING_EFFORT?.trim().toLowerCase();
+  if (configured === 'minimal' || configured === 'low' || configured === 'medium' || configured === 'high') {
+    return configured;
+  }
+  return 'medium';
+}
+
 const PROFILE_DEEP: AgentRunProfile = {
   alias: 'koschei-deep',
   displayLabel: 'Derin analiz modu',
-  model: 'gpt-5.1',
+  model: process.env.OPENAI_MODEL_REASONING?.trim() || process.env.OPENAI_MODEL_PRIMARY?.trim() || 'gpt-5.2',
   enableResearchMode: false,
   maxOutputTokens: 4_096,
-  reasoningEffort: 'medium',
+  reasoningEffort: resolveReasoningEffort(),
   temperature: 0.35
 };
 
 const PROFILE_RESEARCH: AgentRunProfile = {
   alias: 'koschei-research',
   displayLabel: 'Araştırma destekli mod',
-  model: 'gpt-5.1',
+  model: process.env.OPENAI_MODEL_REASONING?.trim() || process.env.OPENAI_MODEL_PRIMARY?.trim() || 'gpt-5.2',
   enableResearchMode: true,
   maxOutputTokens: 4_096,
-  reasoningEffort: 'high',
+  reasoningEffort: resolveReasoningEffort(),
   temperature: 0.3
 };
 
@@ -82,13 +91,18 @@ function resolveRunProfile(agentSlug: string, agentMode?: string | null): AgentR
   if (NANO_MODES.has(normalizedMode)) {
     return {
       ...PROFILE_FAST,
-      model: 'gpt-5-nano',
+      model: process.env.OPENAI_MODEL_LIGHT?.trim() || 'gpt-5-nano',
       maxOutputTokens: 800,
       temperature: 0.2
     };
   }
 
   return PROFILE_FAST;
+}
+
+function takeText(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  return value.trim();
 }
 
 function extractOutputText(response: unknown): string {
@@ -98,23 +112,47 @@ function extractOutputText(response: unknown): string {
     output_text?: string;
     output?: Array<{
       type?: string;
+      text?: string;
+      name?: string;
       content?: Array<{ type?: string; text?: string }>;
     }>;
+    content?: Array<{ type?: string; text?: string }>;
   };
 
-  if (typeof source.output_text === 'string' && source.output_text.trim()) {
-    return source.output_text.trim();
+  const fromOutputText = takeText(source.output_text);
+  if (fromOutputText) {
+    return fromOutputText;
   }
 
-  if (!Array.isArray(source.output)) {
-    return '';
+  if (Array.isArray(source.content)) {
+    const contentText = source.content
+      .map((part) => (part.type === 'output_text' || part.type === 'text' ? takeText(part.text) : ''))
+      .filter(Boolean)
+      .join('\n')
+      .trim();
+    if (contentText) return contentText;
   }
 
-  return source.output
-    .flatMap((item) => (Array.isArray(item.content) ? item.content : []))
-    .map((part) => (part.type === 'output_text' || part.type === 'text' ? part.text ?? '' : ''))
-    .join('')
-    .trim();
+  if (!Array.isArray(source.output)) return '';
+
+  const fragments: string[] = [];
+  for (const item of source.output) {
+    if (item.type === 'message' && Array.isArray(item.content)) {
+      for (const part of item.content) {
+        if (part.type === 'output_text' || part.type === 'text') {
+          const text = takeText(part.text);
+          if (text) fragments.push(text);
+        }
+      }
+      continue;
+    }
+    if (item.type === 'output_text' || item.type === 'text') {
+      const text = takeText(item.text);
+      if (text) fragments.push(text);
+    }
+  }
+
+  return fragments.join('\n').trim();
 }
 
 function extractUsage(response: unknown): { inputTokens: number | null; outputTokens: number | null } {
@@ -129,13 +167,22 @@ function extractUsage(response: unknown): { inputTokens: number | null; outputTo
   };
 }
 
-function createOpenAiClient(apiKey: string): OpenAI {
-  return new OpenAI({ apiKey });
+let cachedClient: OpenAI | null = null;
+function getOpenAiClient(): OpenAI {
+  if (cachedClient) return cachedClient;
+  const { OPENAI_API_KEY: apiKey } = getServerEnv();
+  if (!apiKey) throw new Error('missing_openai_key');
+  cachedClient = new OpenAI({ apiKey });
+  return cachedClient;
 }
 
 async function runInternal(options: RunTextOptions): Promise<AiRunResult> {
+  const provider = process.env.AI_PROVIDER?.trim().toLowerCase() || 'openai';
+  if (provider !== 'openai') {
+    throw new Error('unsupported_provider');
+  }
   const profile = resolveRunProfile(options.agentSlug, options.agentMode);
-  const client = createOpenAiClient(options.apiKey);
+  const client = getOpenAiClient();
 
   const response = await client.responses.create({
     model: profile.model,
