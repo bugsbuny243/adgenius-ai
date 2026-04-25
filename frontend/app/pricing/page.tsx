@@ -4,12 +4,7 @@ import { GAME_AGENT_PACKAGES } from '@/lib/game-agent-pricing';
 
 const OTHER_AGENTS = [
   'Blogger Agent',
-  'YouTube Agent',
-  'Research Agent',
-  'Composer Agent',
-  'Mail Agent',
-  'Sheets Agent',
-  'SEO Agent'
+  'YouTube Agent'
 ] as const;
 
 export default function PricingPage() {
@@ -41,7 +36,7 @@ export default function PricingPage() {
           <h2 className="text-2xl font-semibold">Diğer Koschei Ajanları</h2>
           <p className="text-sm text-white/70">Diğer ajanların fiyatlandırması ayrı paketlerle sunulacaktır.</p>
         </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-2">
           {OTHER_AGENTS.map((agent) => (
             <article key={agent} className="rounded-xl border border-white/10 bg-black/30 p-4">
               <h3 className="font-medium text-white">{agent}</h3>
