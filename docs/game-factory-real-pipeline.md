@@ -11,7 +11,8 @@
 - `UNITY_ORG_ID`
 - `UNITY_PROJECT_ID`
 - `UNITY_BUILD_TARGET_ID`
-- `UNITY_API_TOKEN`
+- `UNITY_SERVICE_ACCOUNT_KEY_ID`
+- `UNITY_SERVICE_ACCOUNT_SECRET_KEY`
 - `GOOGLE_PLAY_PACKAGE_NAME`
 - `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64`
 - `GOOGLE_PLAY_DEFAULT_TRACK` (varsayılan: `production`)
@@ -63,6 +64,6 @@
 - `.jks` commit edilmez.
 - Keystore şifreleri commit edilmez.
 - Play service account JSON commit edilmez.
-- Unity API token commit edilmez.
+- Unity service account kimlik bilgileri commit edilmez.
 - Secret değerler loglanmaz.
 - Otomatik yayınlama yapılmaz, yayın için kullanıcı onayı zorunludur.

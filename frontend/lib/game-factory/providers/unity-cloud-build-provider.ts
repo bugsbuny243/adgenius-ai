@@ -10,27 +10,44 @@ export class UnityCloudBuildProvider {
   private readonly env = getServerEnv();
 
   private config() {
-    const { UNITY_ORG_ID, UNITY_PROJECT_ID, UNITY_BUILD_TARGET_ID, UNITY_API_TOKEN } = this.env;
-    if (!UNITY_ORG_ID || !UNITY_PROJECT_ID || !UNITY_BUILD_TARGET_ID || !UNITY_API_TOKEN) {
-      throw new Error('Unity Build Automation yapılandırması eksik. UNITY_ORG_ID, UNITY_PROJECT_ID, UNITY_BUILD_TARGET_ID ve UNITY_API_TOKEN zorunludur.');
+    const {
+      UNITY_ORG_ID,
+      UNITY_PROJECT_ID,
+      UNITY_BUILD_TARGET_ID,
+      UNITY_SERVICE_ACCOUNT_KEY_ID,
+      UNITY_SERVICE_ACCOUNT_SECRET_KEY
+    } = this.env;
+    const missingVars = [
+      !UNITY_ORG_ID ? 'UNITY_ORG_ID' : null,
+      !UNITY_PROJECT_ID ? 'UNITY_PROJECT_ID' : null,
+      !UNITY_BUILD_TARGET_ID ? 'UNITY_BUILD_TARGET_ID' : null,
+      !UNITY_SERVICE_ACCOUNT_KEY_ID ? 'UNITY_SERVICE_ACCOUNT_KEY_ID' : null,
+      !UNITY_SERVICE_ACCOUNT_SECRET_KEY ? 'UNITY_SERVICE_ACCOUNT_SECRET_KEY' : null
+    ].filter((item): item is string => Boolean(item));
+
+    if (missingVars.length > 0) {
+      throw new Error(`Unity Build Automation yapılandırması eksik. Zorunlu ortam değişkenleri: ${missingVars.join(', ')}`);
     }
 
     return {
       orgId: UNITY_ORG_ID,
       projectId: UNITY_PROJECT_ID,
       targetId: UNITY_BUILD_TARGET_ID,
-      token: UNITY_API_TOKEN
+      authorizationHeader: `Basic ${Buffer.from(
+        `${UNITY_SERVICE_ACCOUNT_KEY_ID}:${UNITY_SERVICE_ACCOUNT_SECRET_KEY}`,
+        'utf8'
+      ).toString('base64')}`
     };
   }
 
   async triggerBuild(gameProject: GameProjectRef): Promise<BuildTriggerResult> {
-    const { orgId, projectId, targetId, token } = this.config();
+    const { orgId, projectId, targetId, authorizationHeader } = this.config();
 
     const endpoint = `${UNITY_BASE_URL}/orgs/${orgId}/projects/${projectId}/buildtargets/${targetId}/builds`;
     const resp = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        Authorization: `Basic ${Buffer.from(`${token}:`).toString('base64')}`,
+        Authorization: authorizationHeader,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -54,14 +71,14 @@ export class UnityCloudBuildProvider {
   }
 
   async getBuildStatus(buildJob: BuildJobRef): Promise<BuildStatusResult> {
-    const { orgId, projectId, targetId, token } = this.config();
+    const { orgId, projectId, targetId, authorizationHeader } = this.config();
     if (!buildJob.external_build_id) {
       throw new Error('Unity build durumu sorgulanamıyor: external_build_id kaydı bulunamadı.');
     }
 
     const endpoint = `${UNITY_BASE_URL}/orgs/${orgId}/projects/${projectId}/buildtargets/${targetId}/builds/${buildJob.external_build_id}`;
     const resp = await fetch(endpoint, {
-      headers: { Authorization: `Basic ${Buffer.from(`${token}:`).toString('base64')}` }
+      headers: { Authorization: authorizationHeader }
     });
 
     if (!resp.ok) {
@@ -80,14 +97,14 @@ export class UnityCloudBuildProvider {
   }
 
   async getArtifacts(buildJob: BuildJobRef): Promise<ArtifactResult[]> {
-    const { orgId, projectId, targetId, token } = this.config();
+    const { orgId, projectId, targetId, authorizationHeader } = this.config();
     if (!buildJob.external_build_id) {
       return [];
     }
 
     const endpoint = `${UNITY_BASE_URL}/orgs/${orgId}/projects/${projectId}/buildtargets/${targetId}/builds/${buildJob.external_build_id}/artifacts`;
     const resp = await fetch(endpoint, {
-      headers: { Authorization: `Basic ${Buffer.from(`${token}:`).toString('base64')}` }
+      headers: { Authorization: authorizationHeader }
     });
 
     if (!resp.ok) {
