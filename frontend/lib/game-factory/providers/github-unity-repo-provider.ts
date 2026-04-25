@@ -37,14 +37,52 @@ function hashPrompt(prompt: string) {
   return hash;
 }
 
+function hslToHex(hue: number, saturation: number, lightness: number) {
+  const h = ((hue % 360) + 360) % 360;
+  const s = Math.max(0, Math.min(100, saturation)) / 100;
+  const l = Math.max(0, Math.min(100, lightness)) / 100;
+
+  const chroma = (1 - Math.abs(2 * l - 1)) * s;
+  const hPrime = h / 60;
+  const x = chroma * (1 - Math.abs((hPrime % 2) - 1));
+
+  let r = 0;
+  let g = 0;
+  let b = 0;
+
+  if (hPrime >= 0 && hPrime < 1) {
+    r = chroma;
+    g = x;
+  } else if (hPrime >= 1 && hPrime < 2) {
+    r = x;
+    g = chroma;
+  } else if (hPrime >= 2 && hPrime < 3) {
+    g = chroma;
+    b = x;
+  } else if (hPrime >= 3 && hPrime < 4) {
+    g = x;
+    b = chroma;
+  } else if (hPrime >= 4 && hPrime < 5) {
+    r = x;
+    b = chroma;
+  } else {
+    r = chroma;
+    b = x;
+  }
+
+  const match = l - chroma / 2;
+  const toHex = (value: number) => Math.round((value + match) * 255).toString(16).padStart(2, '0').toUpperCase();
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
 function paletteFromHash(hash: number) {
   const hue = hash % 360;
   const hue2 = (hue + 100) % 360;
   const hue3 = (hue + 200) % 360;
   return {
-    playerColor: `hsl(${hue} 85% 60%)`,
-    groundColor: `hsl(${hue2} 40% 32%)`,
-    obstacleColor: `hsl(${hue3} 75% 52%)`
+    playerColor: hslToHex(hue, 85, 60),
+    groundColor: hslToHex(hue2, 40, 32),
+    obstacleColor: hslToHex(hue3, 75, 52)
   };
 }
 
