@@ -35,20 +35,34 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
         </div>
 
         <div className="grid gap-2 rounded-xl border border-white/10 bg-black/20 p-4 text-sm">
-          <p>App name: {project.product_name || project.name}</p>
-          <p>Package name: {project.package_name}</p>
-          <p>Version: {buildJob?.version_name ?? project.current_version_name} ({buildJob?.version_code ?? project.current_version_code})</p>
-          <p>Release track: {releaseJob?.track ?? project.release_track}</p>
-          <p>Short description: {brief?.store_short_description ?? '-'}</p>
-          <p>Full description: {brief?.store_full_description ?? '-'}</p>
-          <p>AAB artifact: {artifact?.file_url ? <a className="text-neon underline" href={artifact.file_url}>Bağlantı</a> : 'Yok'}</p>
+          <p>Ürün adı: {project.product_name || project.name}</p>
+          <p>Paket adı: {project.package_name}</p>
+          <p>Sürüm: {buildJob?.version_name ?? project.current_version_name} ({buildJob?.version_code ?? project.current_version_code})</p>
+          <p>Yayın kanalı: {releaseJob?.track ?? project.release_track}</p>
+          <p>Kısa açıklama: {brief?.store_short_description ?? '-'}</p>
+          <p>Detaylı açıklama: {brief?.store_full_description ?? '-'}</p>
+          <p>
+            AAB:{' '}
+            {artifact?.file_url ? (
+              <span>
+                AAB oluşturuldu ·{' '}
+                <a className="text-neon underline" href={artifact.file_url}>
+                  AAB indir
+                </a>
+              </span>
+            ) : (
+              'Yok'
+            )}
+          </p>
         </div>
 
         <form action={updateReleaseNotesAction.bind(null, id)} className="space-y-2">
-          <label className="block text-sm">Release notes</label>
+          <label className="block text-sm">Yayın notları</label>
           <textarea name="release_notes" rows={6} defaultValue={releaseJob?.release_notes ?? brief?.release_notes ?? ''} className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" />
           <button className="rounded-lg border border-white/20 px-3 py-2 text-sm">Notları kaydet</button>
         </form>
+
+        <p className="text-sm text-white/80">Kullanıcı onayı gerekli.</p>
 
         <form action={publishReleaseAction.bind(null, id)} className="space-y-2">
           <PublishButton label="Yayınla" />

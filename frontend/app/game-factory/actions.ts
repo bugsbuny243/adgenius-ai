@@ -306,6 +306,10 @@ export async function publishReleaseAction(projectId: string, formData: FormData
     throw new Error('Yayın için gerekli release kaydı veya AAB artifact bulunamadı.');
   }
 
+  if (releaseJob.status === 'awaiting_user_approval' || releaseJob.status === 'draft') {
+    throw new Error('Kullanıcı onayı gerekli.');
+  }
+
   await supabase.from('game_projects').update({ status: 'publishing' }).eq('id', project.id).eq('user_id', user.id);
   await supabase.from('game_release_jobs').update({ status: 'uploading', submitted_at: new Date().toISOString() }).eq('id', releaseJob.id);
 
@@ -322,7 +326,12 @@ export async function publishReleaseAction(projectId: string, formData: FormData
   if (result.status === 'published') {
     await supabase
       .from('game_release_jobs')
-      .update({ status: 'published', edit_id: result.editId ?? null, completed_at: new Date().toISOString(), error_message: null })
+      .update({
+        status: 'published',
+        edit_id: result.editId ?? null,
+        completed_at: new Date().toISOString(),
+        error_message: null
+      })
       .eq('id', releaseJob.id);
     await supabase.from('game_projects').update({ status: 'published' }).eq('id', project.id).eq('user_id', user.id);
   } else {

@@ -11,7 +11,7 @@ export function PublishButton({ label = 'Yayınla' }: { label?: string }) {
       <button
         type="submit"
         onClick={(event) => {
-          const ok = window.confirm('Bu işlem seçili paketi yayın kanalına gönderecek. Devam etmek istiyor musunuz?');
+          const ok = window.confirm('Kullanıcı onayı gerekli. Bu işlem seçili paketi yayın kanalına gönderecek. Devam etmek istiyor musunuz?');
           if (!ok) {
             event.preventDefault();
             if (inputRef.current) inputRef.current.value = 'no';

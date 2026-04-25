@@ -6,15 +6,15 @@ export default function NewGameFactoryPage() {
     <main>
       <Nav />
       <section className="panel space-y-4">
-        <h1 className="text-3xl font-bold">Yeni oyun oluştur</h1>
+        <h1 className="text-3xl font-bold">Game Factory · Oyun üret</h1>
         <form action={createGameProjectAction} className="grid gap-3 md:grid-cols-2">
           <label className="space-y-1">
-            <span className="text-sm">Game name</span>
+            <span className="text-sm">Oyun adı</span>
             <input name="name" required className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" />
           </label>
 
           <label className="space-y-1">
-            <span className="text-sm">Game type</span>
+            <span className="text-sm">Oyun türü</span>
             <select name="game_type" className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2">
               <option value="runner_2d">runner_2d</option>
               <option value="puzzle">puzzle</option>
@@ -26,23 +26,23 @@ export default function NewGameFactoryPage() {
           </label>
 
           <label className="space-y-1 md:col-span-2">
-            <span className="text-sm">Package name</span>
-            <input name="package_name" placeholder="com.koschei.generated.ornek" className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" />
+            <span className="text-sm">Paket adı (ör. com.koschei.generated.ornek)</span>
+            <input name="package_name" className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" />
           </label>
 
           <label className="space-y-1 md:col-span-2">
-            <span className="text-sm">Prompt</span>
+            <span className="text-sm">Üretim promptu</span>
             <textarea name="prompt" required rows={5} className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" />
           </label>
 
           <label className="space-y-1">
-            <span className="text-sm">Target platform</span>
+            <span className="text-sm">Hedef platform</span>
             <input value="Android" readOnly className="w-full rounded-lg border border-white/20 bg-black/20 px-3 py-2" />
           </label>
 
           <div className="flex items-end">
             <button type="submit" className="rounded-lg bg-neon px-4 py-2 font-semibold text-ink">
-              Oluştur
+              Oyun üret
             </button>
           </div>
         </form>

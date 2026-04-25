@@ -33,8 +33,8 @@ export default async function GameFactoryBuildsPage({ params }: { params: Promis
           <table className="min-w-full text-sm">
             <thead className="bg-black/30 text-left">
               <tr>
-                <th className="px-3 py-2">Version</th>
-                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Sürüm</th>
+                <th className="px-3 py-2">Durum</th>
                 <th className="px-3 py-2">Branch</th>
                 <th className="px-3 py-2">Commit SHA</th>
                 <th className="px-3 py-2">Başlangıç</th>
@@ -53,7 +53,7 @@ export default async function GameFactoryBuildsPage({ params }: { params: Promis
                   <td className="px-3 py-2">{build.commit_sha ?? '-'}</td>
                   <td className="px-3 py-2">{build.started_at ? new Date(build.started_at).toLocaleString('tr-TR') : '-'}</td>
                   <td className="px-3 py-2">{build.finished_at ? new Date(build.finished_at).toLocaleString('tr-TR') : '-'}</td>
-                  <td className="px-3 py-2">{build.artifact_url ? <a href={build.artifact_url} target="_blank" rel="noreferrer" className="text-neon underline">Bağlantı</a> : '-'}</td>
+                  <td className="px-3 py-2">{build.artifact_url ? <a href={build.artifact_url} target="_blank" rel="noreferrer" className="text-neon underline">AAB indir</a> : '-'}</td>
                   <td className="px-3 py-2">{build.logs_url ? <a href={build.logs_url} target="_blank" rel="noreferrer" className="text-neon underline">Bağlantı</a> : '-'}</td>
                   <td className="px-3 py-2">{build.error_message ?? '-'}</td>
                 </tr>
