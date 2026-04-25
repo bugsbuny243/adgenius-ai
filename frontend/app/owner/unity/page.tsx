@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import {
   UNITY_TEMPLATE_SEEDS,
-  createMockUnityBuildJobPayload,
+  createUnityBuildJobPayload,
   createUnityGameBriefFromPrompt,
   normalizePackageName,
   selectUnityTemplateForPrompt,
@@ -33,8 +33,8 @@ export default function OwnerUnityBridgePage() {
 
   const buildPayloadPreview = useMemo(
     () =>
-      createMockUnityBuildJobPayload({
-        unityGameProjectId: 'plan-project-id',
+      createUnityBuildJobPayload({
+        unityGameProjectId: 'production-project-id',
         appName,
         packageName,
         userPrompt: prompt,
@@ -49,7 +49,7 @@ export default function OwnerUnityBridgePage() {
       <header className="panel">
         <h2 className="text-xl font-semibold">Koschei Unity Bridge</h2>
         <p className="mt-2 text-sm text-white/80">
-          Unity build hazırlığı bu ekranda planlanır. Build çalıştırma süreci ayrı Unity worker katmanında yürür.
+          Unity build hazırlığı bu ekranda yönetilir. Build çalıştırma süreci Unity worker katmanında yürür.
         </p>
       </header>
 
@@ -67,14 +67,13 @@ export default function OwnerUnityBridgePage() {
       </section>
 
       <section className="panel grid gap-3">
-        <h3 className="text-base font-semibold">Unity Build Planı</h3>
+        <h3 className="text-base font-semibold">Unity Build Akışı</h3>
         <label className="grid gap-2 text-sm">
           <span>App name</span>
           <input
             value={appName}
             onChange={(event) => setAppName(event.target.value)}
             className="rounded-lg border border-white/15 bg-black/20 px-3 py-2"
-            placeholder="My Koschei Game"
           />
         </label>
         <label className="grid gap-2 text-sm">
@@ -84,7 +83,6 @@ export default function OwnerUnityBridgePage() {
             onChange={(event) => setPrompt(event.target.value)}
             rows={6}
             className="rounded-lg border border-white/15 bg-black/20 px-3 py-2"
-            placeholder="Describe the game concept"
           />
         </label>
 
@@ -102,7 +100,7 @@ export default function OwnerUnityBridgePage() {
               ))}
             </ul>
           ) : (
-            <p className="mt-2 text-emerald-200">Taslak doğrulaması tamamlandı. Build payload preview hazır.</p>
+            <p className="mt-2 text-emerald-200">Taslak doğrulaması tamamlandı. Build payload hazır.</p>
           )}
         </div>
       </section>
@@ -113,7 +111,7 @@ export default function OwnerUnityBridgePage() {
       </section>
 
       <section className="panel grid gap-3">
-        <h3 className="text-base font-semibold">Build payload preview</h3>
+        <h3 className="text-base font-semibold">Build payload</h3>
         <pre className="overflow-auto rounded-lg border border-white/10 bg-black/30 p-3 text-xs">{JSON.stringify(buildPayloadPreview, null, 2)}</pre>
       </section>
     </section>

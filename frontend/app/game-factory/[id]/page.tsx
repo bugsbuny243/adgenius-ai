@@ -33,12 +33,13 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
   } = await supabase.auth.getUser();
   if (!user) redirect('/signin');
 
-  const [{ data: project }, { data: brief }, { data: buildJob }, { data: artifact }, { data: releaseJob }] = await Promise.all([
+  const [{ data: project }, { data: brief }, { data: buildJob }, { data: artifact }, { data: releaseJob }, { data: integrations }] = await Promise.all([
     supabase.from('game_projects').select('*').eq('id', id).eq('user_id', user.id).maybeSingle(),
     supabase.from('game_briefs').select('*').eq('game_project_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('game_build_jobs').select('*').eq('game_project_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('game_artifacts').select('*').eq('game_project_id', id).eq('artifact_type', 'aab').order('created_at', { ascending: false }).limit(1).maybeSingle(),
-    supabase.from('game_release_jobs').select('*').eq('game_project_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle()
+    supabase.from('game_release_jobs').select('*').eq('game_project_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    supabase.from('user_integrations').select('id').eq('user_id', user.id).eq('provider', 'google_play').limit(1)
   ]);
 
   if (!project) notFound();
@@ -55,6 +56,7 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
           <div className="flex gap-2">
             <Link href={`/game-factory/${id}/builds`} className="rounded-lg border border-white/20 px-3 py-2 text-sm">Build geçmişi</Link>
             <Link href={`/game-factory/${id}/release`} className="rounded-lg border border-white/20 px-3 py-2 text-sm">Yayın</Link>
+            <Link href={`/game-factory/${id}/settings`} className="rounded-lg border border-white/20 px-3 py-2 text-sm">Ayarlar</Link>
           </div>
         </div>
 
@@ -114,9 +116,16 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
           </Card>
 
           <Card title="7. Publish">
-            <form action={publishReleaseAction.bind(null, id)} className="flex items-center gap-2">
-              <PublishButton />
-            </form>
+            {(integrations ?? []).length === 0 ? (
+              <div className="space-y-2 text-sm text-amber-100">
+                <p>Yayınlamak için Google Play bağlantısı gerekli.</p>
+                <Link href="/settings/integrations/google-play" className="inline-flex rounded-lg border border-amber-200/60 px-3 py-2 text-xs">Google Play hesabını bağla</Link>
+              </div>
+            ) : (
+              <form action={publishReleaseAction.bind(null, id)} className="flex items-center gap-2">
+                <PublishButton />
+              </form>
+            )}
             {releaseJob?.status === 'blocked_by_platform_requirement' ? (
               <p className="mt-2 text-sm text-yellow-300">Platform gereksinimi nedeniyle durduruldu: {releaseJob.error_message}</p>
             ) : null}

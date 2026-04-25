@@ -3,17 +3,20 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { tryParseEncryptedCredentials, decryptCredentials } from '@/lib/credentials-encryption';
 import { GitHubUnityRepoProvider } from '@/lib/game-factory/providers/github-unity-repo-provider';
 import { UnityCloudBuildProvider } from '@/lib/game-factory/providers/unity-cloud-build-provider';
 import { GooglePlayPublisherProvider } from '@/lib/game-factory/providers/google-play-publisher-provider';
 
 function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-') || 'oyun';
+  return (
+    value
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-') || 'oyun'
+  );
 }
 
 async function getCurrentUser() {
@@ -251,7 +254,8 @@ export async function prepareReleaseAction(projectId: string) {
     version_code: buildJob?.version_code ?? project.current_version_code,
     version_name: buildJob?.version_name ?? project.current_version_name,
     release_name: `${project.name} ${project.current_version_name}`,
-    release_notes: brief?.release_notes ?? 'Yayın hazırlığı oluşturuldu.'
+    release_notes: brief?.release_notes ?? 'Yayın hazırlığı oluşturuldu.',
+    user_approved_at: null
   });
 
   await supabase.from('game_projects').update({ status: 'release_ready' }).eq('id', project.id).eq('user_id', user.id);
@@ -267,9 +271,42 @@ export async function approveReleaseAction(projectId: string) {
 
   await supabase
     .from('game_release_jobs')
-    .update({ status: 'preparing' })
+    .update({ status: 'preparing', user_approved_at: new Date().toISOString() })
     .eq('game_project_id', project.id)
     .eq('status', 'awaiting_user_approval');
+
+  revalidatePath(`/game-factory/${project.id}`);
+  revalidatePath(`/game-factory/${project.id}/release`);
+}
+
+export async function setProjectGooglePlayIntegrationAction(projectId: string, formData: FormData) {
+  const { supabase, user } = await getCurrentUser();
+  const project = await getOwnedProject(projectId, user.id);
+  if (!project) return;
+
+  const integrationId = String(formData.get('google_play_integration_id') ?? '').trim();
+  if (!integrationId) return;
+
+  const { data: integration } = await supabase
+    .from('user_integrations')
+    .select('id, default_track')
+    .eq('id', integrationId)
+    .eq('user_id', user.id)
+    .eq('provider', 'google_play')
+    .maybeSingle();
+
+  if (!integration) {
+    throw new Error('Seçilen Google Play bağlantısı bulunamadı.');
+  }
+
+  await supabase
+    .from('game_projects')
+    .update({
+      google_play_integration_id: integration.id,
+      release_track: integration.default_track ?? project.release_track
+    })
+    .eq('id', project.id)
+    .eq('user_id', user.id);
 
   revalidatePath(`/game-factory/${project.id}`);
   revalidatePath(`/game-factory/${project.id}/release`);
@@ -278,7 +315,7 @@ export async function approveReleaseAction(projectId: string) {
 export async function publishReleaseAction(projectId: string, formData: FormData) {
   const confirmation = String(formData.get('confirm_publish') ?? 'no');
   if (confirmation !== 'yes') {
-    throw new Error('Kullanıcı onayı gerekli.');
+    throw new Error('Yayın işlemi için onay kutusu doğrulanmalıdır.');
   }
 
   const { supabase, user } = await getCurrentUser();
@@ -306,19 +343,46 @@ export async function publishReleaseAction(projectId: string, formData: FormData
     throw new Error('Yayın için gerekli release kaydı veya AAB artifact bulunamadı.');
   }
 
-  if (releaseJob.status === 'awaiting_user_approval' || releaseJob.status === 'draft') {
-    throw new Error('Kullanıcı onayı gerekli.');
+  if (!releaseJob.user_approved_at) {
+    throw new Error('Yayın için önce kullanıcı onayı verilmelidir.');
   }
 
+  if (!project.google_play_integration_id) {
+    throw new Error('Yayınlamak için Google Play bağlantısı gerekli.');
+  }
+
+  const { data: integration } = await supabase
+    .from('user_integrations')
+    .select('id, encrypted_credentials, default_track, status')
+    .eq('id', project.google_play_integration_id)
+    .eq('user_id', user.id)
+    .eq('provider', 'google_play')
+    .maybeSingle();
+
+  if (!integration || integration.status !== 'connected') {
+    throw new Error('Seçili Google Play bağlantısı kullanılamıyor.');
+  }
+
+  const encryptedPayload = tryParseEncryptedCredentials(integration.encrypted_credentials);
+  if (!encryptedPayload) {
+    throw new Error('Google Play kimlik bilgileri çözümlenemedi.');
+  }
+
+  const serviceAccountJson = decryptCredentials(encryptedPayload);
+
   await supabase.from('game_projects').update({ status: 'publishing' }).eq('id', project.id).eq('user_id', user.id);
-  await supabase.from('game_release_jobs').update({ status: 'uploading', submitted_at: new Date().toISOString() }).eq('id', releaseJob.id);
+  await supabase
+    .from('game_release_jobs')
+    .update({ status: 'uploading', submitted_at: new Date().toISOString(), track: releaseJob.track || integration.default_track || project.release_track })
+    .eq('id', releaseJob.id);
 
   const provider = new GooglePlayPublisherProvider();
   const result = await provider.publishRelease({
     packageName: project.package_name,
-    track: releaseJob.track,
+    track: releaseJob.track || integration.default_track || project.release_track,
     releaseNotes: releaseJob.release_notes ?? 'Game Factory yayın güncellemesi',
     aabFileUrl: artifact.file_url,
+    serviceAccountJson,
     versionCode: releaseJob.version_code,
     versionName: releaseJob.version_name
   });
