@@ -13,15 +13,17 @@ import { AgentEditorRenderer } from './AgentEditorRenderer';
 type AgentEditorShellProps = {
   agentSlug: string;
   projects: Array<{ id: string; name: string }>;
+  knowledgeSources?: Array<{ id: string; title: string }>;
   runAction: (formData: FormData) => void;
   initialMetadata?: EditorMetadata;
 };
 
-export function AgentEditorShell({ agentSlug, projects, runAction, initialMetadata }: AgentEditorShellProps) {
+export function AgentEditorShell({ agentSlug, projects, knowledgeSources = [], runAction, initialMetadata }: AgentEditorShellProps) {
   const config = useMemo(() => getAgentEditorConfig(agentSlug), [agentSlug]);
   const [editorState, setEditorState] = useState<EditorState>(initialMetadata?.editorState ?? {});
   const [freeNotes, setFreeNotes] = useState(initialMetadata?.freeNotes ?? '');
   const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [selectedKnowledgeIds, setSelectedKnowledgeIds] = useState<string[]>([]);
   const [isPending, startTransition] = useTransition();
 
   const storageKey = `agent-editor-v5:${agentSlug}`;
@@ -46,7 +48,15 @@ export function AgentEditorShell({ agentSlug, projects, runAction, initialMetada
     window.localStorage.setItem(storageKey, JSON.stringify({ editorState, freeNotes, selectedProjectId }));
   }, [editorState, freeNotes, selectedProjectId, storageKey]);
 
-  const derivedPrompt = useMemo(() => buildDerivedPrompt(config, editorState, freeNotes), [config, editorState, freeNotes]);
+  const derivedPrompt = useMemo(() => {
+    const basePrompt = buildDerivedPrompt(config, editorState, freeNotes);
+    const knowledgeLines = selectedKnowledgeIds
+      .map((id) => knowledgeSources.find((item) => item.id === id))
+      .filter((item): item is { id: string; title: string } => Boolean(item))
+      .map((item) => `- [${item.id}] ${item.title}`);
+
+    return knowledgeLines.length > 0 ? `${basePrompt}\n\nBilgi kaynakları:\n${knowledgeLines.join('\n')}` : basePrompt;
+  }, [config, editorState, freeNotes, selectedKnowledgeIds, knowledgeSources]);
 
   const handleFieldChange = (key: string, value: string | boolean) => {
     setEditorState((current) => ({ ...current, [key]: value }));
@@ -63,6 +73,7 @@ export function AgentEditorShell({ agentSlug, projects, runAction, initialMetada
       <input type="hidden" name="derived_prompt" value={derivedPrompt} readOnly />
       <input type="hidden" name="editor_state" value={JSON.stringify(editorState)} readOnly />
       <input type="hidden" name="project_id" value={selectedProjectId} readOnly />
+      <input type="hidden" name="knowledge_source_ids" value={selectedKnowledgeIds.join(',')} readOnly />
 
       <div className="rounded-xl border border-white/10 bg-black/20 p-4">
         <h3 className="text-lg font-semibold text-white">{config.title}</h3>
@@ -82,6 +93,27 @@ export function AgentEditorShell({ agentSlug, projects, runAction, initialMetada
       </div>
 
       <AgentEditorRenderer config={config} state={editorState} onChange={handleFieldChange} />
+      {knowledgeSources.length > 0 ? (
+        <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+          <p className="mb-2 text-sm font-medium text-white/80">Bilgi kaynakları</p>
+          <div className="grid gap-2 text-sm">
+            {knowledgeSources.map((source) => (
+              <label key={source.id} className="flex items-start gap-2 rounded-md border border-white/10 bg-black/20 px-2 py-1.5">
+                <input
+                  type="checkbox"
+                  checked={selectedKnowledgeIds.includes(source.id)}
+                  onChange={(event) =>
+                    setSelectedKnowledgeIds((current) =>
+                      event.target.checked ? Array.from(new Set([...current, source.id])) : current.filter((id) => id !== source.id)
+                    )
+                  }
+                />
+                <span>{source.title}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="rounded-xl border border-white/10 bg-black/20 p-4">
         <label className="mb-1 block text-sm font-medium text-white/80">Ek notlar</label>

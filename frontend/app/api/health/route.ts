@@ -3,23 +3,17 @@ import { getEnvDiagnostics } from '@/lib/env';
 
 export async function GET() {
   const diagnostics = getEnvDiagnostics();
+  const groups = diagnostics.groupReadiness;
+  const supabaseReady = groups.supabase;
 
   return NextResponse.json({
+    ok: groups.core && supabaseReady,
     app: 'up',
-    environment: {
-      public: {
-        ready: diagnostics.publicReady,
-        missingCount: diagnostics.missingPublicEnv.length
-      },
-      server: {
-        ready: diagnostics.serverReady,
-        missingCount: diagnostics.missingServerEnv.length
-      }
-    },
-    supabase: {
-      browserClientReady: diagnostics.publicReady,
-      serverClientReady: Boolean(diagnostics.serverEnv.SUPABASE_URL && diagnostics.serverEnv.SUPABASE_ANON_KEY),
-      ready: diagnostics.publicReady && Boolean(diagnostics.serverEnv.SUPABASE_URL && diagnostics.serverEnv.SUPABASE_ANON_KEY)
-    }
+    environment: groups,
+    supabase: supabaseReady,
+    githubUnityConfigured: groups.githubUnity,
+    unityBuildConfigured: groups.unityBuild,
+    googleOAuthConfigured: groups.googleOAuth,
+    googlePlayEncryptionConfigured: groups.googlePlayEncryption
   });
 }

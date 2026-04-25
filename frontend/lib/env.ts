@@ -88,14 +88,32 @@ export function getEnvDiagnostics() {
 
   const missingPublicEnv = PUBLIC_ENV_KEYS.filter((key) => !publicEnv[key]);
   const missingServerEnv = isServerRuntime ? SERVER_ENV_KEYS.filter((key) => !serverEnv[key]) : [];
+  const publicReady = missingPublicEnv.length === 0;
+
+  const groupReadiness = {
+    core: hasValue(serverEnv.APP_ORIGIN ?? undefined),
+    supabase: publicReady && Boolean(serverEnv.SUPABASE_URL && serverEnv.SUPABASE_ANON_KEY && serverEnv.SUPABASE_SERVICE_ROLE_KEY),
+    ai: Boolean(serverEnv.AI_PROVIDER && serverEnv.OPENAI_API_KEY),
+    githubUnity: Boolean(serverEnv.GITHUB_UNITY_REPO_OWNER && serverEnv.GITHUB_UNITY_REPO_NAME && serverEnv.GITHUB_UNITY_REPO_TOKEN),
+    unityBuild: Boolean(
+      serverEnv.UNITY_ORG_ID &&
+        serverEnv.UNITY_PROJECT_ID &&
+        serverEnv.UNITY_BUILD_TARGET_ID &&
+        serverEnv.UNITY_SERVICE_ACCOUNT_KEY_ID &&
+        serverEnv.UNITY_SERVICE_ACCOUNT_SECRET_KEY
+    ),
+    googleOAuth: Boolean(serverEnv.GOOGLE_CLIENT_ID && serverEnv.GOOGLE_CLIENT_SECRET && serverEnv.GOOGLE_REDIRECT_URI),
+    googlePlayEncryption: Boolean(serverEnv.KOSCHEI_CREDENTIALS_ENCRYPTION_KEY)
+  };
 
   return {
     publicEnv,
     serverEnv,
     missingPublicEnv,
     missingServerEnv,
-    publicReady: missingPublicEnv.length === 0,
-    serverReady: isServerRuntime ? missingServerEnv.length === 0 : true
+    publicReady,
+    serverReady: isServerRuntime ? missingServerEnv.length === 0 : true,
+    groupReadiness
   };
 }
 

@@ -5,7 +5,7 @@ export const tiktokConnector: ConnectorAdapter = {
     return {
       platform: 'tiktok',
       state: 'not_connected',
-      label: 'Bağlanmadı',
+      label: 'Bağlantı gerekli',
       connectedAt: null
     };
   },

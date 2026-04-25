@@ -1,20 +1,20 @@
-export type QueueStatus = 'draft' | 'queued' | 'processing' | 'published' | 'failed' | string | null;
+export type QueueStatus = 'queued' | 'preparing' | 'waiting_for_approval' | 'published' | 'failed' | 'draft' | 'processing' | string | null;
 
 export function toQueueStatusLabel(status: QueueStatus): string {
   if (!status) return 'Durum bilinmiyor';
-  if (status === 'draft') return 'Taslak';
   if (status === 'queued') return 'Sıraya alındı';
-  if (status === 'processing') return 'İşleniyor';
-  if (status === 'published') return 'Yayın hazırlığında';
+  if (status === 'preparing' || status === 'processing') return 'Hazırlanıyor';
+  if (status === 'waiting_for_approval' || status === 'draft') return 'Onay bekliyor';
+  if (status === 'published') return 'Yayınlandı';
   if (status === 'failed') return 'Başarısız';
   return status;
 }
 
 export function toQueueStateHint(status: QueueStatus): string {
-  if (status === 'draft') return 'Gönderime hazır';
-  if (status === 'queued') return 'Yayın hazırlığında';
-  if (status === 'processing') return 'İşlem sürüyor';
-  if (status === 'published') return 'Yayın hazırlığında';
+  if (status === 'queued') return 'Sırada';
+  if (status === 'preparing' || status === 'processing') return 'Manuel yayın hazırlığı sürüyor';
+  if (status === 'waiting_for_approval' || status === 'draft') return 'Kullanıcı onayı bekleniyor';
+  if (status === 'published') return 'Yayın hedefi tamamlandı';
   if (status === 'failed') return 'Tekrar denenebilir';
   return 'Durum bilgisi sınırlı';
 }
