@@ -4,6 +4,7 @@ type GameProjectRef = {
   id: string;
   name: string;
   slug: string;
+  game_type?: string | null;
   package_name: string;
   unity_branch: string | null;
   current_version_code: number;
@@ -15,6 +16,7 @@ type GameBriefRef = {
   generated_summary: string | null;
   store_short_description: string | null;
   store_full_description: string | null;
+  release_notes?: string | null;
 };
 
 type GeneratedUnityFile = { path: string; content: string };
@@ -25,6 +27,31 @@ function assertSafePath(path: string) {
   if (BLOCKED_PATTERNS.some((pattern) => pattern.test(path))) {
     throw new Error(`Güvenlik nedeniyle bu dosya yolu güncellenemez: ${path}`);
   }
+}
+
+function hashPrompt(prompt: string) {
+  let hash = 0;
+  for (let index = 0; index < prompt.length; index += 1) {
+    hash = (hash * 31 + prompt.charCodeAt(index)) >>> 0;
+  }
+  return hash;
+}
+
+function paletteFromHash(hash: number) {
+  const hue = hash % 360;
+  const hue2 = (hue + 100) % 360;
+  const hue3 = (hue + 200) % 360;
+  return {
+    playerColor: `hsl(${hue} 85% 60%)`,
+    groundColor: `hsl(${hue2} 40% 32%)`,
+    obstacleColor: `hsl(${hue3} 75% 52%)`
+  };
+}
+
+function summarizePrompt(prompt: string) {
+  const normalized = prompt.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= 140) return normalized;
+  return `${normalized.slice(0, 137)}...`;
 }
 
 export class GitHubUnityRepoProvider {
@@ -45,6 +72,57 @@ export class GitHubUnityRepoProvider {
 
   async generateUnityProjectFiles(gameProject: GameProjectRef, gameBrief: GameBriefRef): Promise<GeneratedUnityFile[]> {
     const summary = gameBrief.generated_summary || gameBrief.prompt;
+    const promptSummary = summarizePrompt(summary);
+    const hashed = hashPrompt(gameBrief.prompt);
+    const palette = paletteFromHash(hashed);
+    const speedMultiplier = Number((1 + (hashed % 40) / 100).toFixed(2));
+    const jumpForce = 6 + (hashed % 5);
+    const config = {
+      gameTitle: gameProject.name,
+      packageName: gameProject.package_name,
+      gameType: gameProject.game_type || 'runner_2d',
+      promptSummary,
+      playerColor: palette.playerColor,
+      groundColor: palette.groundColor,
+      obstacleColor: palette.obstacleColor,
+      speedMultiplier,
+      jumpForce,
+      scoreLabel: 'Skor',
+      releaseVersion: `${gameProject.current_version_name}+${gameProject.current_version_code}`
+    };
+    const csConfig = `using System;
+using UnityEngine;
+
+namespace Koschei.Generated
+{
+    [Serializable]
+    public class KoscheiGeneratedGameConfig
+    {
+        public string gameTitle = ${JSON.stringify(config.gameTitle)};
+        public string packageName = ${JSON.stringify(config.packageName)};
+        public string gameType = ${JSON.stringify(config.gameType)};
+        public string promptSummary = ${JSON.stringify(config.promptSummary)};
+        public string playerColor = ${JSON.stringify(config.playerColor)};
+        public string groundColor = ${JSON.stringify(config.groundColor)};
+        public string obstacleColor = ${JSON.stringify(config.obstacleColor)};
+        public float speedMultiplier = ${config.speedMultiplier}f;
+        public float jumpForce = ${config.jumpForce}f;
+        public string scoreLabel = ${JSON.stringify(config.scoreLabel)};
+        public string releaseVersion = ${JSON.stringify(config.releaseVersion)};
+
+        public static KoscheiGeneratedGameConfig LoadFromTextAsset(TextAsset jsonAsset)
+        {
+            if (jsonAsset == null || string.IsNullOrWhiteSpace(jsonAsset.text))
+            {
+                return new KoscheiGeneratedGameConfig();
+            }
+
+            return JsonUtility.FromJson<KoscheiGeneratedGameConfig>(jsonAsset.text) ?? new KoscheiGeneratedGameConfig();
+        }
+    }
+}
+`;
+
     return [
       {
         path: 'Assets/Koschei/Generated/game_factory_brief.json',
@@ -58,15 +136,20 @@ export class GitHubUnityRepoProvider {
             summary,
             shortDescription: gameBrief.store_short_description,
             fullDescription: gameBrief.store_full_description,
-            generatedAt: new Date().toISOString()
+            generatedAt: new Date().toISOString(),
+            generatedConfig: config
           },
           null,
           2
         )
       },
       {
-        path: 'Assets/Koschei/Generated/version.txt',
-        content: `${gameProject.current_version_name}+${gameProject.current_version_code}`
+        path: 'Assets/Koschei/Generated/koschei-game-config.json',
+        content: JSON.stringify(config, null, 2)
+      },
+      {
+        path: 'Assets/Koschei/Generated/KoscheiGeneratedGameConfig.cs',
+        content: csConfig
       }
     ];
   }

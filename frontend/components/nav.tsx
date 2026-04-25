@@ -14,6 +14,7 @@ const primaryLinks = [
 
 const secondaryLinks = [
   { href: '/projects', label: 'Projeler' },
+  { href: '/game-factory', label: 'Game Factory' },
   { href: '/saved', label: 'Kaydedilenler' },
   { href: '/composer', label: 'Yayın Kuyruğu' }
 ] as const satisfies ReadonlyArray<{ href: Route; label: string }>;

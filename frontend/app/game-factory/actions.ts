@@ -8,6 +8,12 @@ import { GitHubUnityRepoProvider } from '@/lib/game-factory/providers/github-uni
 import { UnityCloudBuildProvider } from '@/lib/game-factory/providers/unity-cloud-build-provider';
 import { GooglePlayPublisherProvider } from '@/lib/game-factory/providers/google-play-publisher-provider';
 
+function actionableErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string' && error.trim().length > 0) return error;
+  return fallback;
+}
+
 function slugify(value: string) {
   return (
     value
@@ -94,19 +100,53 @@ export async function generateGameAction(projectId: string) {
 
   if (!brief) return;
 
-  await supabase.from('game_projects').update({ status: 'generating' }).eq('id', project.id).eq('user_id', user.id);
-
-  const provider = new GitHubUnityRepoProvider();
-  const files = await provider.generateUnityProjectFiles(project, brief);
-
-  await supabase
-    .from('game_briefs')
-    .update({
-      generated_summary: `Unity dosyaları üretime hazırlandı (${files.length} dosya).`
+  const { data: generationJob } = await supabase
+    .from('game_generation_jobs')
+    .insert({
+      game_project_id: project.id,
+      status: 'queued',
+      prompt: brief.prompt
     })
-    .eq('id', brief.id);
+    .select('id')
+    .single();
+  if (!generationJob) {
+    throw new Error('Generation job kaydı oluşturulamadı.');
+  }
 
-  await supabase.from('game_projects').update({ status: 'generated' }).eq('id', project.id).eq('user_id', user.id);
+  const startedAt = new Date().toISOString();
+  await supabase.from('game_projects').update({ status: 'generating' }).eq('id', project.id).eq('user_id', user.id);
+  await supabase.from('game_generation_jobs').update({ status: 'running', started_at: startedAt }).eq('id', generationJob.id);
+
+  try {
+    const provider = new GitHubUnityRepoProvider();
+    const files = await provider.generateUnityProjectFiles(project, brief);
+    const output = {
+      generatedFiles: files.map((file) => ({ path: file.path, bytes: Buffer.byteLength(file.content, 'utf8') })),
+      generatedAt: new Date().toISOString()
+    };
+
+    await supabase
+      .from('game_briefs')
+      .update({
+        generated_summary: `Unity dosyaları üretime hazırlandı (${files.length} dosya).`
+      })
+      .eq('id', brief.id);
+
+    await supabase.from('game_generation_jobs').update({ status: 'succeeded', output, finished_at: new Date().toISOString(), error_message: null }).eq('id', generationJob.id);
+    await supabase.from('game_projects').update({ status: 'generated' }).eq('id', project.id).eq('user_id', user.id);
+  } catch (error) {
+    const errorMessage = actionableErrorMessage(error, 'Unity dosyaları üretilemedi.');
+    await supabase
+      .from('game_generation_jobs')
+      .update({
+        status: 'failed',
+        error_message: errorMessage,
+        finished_at: new Date().toISOString()
+      })
+      .eq('id', generationJob.id);
+    await supabase.from('game_projects').update({ status: 'draft' }).eq('id', project.id).eq('user_id', user.id);
+    throw new Error(errorMessage);
+  }
 
   revalidatePath(`/game-factory/${project.id}`);
 }
@@ -321,94 +361,122 @@ export async function publishReleaseAction(projectId: string, formData: FormData
   const { supabase, user } = await getCurrentUser();
   const project = await getOwnedProject(projectId, user.id);
   if (!project) return;
-
-  const { data: releaseJob } = await supabase
-    .from('game_release_jobs')
-    .select('*')
-    .eq('game_project_id', project.id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const { data: artifact } = await supabase
-    .from('game_artifacts')
-    .select('*')
-    .eq('game_project_id', project.id)
-    .eq('artifact_type', 'aab')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (!releaseJob || !artifact?.file_url) {
-    throw new Error('Yayın için gerekli release kaydı veya AAB artifact bulunamadı.');
-  }
-
-  if (!releaseJob.user_approved_at) {
-    throw new Error('Yayın için önce kullanıcı onayı verilmelidir.');
-  }
-
-  if (!project.google_play_integration_id) {
-    throw new Error('Yayınlamak için Google Play bağlantısı gerekli.');
-  }
-
-  const { data: integration } = await supabase
-    .from('user_integrations')
-    .select('id, encrypted_credentials, default_track, status')
-    .eq('id', project.google_play_integration_id)
-    .eq('user_id', user.id)
-    .eq('provider', 'google_play')
-    .maybeSingle();
-
-  if (!integration || integration.status !== 'connected') {
-    throw new Error('Seçili Google Play bağlantısı kullanılamıyor.');
-  }
-
-  const encryptedPayload = tryParseEncryptedCredentials(integration.encrypted_credentials);
-  if (!encryptedPayload) {
-    throw new Error('Google Play kimlik bilgileri çözümlenemedi.');
-  }
-
-  const serviceAccountJson = decryptCredentials(encryptedPayload);
-
-  await supabase.from('game_projects').update({ status: 'publishing' }).eq('id', project.id).eq('user_id', user.id);
-  await supabase
-    .from('game_release_jobs')
-    .update({ status: 'uploading', submitted_at: new Date().toISOString(), track: releaseJob.track || integration.default_track || project.release_track })
-    .eq('id', releaseJob.id);
-
-  const provider = new GooglePlayPublisherProvider();
-  const result = await provider.publishRelease({
-    packageName: project.package_name,
-    track: releaseJob.track || integration.default_track || project.release_track,
-    releaseNotes: releaseJob.release_notes ?? 'Game Factory yayın güncellemesi',
-    aabFileUrl: artifact.file_url,
-    serviceAccountJson,
-    versionCode: releaseJob.version_code,
-    versionName: releaseJob.version_name
-  });
-
-  if (result.status === 'published') {
-    await supabase
+  let releaseJobId: string | null = null;
+  try {
+    const { data: releaseJob } = await supabase
       .from('game_release_jobs')
-      .update({
-        status: 'published',
-        edit_id: result.editId ?? null,
-        completed_at: new Date().toISOString(),
-        error_message: null
-      })
-      .eq('id', releaseJob.id);
-    await supabase.from('game_projects').update({ status: 'published' }).eq('id', project.id).eq('user_id', user.id);
-  } else {
-    await supabase
-      .from('game_release_jobs')
-      .update({
-        status: result.status,
-        edit_id: result.editId ?? null,
-        error_message: result.errorMessage ?? 'Yayınlama hatası',
-        completed_at: new Date().toISOString()
-      })
-      .eq('id', releaseJob.id);
+      .select('*')
+      .eq('game_project_id', project.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    releaseJobId = releaseJob?.id ?? null;
+
+    const { data: artifact } = await supabase
+      .from('game_artifacts')
+      .select('*')
+      .eq('game_project_id', project.id)
+      .eq('artifact_type', 'aab')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!releaseJob || !artifact?.file_url) {
+      throw new Error('Yayın için gerekli release kaydı veya AAB artifact bulunamadı.');
+    }
+
+    if (!releaseJob.user_approved_at) {
+      throw new Error('Yayın için önce kullanıcı onayı verilmelidir.');
+    }
+
+    if (!project.google_play_integration_id) {
+      throw new Error('Yayınlamak için Google Play bağlantısı gerekli.');
+    }
+
+    const { data: integration } = await supabase
+      .from('user_integrations')
+      .select('id, encrypted_credentials, default_track, status')
+      .eq('id', project.google_play_integration_id)
+      .eq('user_id', user.id)
+      .eq('provider', 'google_play')
+      .maybeSingle();
+
+    if (!integration || integration.status !== 'connected') {
+      throw new Error('Seçili Google Play bağlantısı kullanılamıyor.');
+    }
+
+    const encryptedPayload = tryParseEncryptedCredentials(integration.encrypted_credentials);
+    if (!encryptedPayload) {
+      throw new Error('Google Play kimlik bilgileri çözümlenemedi.');
+    }
+
+    const serviceAccountJson = decryptCredentials(encryptedPayload);
+    const track = releaseJob.track || integration.default_track || project.release_track;
+
+    await supabase.from('game_projects').update({ status: 'publishing' }).eq('id', project.id).eq('user_id', user.id);
+    await supabase.from('game_release_jobs').update({ status: 'uploading', submitted_at: new Date().toISOString(), track }).eq('id', releaseJob.id);
+
+    const provider = new GooglePlayPublisherProvider();
+    const result = await provider.publishRelease({
+      packageName: project.package_name,
+      track,
+      releaseNotes: releaseJob.release_notes ?? 'Game Factory yayın güncellemesi',
+      aabFileUrl: artifact.file_url,
+      serviceAccountJson,
+      versionCode: releaseJob.version_code,
+      versionName: releaseJob.version_name
+    });
+
+    if (result.status === 'published') {
+      await supabase
+        .from('game_release_jobs')
+        .update({
+          status: 'published',
+          edit_id: result.editId ?? null,
+          completed_at: new Date().toISOString(),
+          error_message: null
+        })
+        .eq('id', releaseJob.id);
+      await supabase.from('game_projects').update({ status: 'published' }).eq('id', project.id).eq('user_id', user.id);
+    } else {
+      await supabase
+        .from('game_release_jobs')
+        .update({
+          status: result.status,
+          edit_id: result.editId ?? null,
+          error_message: result.errorMessage ?? 'Yayınlama hatası',
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', releaseJob.id);
+      await supabase.from('game_projects').update({ status: 'publish_failed' }).eq('id', project.id).eq('user_id', user.id);
+    }
+  } catch (error) {
+    const errorMessage = actionableErrorMessage(error, 'Yayın akışı başarısız oldu.');
+    const blocked = /permission|account|policy|production|package|insufficient|forbidden|play console/i.test(errorMessage);
+    const targetReleaseJobId =
+      releaseJobId ??
+      (
+        await supabase
+          .from('game_release_jobs')
+          .select('id')
+          .eq('game_project_id', project.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      ).data?.id ??
+      null;
+    if (targetReleaseJobId) {
+      await supabase
+        .from('game_release_jobs')
+        .update({
+          status: blocked ? 'blocked_by_platform_requirement' : 'failed',
+          error_message: errorMessage,
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', targetReleaseJobId);
+    }
     await supabase.from('game_projects').update({ status: 'publish_failed' }).eq('id', project.id).eq('user_id', user.id);
+    throw new Error(errorMessage);
   }
 
   revalidatePath(`/game-factory/${project.id}`);
