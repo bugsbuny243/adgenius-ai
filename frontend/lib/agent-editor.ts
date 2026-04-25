@@ -35,7 +35,7 @@ export type PreviewTemplate = {
 };
 
 export type AgentEditorConfig = {
-  slug: AgentEditorSlug;
+  slug: string;
   title: string;
   shortHelp: string;
   summaryDescription: string;
@@ -56,13 +56,28 @@ export type EditorStarterPack = {
   freeNotes: string;
 };
 
-const DEFAULT_AGENT_SLUG: AgentEditorSlug = 'icerik';
-
 const EMPTY_STARTER_PACK: EditorStarterPack = {
   label: 'Boş başla',
   description: 'Form alanlarını boş bırakır ve sıfırdan brief yazmanızı sağlar.',
   state: {},
   freeNotes: ''
+};
+
+const GENERIC_AGENT_CONFIG: AgentEditorConfig = {
+  slug: 'generic',
+  title: 'Ajan Çalıştır',
+  shortHelp: 'İstediğiniz çıktıyı kısa ve net bir şekilde tarif edin.',
+  summaryDescription: 'Genel amaçlı ajan düzenleyici.',
+  placeholder: 'Ne üretmek istediğinizi yazın...',
+  outputMode: 'AI çıktısı',
+  sections: [
+    {
+      title: 'İstek',
+      fields: [{ key: 'istek', label: 'İstek', type: 'textarea', placeholder: 'Ne üretmek istediğinizi yazın...' }]
+    }
+  ],
+  previewSections: [{ title: 'İstek özeti', template: '{{istek}}', emptyFallback: 'Henüz belirtilmedi' }],
+  starterPacks: [EMPTY_STARTER_PACK]
 };
 
 const EXTRA_STARTER_PACKS: Partial<Record<AgentEditorSlug, EditorStarterPack[]>> = {
@@ -646,13 +661,13 @@ function interpolateTemplate(template: string, state: EditorState, fallback: str
 }
 
 export function getAgentEditorConfig(slug?: string | null): AgentEditorConfig {
-  if (!slug) return agentEditorConfigs[DEFAULT_AGENT_SLUG];
-  return agentEditorConfigs[(slug as AgentEditorSlug)] ?? agentEditorConfigs[DEFAULT_AGENT_SLUG];
+  if (!slug) return GENERIC_AGENT_CONFIG;
+  return agentEditorConfigs[(slug as AgentEditorSlug)] ?? GENERIC_AGENT_CONFIG;
 }
 
 export function getAgentStarterPacks(slug?: string | null): EditorStarterPack[] {
   const config = getAgentEditorConfig(slug);
-  const extras = EXTRA_STARTER_PACKS[config.slug] ?? [];
+  const extras = config.slug in EXTRA_STARTER_PACKS ? EXTRA_STARTER_PACKS[config.slug as AgentEditorSlug] ?? [] : [];
   return [EMPTY_STARTER_PACK, ...config.starterPacks, ...extras].slice(0, 5);
 }
 
