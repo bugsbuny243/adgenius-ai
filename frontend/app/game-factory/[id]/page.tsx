@@ -59,24 +59,24 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
-          <Card title="1. Brief">
+          <Card title="1. Oyun brief'i">
             <p className="text-sm text-white/75">{brief?.generated_summary || brief?.prompt || 'Brief bekleniyor.'}</p>
           </Card>
 
-          <Card title="2. Unity project generation">
+          <Card title="2. Oyun üret">
             <form action={generateGameAction.bind(null, id)}>
-              <button className="rounded-lg border border-white/20 px-3 py-2 text-sm">Oyunu üret</button>
+              <button className="rounded-lg border border-white/20 px-3 py-2 text-sm">Oyun üret</button>
             </form>
           </Card>
 
-          <Card title="3. GitHub commit">
+          <Card title="3. Unity repo’ya gönder">
             <p className="mb-2 text-xs text-white/60">Son commit: {project.unity_commit_sha || '-'}</p>
             <form action={commitUnityRepoAction.bind(null, id)}>
               <button className="rounded-lg border border-white/20 px-3 py-2 text-sm">Unity repo’ya gönder</button>
             </form>
           </Card>
 
-          <Card title="4. Unity build">
+          <Card title="4. Build başlat">
             <p className="mb-2 text-xs text-white/60">Build: {buildJob?.status || '-'}</p>
             <div className="flex gap-2">
               <form action={triggerBuildAction.bind(null, id)}>
@@ -88,24 +88,27 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
             </div>
           </Card>
 
-          <Card title="5. AAB artifact">
+          <Card title="5. AAB durumu">
             {artifact?.file_url ? (
-              <a className="text-neon underline" href={artifact.file_url} target="_blank" rel="noreferrer">
-                AAB indir
-              </a>
+              <div className="space-y-2">
+                <p className="text-sm text-emerald-300">AAB oluşturuldu</p>
+                <a className="text-neon underline" href={artifact.file_url} target="_blank" rel="noreferrer">
+                  AAB indir
+                </a>
+              </div>
             ) : (
               <p className="text-sm text-white/70">AAB henüz hazır değil.</p>
             )}
           </Card>
 
-          <Card title="6. Release preparation">
+          <Card title="6. Yayın hazırlığı">
             <p className="mb-2 text-xs text-white/60">Durum: {releaseJob?.status || 'Hazırlanmadı'}</p>
             <div className="flex gap-2">
               <form action={prepareReleaseAction.bind(null, id)}>
-                <button className="rounded-lg border border-white/20 px-3 py-2 text-sm">Yayın hazırlığını oluştur</button>
+                <button className="rounded-lg border border-white/20 px-3 py-2 text-sm">Yayın hazırlığı</button>
               </form>
               <form action={approveReleaseAction.bind(null, id)}>
-                <button className="rounded-lg border border-white/20 px-3 py-2 text-sm">Kullanıcı onayı ver</button>
+                <button className="rounded-lg border border-white/20 px-3 py-2 text-sm">Kullanıcı onayı gerekli</button>
               </form>
             </div>
           </Card>

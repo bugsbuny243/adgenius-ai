@@ -29,7 +29,7 @@ export default async function GameFactoryPage() {
             <h1 className="text-3xl font-bold">Game Factory</h1>
           </div>
           <Link href="/game-factory/new" className="rounded-lg bg-neon px-4 py-2 font-semibold text-ink">
-            Yeni oyun oluştur
+            Oyun üret
           </Link>
         </div>
 
