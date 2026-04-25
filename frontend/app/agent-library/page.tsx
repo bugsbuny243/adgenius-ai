@@ -4,8 +4,7 @@ import { PublicSiteNav } from '@/components/public-site-nav';
 const marketingAgents = [
   { name: 'Koschei Blogger Agent', description: 'Blog planı, SEO başlıkları ve yayın hazırlığı üretir.' },
   { name: 'Koschei Channel Planner', description: 'Video serileri için içerik akışı ve takvim oluşturur.' },
-  { name: 'Koschei Game Factory', description: 'Oyun fikrini üretim planına dönüştürür ve süreç adımlarını toplar.' },
-  { name: 'Koschei Publisher Assistant', description: 'Sürüm notu, mağaza metni ve yayın kontrol listesi hazırlar.' }
+  { name: 'Koschei Game Factory', description: 'Oyun fikrini üretim planına dönüştürür ve süreç adımlarını toplar.' }
 ] as const;
 
 export default function AgentLibraryPage() {
