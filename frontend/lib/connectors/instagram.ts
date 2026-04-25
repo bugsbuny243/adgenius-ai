@@ -5,7 +5,7 @@ export const instagramConnector: ConnectorAdapter = {
     return {
       platform: 'instagram',
       state: 'not_connected',
-      label: 'Not connected',
+      label: 'Bağlantı gerekli',
       connectedAt: null
     };
   },

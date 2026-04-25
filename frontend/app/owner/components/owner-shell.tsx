@@ -9,12 +9,11 @@ type OwnerShellProps = {
 };
 
 const OWNER_LINKS = [
-  { href: '/owner', label: 'Overview' },
-  { href: '/owner/unity', label: 'Unity Bridge' },
-  { href: '/owner/ads', label: 'Ads' },
-  { href: '/owner/payments', label: 'Payments' },
-  { href: '/owner/users', label: 'Users & Projects' },
-  { href: '/owner/system', label: 'System' }
+  { href: '/owner/system', label: 'Sistem Durumu' },
+  { href: '/owner/unity', label: 'Unity Operasyon' },
+  { href: '/owner/ads', label: 'Reklam Yönetimi' },
+  { href: '/owner/payments', label: 'Ödemeler' },
+  { href: '/owner/users', label: 'Kullanım / Limitler' }
 ] as const;
 
 export function OwnerShell({ workspaceName, role, isSuperOwner, children }: OwnerShellProps) {

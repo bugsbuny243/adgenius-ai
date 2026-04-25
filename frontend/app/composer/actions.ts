@@ -2,58 +2,44 @@
 
 import { revalidatePath } from 'next/cache';
 import { getAppContextOrRedirect } from '@/lib/app-context';
+import { createSocialPublishPayload, type SocialPlatform } from '@/lib/social-content';
+import { createKnowledgeSource } from '@/lib/knowledge';
 
-type Platform = 'youtube';
+const SUPPORTED_STATUS_VALUES = ['queued', 'preparing', 'waiting_for_approval', 'published', 'failed', 'draft', 'processing'] as const;
+const PLATFORM_SET = new Set<SocialPlatform>(['youtube', 'instagram', 'tiktok']);
 
-const SUPPORTED_STATUS_VALUES = ['draft', 'queued', 'processing', 'published', 'failed'] as const;
-
-function buildVariants(brief: string, platforms: Platform[]) {
-  const cleanBrief = brief.trim();
-  return {
-    youtubeTitle: `🎯 ${cleanBrief.slice(0, 58)}`,
-    youtubeDescription: `${cleanBrief}\n\nBu içerik AI motoru ile planlandı. #icerik`,
-    platforms
-  };
+function pickPlatforms(formData: FormData): SocialPlatform[] {
+  return formData
+    .getAll('platforms')
+    .map((item) => String(item).toLowerCase().trim())
+    .filter((item): item is SocialPlatform => PLATFORM_SET.has(item as SocialPlatform));
 }
 
-function buildPublishPayload(input: {
-  brief: string;
-  platform: Platform;
-  variants: ReturnType<typeof buildVariants>;
-  runId: string;
-  contentItemId: string;
-  savedOutputId: string;
-  projectId: string | null;
-}) {
-  const payload: Record<string, unknown> = {
-    brief: input.brief,
-    platform: input.platform,
-    run_id: input.runId,
-    content_item_id: input.contentItemId,
-    saved_output_id: input.savedOutputId,
-    project_id: input.projectId,
-    source: 'composer'
+function buildDraft(input: { brief: string; contentType: string; agentType: string; platforms: SocialPlatform[] }) {
+  const base = `${input.agentType} • ${input.contentType} • ${input.brief}`.trim();
+  return {
+    brief: base,
+    platforms: input.platforms,
+    youtubeTitle: `🎯 ${base.slice(0, 70)}`,
+    youtubeDescription: `${base}\n\nYayın hazırlığı: bağlantı durumuna göre otomatik veya manuel işlem uygulanır.`,
+    instagramCaption: `${base}\n\n#koschei #icerik`,
+    tiktokCaption: `${base}\n\n#koschei #shorts`
   };
-
-  if (input.platform === 'youtube') {
-    payload.youtube_title = input.variants.youtubeTitle;
-    payload.youtube_description = input.variants.youtubeDescription;
-  }
-
-  return payload;
 }
 
 export async function createContentJobAction(formData: FormData) {
   const brief = String(formData.get('brief') ?? '').trim();
   const projectId = String(formData.get('project_id') ?? '').trim() || null;
-  const selectedPlatforms: Platform[] = ['youtube'];
+  const contentType = String(formData.get('content_type') ?? 'Sosyal içerik').trim() || 'Sosyal içerik';
+  const agentType = String(formData.get('agent_type') ?? 'Koschei Composer').trim() || 'Koschei Composer';
+  const platforms = pickPlatforms(formData);
 
-  if (!brief || selectedPlatforms.length === 0) {
+  if (!brief || platforms.length === 0) {
     return;
   }
 
   const { supabase, userId, workspace } = await getAppContextOrRedirect();
-  const variants = buildVariants(brief, selectedPlatforms);
+  const draft = buildDraft({ brief, contentType, agentType, platforms });
   const queuedAt = new Date().toISOString();
 
   const { data: run, error: runError } = await supabase
@@ -62,22 +48,21 @@ export async function createContentJobAction(formData: FormData) {
       workspace_id: workspace.workspaceId,
       user_id: userId,
       status: 'completed',
-      model_name: 'default',
+      model_name: 'composer',
       user_input: brief,
       metadata: {
-        project_id: projectId
+        project_id: projectId,
+        source: 'composer',
+        content_type: contentType,
+        agent_type: agentType
       },
-      result_text: JSON.stringify(variants, null, 2),
+      result_text: JSON.stringify(draft, null, 2),
       completed_at: new Date().toISOString()
     })
     .select('id')
     .single();
 
-  if (runError || !run) {
-    throw new Error(`İçerik çalıştırması kaydedilemedi: ${runError?.message ?? 'bilinmeyen hata'}`);
-  }
-
-  const title = `İçerik işi • ${new Date().toLocaleString('tr-TR')}`;
+  if (runError || !run) throw new Error(`İçerik kaydedilemedi: ${runError?.message ?? 'bilinmeyen hata'}`);
 
   const { data: saved, error: savedError } = await supabase
     .from('saved_outputs')
@@ -86,15 +71,12 @@ export async function createContentJobAction(formData: FormData) {
       project_id: projectId,
       user_id: userId,
       agent_run_id: run.id,
-      title,
-      content: JSON.stringify(variants, null, 2)
+      title: `Composer çıktısı • ${new Date().toLocaleString('tr-TR')}`,
+      content: JSON.stringify(draft, null, 2)
     })
     .select('id')
     .single();
-
-  if (savedError || !saved) {
-    throw new Error(`Kaydedilen çıktı oluşturulamadı: ${savedError?.message ?? 'bilinmeyen hata'}`);
-  }
+  if (savedError || !saved) throw new Error(`Kaydedilen çıktı oluşturulamadı: ${savedError?.message ?? 'bilinmeyen hata'}`);
 
   const { data: contentItem, error: contentItemError } = await supabase
     .from('content_items')
@@ -102,54 +84,73 @@ export async function createContentJobAction(formData: FormData) {
       workspace_id: workspace.workspaceId,
       project_id: projectId,
       user_id: userId,
-      brief,
-      platforms: selectedPlatforms,
-      youtube_title: variants.youtubeTitle,
-      youtube_description: variants.youtubeDescription,
-      instagram_caption: null,
-      tiktok_caption: null,
+      brief: draft.brief,
+      platforms,
+      youtube_title: draft.youtubeTitle,
+      youtube_description: draft.youtubeDescription,
+      instagram_caption: draft.instagramCaption,
+      tiktok_caption: draft.tiktokCaption,
       run_id: run.id,
       saved_output_id: saved.id,
       status: 'draft'
     })
     .select('id')
     .single();
-
-  if (contentItemError || !contentItem) {
-    throw new Error(`İçerik kaydı oluşturulamadı: ${contentItemError?.message ?? 'bilinmeyen hata'}`);
-  }
+  if (contentItemError || !contentItem) throw new Error(`İçerik kaydı oluşturulamadı: ${contentItemError?.message ?? 'bilinmeyen hata'}`);
 
   const insertResults = await Promise.all(
-    selectedPlatforms.map((platform) =>
+    platforms.map((platform) =>
       supabase.from('publish_jobs').insert({
         workspace_id: workspace.workspaceId,
         project_id: projectId,
         content_output_id: contentItem.id,
         target_platform: platform,
-        status: 'draft',
+        status: platform === 'youtube' ? 'queued' : 'preparing',
         queued_at: queuedAt,
-        payload: buildPublishPayload({
-          brief,
-          platform,
-          variants,
-          runId: run.id,
-          contentItemId: contentItem.id,
-          savedOutputId: saved.id,
-          projectId
-        })
+        payload: {
+          ...createSocialPublishPayload(draft, platform),
+          run_id: run.id,
+          content_item_id: contentItem.id,
+          saved_output_id: saved.id,
+          project_id: projectId,
+          source: 'composer',
+          delivery_mode: platform === 'youtube' ? 'connector_or_manual' : 'manual_preparation'
+        }
       })
     )
   );
 
   const queueError = insertResults.find((result) => result.error)?.error;
-  if (queueError) {
-    throw new Error(`Yayın kuyruğuna eklenemedi: ${queueError.message}`);
-  }
+  if (queueError) throw new Error(`Yayın kuyruğuna eklenemedi: ${queueError.message}`);
 
   revalidatePath('/composer');
+  revalidatePath('/publish-queue');
   revalidatePath('/dashboard');
-  revalidatePath('/runs');
   revalidatePath('/saved');
+}
+
+export async function createKnowledgeSourceAction(formData: FormData) {
+  const title = String(formData.get('title') ?? '').trim();
+  const rawText = String(formData.get('raw_text') ?? '').trim();
+  const sourceUrl = String(formData.get('source_url') ?? '').trim();
+  const projectId = String(formData.get('project_id') ?? '').trim() || null;
+
+  if (!title || (!rawText && !sourceUrl)) return;
+
+  const { supabase, userId, workspace } = await getAppContextOrRedirect();
+  await createKnowledgeSource({
+    supabase,
+    workspaceId: workspace.workspaceId,
+    userId,
+    projectId,
+    sourceType: sourceUrl ? 'url' : 'text',
+    title,
+    rawText: rawText || null,
+    sourceUrl: sourceUrl || null,
+    metadata: { source: 'composer' }
+  });
+
+  revalidatePath('/composer');
 }
 
 export async function updatePublishStatusAction(formData: FormData) {
@@ -171,4 +172,5 @@ export async function updatePublishStatusAction(formData: FormData) {
     .eq('id', jobId);
 
   revalidatePath('/composer');
+  revalidatePath('/publish-queue');
 }

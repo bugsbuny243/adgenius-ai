@@ -51,7 +51,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
   const createProjectItem = createProjectItemFromOutputAction.bind(null, id, runIdParam ?? '');
   const attachOutput = attachSavedOutputToProjectAction.bind(null, id, runIdParam ?? '');
 
-  const [{ data: agent }, { data: projects }] = await Promise.all([
+  const [{ data: agent }, { data: projects }, { data: knowledgeSources }] = await Promise.all([
     supabase.from('agent_types').select('id, slug, name, description, is_active').eq('id', id).maybeSingle(),
     supabase
       .from('projects')
@@ -59,6 +59,13 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
       .eq('workspace_id', workspaceId)
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
+      .limit(100),
+    supabase
+      .from('project_knowledge_entries')
+      .select('id, title')
+      .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: false })
+      .limit(20)
   ]);
 
   if (!agent) notFound();
@@ -112,7 +119,13 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
 
         {errorParam ? <p className="mb-3 rounded-lg border border-red-300/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">{neutralizeVendorTerms(errorParam)}</p> : null}
 
-        <AgentEditorShell agentSlug={agent.slug} projects={projects ?? []} runAction={runAgent} initialMetadata={initialEditorMetadata} />
+        <AgentEditorShell
+          agentSlug={agent.slug}
+          projects={projects ?? []}
+          knowledgeSources={(knowledgeSources ?? []).map((item) => ({ id: item.id, title: item.title ?? 'Bilgi kaynağı' }))}
+          runAction={runAgent}
+          initialMetadata={initialEditorMetadata}
+        />
       </section>
 
       <section className="panel mb-4">

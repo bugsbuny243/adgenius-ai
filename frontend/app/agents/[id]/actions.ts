@@ -15,9 +15,9 @@ function buildInternalUrl(pathname: string, headerList: Headers): string {
   return `${protocol}://${host}${pathname}`;
 }
 
-function parseRunMetadata(source: unknown): { editorState: Record<string, unknown>; freeNotes: string; derivedPrompt: string; workflowType: string; sourceProjectItemId: string; parentOutputId: string; targetItemType: string; revisionRound: string } {
+function parseRunMetadata(source: unknown): { editorState: Record<string, unknown>; freeNotes: string; derivedPrompt: string; workflowType: string; sourceProjectItemId: string; parentOutputId: string; targetItemType: string; revisionRound: string; knowledgeSourceIds: string[] } {
   if (!source || typeof source !== 'object') {
-    return { editorState: {}, freeNotes: '', derivedPrompt: '', workflowType: '', sourceProjectItemId: '', parentOutputId: '', targetItemType: '', revisionRound: '' };
+    return { editorState: {}, freeNotes: '', derivedPrompt: '', workflowType: '', sourceProjectItemId: '', parentOutputId: '', targetItemType: '', revisionRound: '', knowledgeSourceIds: [] };
   }
 
   const metadata = source as Record<string, unknown>;
@@ -34,7 +34,10 @@ function parseRunMetadata(source: unknown): { editorState: Record<string, unknow
         ? String(metadata.revision_round)
         : typeof metadata.revision_round === 'string'
           ? metadata.revision_round
-          : ''
+          : '',
+    knowledgeSourceIds: Array.isArray(metadata.knowledge_source_ids)
+      ? metadata.knowledge_source_ids.filter((item): item is string => typeof item === 'string')
+      : []
   };
 }
 
@@ -84,12 +87,17 @@ export async function runAgentAction(agentId: string, formData: FormData) {
   const parentOutputIdRaw = String(formData.get('parent_output_id') ?? '').trim();
   const targetItemTypeRaw = String(formData.get('target_item_type') ?? '').trim();
   const revisionRoundRaw = String(formData.get('revision_round') ?? '').trim();
+  const knowledgeSourceIdsRaw = String(formData.get('knowledge_source_ids') ?? '').trim();
   const projectId = projectIdRaw || null;
   const sourceProjectItemId = sourceProjectItemIdRaw || null;
   const workflowType = workflowTypeRaw || null;
   const parentOutputId = parentOutputIdRaw || null;
   const targetItemType = targetItemTypeRaw || null;
   const revisionRound = revisionRoundRaw ? Number(revisionRoundRaw) : null;
+  const knowledgeSourceIds = knowledgeSourceIdsRaw
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
 
   const prompt = derivedPrompt || rawPrompt;
 
@@ -170,6 +178,7 @@ export async function runAgentAction(agentId: string, formData: FormData) {
         editor_state: parsedEditorState,
         derived_prompt: derivedPrompt || prompt,
         free_notes: freeNotes,
+        knowledge_source_ids: knowledgeSourceIds,
         input_mode: 'agent-live-editor-v2'
       },
       status: 'pending'
@@ -198,6 +207,7 @@ export async function runAgentAction(agentId: string, formData: FormData) {
           editor_state: parsedEditorState,
           derived_prompt: derivedPrompt || prompt,
           free_notes: freeNotes,
+          knowledge_source_ids: knowledgeSourceIds,
           workflow_type: workflowType,
           source_project_item_id: sourceProjectItemId,
           parent_output_id: parentOutputId,
@@ -313,6 +323,7 @@ export async function rerunAgentAction(agentId: string, formData: FormData) {
   if (parsed.parentOutputId) runFormData.set('parent_output_id', parsed.parentOutputId);
   if (parsed.targetItemType) runFormData.set('target_item_type', parsed.targetItemType);
   if (parsed.revisionRound) runFormData.set('revision_round', parsed.revisionRound);
+  if (parsed.knowledgeSourceIds.length) runFormData.set('knowledge_source_ids', parsed.knowledgeSourceIds.join(','));
   const sourceProjectId =
     sourceRun.metadata && typeof sourceRun.metadata === 'object' && 'project_id' in sourceRun.metadata && typeof sourceRun.metadata.project_id === 'string'
       ? sourceRun.metadata.project_id
