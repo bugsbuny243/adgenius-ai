@@ -11,6 +11,7 @@ import {
 import { resolveAppOrigin } from '@/lib/app-origin';
 import { getServerEnv } from '@/lib/env';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { encryptCredentials, serializeEncryptedCredentials } from '@/lib/credentials-encryption';
 
 const GOOGLE_STATE_COOKIE = 'koschei_google_oauth_state';
 const STATE_TTL_MS = 10 * 60 * 1000;
@@ -201,8 +202,11 @@ export async function GET(request: Request) {
       user_id: storedState.userId,
       provider: 'google',
       provider_account_id: providerAccountId,
-      access_token: normalizedTokens.accessToken,
-      refresh_token: normalizedTokens.refreshToken ?? existing?.refresh_token ?? null,
+      access_token: serializeEncryptedCredentials(encryptCredentials(normalizedTokens.accessToken)),
+      refresh_token:
+        normalizedTokens.refreshToken != null
+          ? serializeEncryptedCredentials(encryptCredentials(normalizedTokens.refreshToken))
+          : existing?.refresh_token ?? null,
       access_token_expires_at: normalizedTokens.accessTokenExpiresAt,
       scopes: normalizedTokens.scopes,
       channel_id: channelId,
