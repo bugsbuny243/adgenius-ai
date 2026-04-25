@@ -117,7 +117,11 @@ export default async function ConnectionsPage({ searchParams }: ConnectionsPageP
         </div>
         <div className="mb-4 rounded-lg border border-white/10 bg-black/20 p-3 text-xs text-white/75">
           <p>Google OAuth durumu: {googleOAuthConfigured ? 'bağlantıya hazır' : 'kurulum gerekli'}</p>
+          <p className="mt-1">Google bağlantısı YouTube/Blogger yayın akışları için kullanılır.</p>
           <p className="mt-1">YouTube ve Blogger Google OAuth ile çalışır. Instagram ve TikTok akışları manuel yayın hazırlığı modunda kullanılabilir.</p>
+          {!googleOAuthConfigured ? (
+            <p className="mt-1 text-amber-100">Google doğrulaması tamamlanana kadar bu bağlantı geliştirici/test kullanıcılarıyla sınırlı olabilir.</p>
+          ) : null}
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
           {statuses.map((item) => <ConnectionCard key={item.platform} item={item} />)}
