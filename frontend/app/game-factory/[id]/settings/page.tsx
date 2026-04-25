@@ -6,7 +6,7 @@ import { createSupabaseServerClient } from '@/lib/supabase-server';
 export const dynamic = 'force-dynamic';
 
 function statusLabel(ok: boolean) {
-  return ok ? 'connected' : 'missing';
+  return ok ? 'Bağlı' : 'Eksik';
 }
 
 export default async function GameFactorySettingsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -58,10 +58,10 @@ export default async function GameFactorySettingsPage({ params }: { params: Prom
         </div>
 
         <div className="grid gap-2 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/85">
-          <h2 className="text-lg font-semibold">Bağlantı durumu</h2>
-          <p>GitHub Unity repo env: {statusLabel(hasGithubRepoEnv)}</p>
+          <h2 className="text-lg font-semibold">Sistem durumu</h2>
+          <p>GitHub Unity repo: {statusLabel(hasGithubRepoEnv)}</p>
           <p>Unity Build Automation: {statusLabel(hasUnityBuildAutomation)}</p>
-          <p>Selected Google Play integration: {statusLabel(Boolean(selectedIntegration && selectedIntegration.status === 'connected'))}</p>
+          <p>Google Play: {statusLabel(Boolean(selectedIntegration && selectedIntegration.status === 'connected'))}</p>
         </div>
 
         <div className="flex gap-2">

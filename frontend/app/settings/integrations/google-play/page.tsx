@@ -42,8 +42,8 @@ export default async function GooglePlayIntegrationsPage({ searchParams }: PageP
       <section className="panel space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Google Play Entegrasyonları</h1>
-            <p className="text-sm text-white/70">Google Play Console hesabınızı bağlayın ve yayın akışında kullanın.</p>
+            <h1 className="text-3xl font-bold">Google Play hesabınızı bağlayın</h1>
+            <p className="text-sm text-white/70">Koschei, oluşturulan AAB dosyasını sizin Play Console hesabınıza göndermek için bu bağlantıyı kullanır. Google şifrenizi istemeyiz.</p>
           </div>
           <Link href="/settings" className="rounded-lg border border-white/20 px-3 py-2 text-xs hover:border-neon">Ayarlara dön</Link>
         </div>
@@ -64,17 +64,21 @@ export default async function GooglePlayIntegrationsPage({ searchParams }: PageP
           </label>
 
           <label className="space-y-1 md:col-span-2">
-            <span className="text-sm">Service account JSON (dosya yükle)</span>
+            <span className="text-sm">Service account JSON dosyası yükle</span>
+            <p className="text-xs text-white/60">Bu dosya Google Play Console’da oluşturulan service account JSON dosyasıdır.</p>
             <input type="file" name="service_account_json_file" accept="application/json" className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" />
           </label>
 
-          <label className="space-y-1 md:col-span-2">
-            <span className="text-sm">Service account JSON (metin olarak yapıştır)</span>
-            <textarea name="service_account_json" rows={8} className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" placeholder='{"type":"service_account", ...}' />
-          </label>
+          <details className="space-y-1 md:col-span-2">
+            <summary className="cursor-pointer text-sm">Gelişmiş: JSON metni yapıştır</summary>
+            <textarea name="service_account_json" rows={8} className="mt-2 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" placeholder='{"type":"service_account", ...}' />
+          </details>
 
-          <div className="md:col-span-2">
+          <div className="flex flex-wrap gap-2 md:col-span-2">
             <button type="submit" className="rounded-lg bg-neon px-4 py-2 font-semibold text-ink">Bağlantıyı kaydet</button>
+            <a href="https://support.google.com/googleplay/android-developer/answer/9844686" target="_blank" rel="noreferrer" className="rounded-lg border border-white/20 px-4 py-2 text-sm">
+              Bağlantı rehberini göster
+            </a>
           </div>
         </form>
 

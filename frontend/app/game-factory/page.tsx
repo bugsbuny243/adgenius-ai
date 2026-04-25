@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Nav } from '@/components/nav';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { gameFactoryStatusLabel } from '@/lib/game-factory/ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,11 +30,24 @@ export default async function GameFactoryPage() {
             <h1 className="text-3xl font-bold">Game Factory</h1>
           </div>
           <Link href="/game-factory/new" className="rounded-lg bg-neon px-4 py-2 font-semibold text-ink">
-            Oyun üret
+            Yeni oyun oluştur
           </Link>
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-white/10">
+        <div className="space-y-3 md:hidden">
+          {(projects ?? []).map((project) => (
+            <article key={project.id} className="rounded-xl border border-white/10 bg-black/20 p-4 text-sm">
+              <p className="text-lg font-semibold">{project.name}</p>
+              <p className="text-white/70">Durum: {gameFactoryStatusLabel(project.status)}</p>
+              <p className="text-white/70">Paket: {project.package_name || '—'}</p>
+              <Link className="mt-3 inline-flex rounded-lg border border-white/20 px-3 py-2" href={`/game-factory/${project.id}`}>
+                Aç
+              </Link>
+            </article>
+          ))}
+        </div>
+
+        <div className="hidden overflow-x-auto rounded-xl border border-white/10 md:block">
           <table className="min-w-full text-sm">
             <thead className="bg-black/30 text-left">
               <tr>
@@ -43,12 +57,13 @@ export default async function GameFactoryPage() {
                 <th className="px-3 py-2">Paket adı</th>
                 <th className="px-3 py-2">Son build</th>
                 <th className="px-3 py-2">Son yayın</th>
+                <th className="px-3 py-2">İşlem</th>
               </tr>
             </thead>
             <tbody>
               {(projects ?? []).map((project) => {
-                const latestBuild = (project.game_build_jobs ?? [])[0]?.status ?? '-';
-                const latestRelease = (project.game_release_jobs ?? [])[0]?.status ?? '-';
+                const latestBuild = gameFactoryStatusLabel((project.game_build_jobs ?? [])[0]?.status ?? null);
+                const latestRelease = gameFactoryStatusLabel((project.game_release_jobs ?? [])[0]?.status ?? null);
                 return (
                   <tr key={project.id} className="border-t border-white/10 hover:bg-white/5">
                     <td className="px-3 py-2">
@@ -57,10 +72,15 @@ export default async function GameFactoryPage() {
                       </Link>
                     </td>
                     <td className="px-3 py-2">{project.game_type}</td>
-                    <td className="px-3 py-2">{project.status}</td>
+                    <td className="px-3 py-2">{gameFactoryStatusLabel(project.status)}</td>
                     <td className="px-3 py-2">{project.package_name}</td>
                     <td className="px-3 py-2">{latestBuild}</td>
                     <td className="px-3 py-2">{latestRelease}</td>
+                    <td className="px-3 py-2">
+                      <Link className="rounded-lg border border-white/20 px-3 py-1.5" href={`/game-factory/${project.id}`}>
+                        Aç
+                      </Link>
+                    </td>
                   </tr>
                 );
               })}
