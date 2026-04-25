@@ -16,9 +16,41 @@ export default async function GameFactoryPage() {
 
   const { data: projects } = await supabase
     .from('game_projects')
-    .select('id, name, game_type, status, package_name, game_build_jobs(status, created_at), game_release_jobs(status, created_at)')
+    .select('id, name, game_type, status, package_name')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false });
+
+  const projectIds = (projects ?? []).map((project) => project.id);
+  const [{ data: buildJobs }, { data: releaseJobs }] = await Promise.all([
+    projectIds.length
+      ? supabase
+          .from('game_build_jobs')
+          .select('game_project_id, status, created_at')
+          .in('game_project_id', projectIds)
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] }),
+    projectIds.length
+      ? supabase
+          .from('game_release_jobs')
+          .select('game_project_id, status, created_at')
+          .in('game_project_id', projectIds)
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] })
+  ]);
+
+  const latestBuildByProject = new Map<string, string>();
+  for (const job of buildJobs ?? []) {
+    if (!latestBuildByProject.has(job.game_project_id)) {
+      latestBuildByProject.set(job.game_project_id, job.status);
+    }
+  }
+
+  const latestReleaseByProject = new Map<string, string>();
+  for (const job of releaseJobs ?? []) {
+    if (!latestReleaseByProject.has(job.game_project_id)) {
+      latestReleaseByProject.set(job.game_project_id, job.status);
+    }
+  }
 
   return (
     <main>
@@ -62,8 +94,10 @@ export default async function GameFactoryPage() {
             </thead>
             <tbody>
               {(projects ?? []).map((project) => {
-                const latestBuild = gameFactoryStatusLabel((project.game_build_jobs ?? [])[0]?.status ?? null);
-                const latestRelease = gameFactoryStatusLabel((project.game_release_jobs ?? [])[0]?.status ?? null);
+                const latestBuildStatus = latestBuildByProject.get(project.id) ?? null;
+                const latestReleaseStatus = latestReleaseByProject.get(project.id) ?? null;
+                const latestBuild = latestBuildStatus ? gameFactoryStatusLabel(latestBuildStatus) : '—';
+                const latestRelease = latestReleaseStatus ? gameFactoryStatusLabel(latestReleaseStatus) : '—';
                 return (
                   <tr key={project.id} className="border-t border-white/10 hover:bg-white/5">
                     <td className="px-3 py-2">

@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { getAppContextOrRedirect } from '@/lib/app-context';
-import { createSocialPublishPayload, type SocialPlatform } from '@/lib/social-content';
+import { runTextWithAiEngine } from '@/lib/ai-engine';
+import { createSocialPublishPayload, normalizeSocialContentDraft, type SocialPlatform } from '@/lib/social-content';
 import { createKnowledgeSource } from '@/lib/knowledge';
 
 const SUPPORTED_STATUS_VALUES = ['queued', 'preparing', 'waiting_for_approval', 'published', 'failed', 'draft', 'processing'] as const;
@@ -15,16 +16,50 @@ function pickPlatforms(formData: FormData): SocialPlatform[] {
     .filter((item): item is SocialPlatform => PLATFORM_SET.has(item as SocialPlatform));
 }
 
-function buildDraft(input: { brief: string; contentType: string; agentType: string; platforms: SocialPlatform[] }) {
-  const base = `${input.agentType} • ${input.contentType} • ${input.brief}`.trim();
-  return {
-    brief: base,
-    platforms: input.platforms,
-    youtubeTitle: `🎯 ${base.slice(0, 70)}`,
-    youtubeDescription: `${base}\n\nYayın hazırlığı: bağlantı durumuna göre otomatik veya manuel işlem uygulanır.`,
-    instagramCaption: `${base}\n\n#koschei #icerik`,
-    tiktokCaption: `${base}\n\n#koschei #shorts`
-  };
+async function generateComposerDraft(input: { brief: string; contentType: string; agentType: string; platforms: SocialPlatform[] }) {
+  const aiPrompt = [
+    `Ajan tipi: ${input.agentType}`,
+    `İçerik türü: ${input.contentType}`,
+    `Platformlar: ${input.platforms.join(', ')}`,
+    `Brief: ${input.brief}`,
+    '',
+    'Sadece JSON döndür. Alanlar: brief, platforms, youtube_title, youtube_description, instagram_caption, tiktok_caption.'
+  ].join('\n');
+
+  try {
+    const aiRun = await runTextWithAiEngine({
+      agentSlug: 'sosyal',
+      agentMode: 'script',
+      userInput: aiPrompt,
+      systemPrompt: 'Türkçe sosyal medya içerik taslağı üret. Marka güvenli, doğal ve aksiyona yönlendiren dil kullan.'
+    });
+
+    const draft = normalizeSocialContentDraft({
+      sourceBrief: input.brief,
+      sourcePlatforms: input.platforms,
+      rawText: aiRun.text
+    });
+
+    return {
+      draft,
+      aiResultText: aiRun.text,
+      modelAlias: aiRun.alias,
+      usage: aiRun.usage
+    };
+  } catch {
+    const fallbackText = 'AI sağlayıcısı geçici olarak yanıt veremedi. Lütfen tekrar deneyin.';
+    const draft = normalizeSocialContentDraft({
+      sourceBrief: input.brief,
+      sourcePlatforms: input.platforms,
+      rawText: fallbackText
+    });
+    return {
+      draft,
+      aiResultText: fallbackText,
+      modelAlias: 'koschei-fast' as const,
+      usage: { inputTokens: null, outputTokens: null }
+    };
+  }
 }
 
 export async function createContentJobAction(formData: FormData) {
@@ -39,7 +74,8 @@ export async function createContentJobAction(formData: FormData) {
   }
 
   const { supabase, userId, workspace } = await getAppContextOrRedirect();
-  const draft = buildDraft({ brief, contentType, agentType, platforms });
+  const generated = await generateComposerDraft({ brief, contentType, agentType, platforms });
+  const draft = generated.draft;
   const queuedAt = new Date().toISOString();
 
   const { data: run, error: runError } = await supabase
@@ -48,15 +84,16 @@ export async function createContentJobAction(formData: FormData) {
       workspace_id: workspace.workspaceId,
       user_id: userId,
       status: 'completed',
-      model_name: 'composer',
+      model_name: generated.modelAlias,
       user_input: brief,
       metadata: {
         project_id: projectId,
         source: 'composer',
         content_type: contentType,
-        agent_type: agentType
+        agent_type: agentType,
+        token_usage: generated.usage
       },
-      result_text: JSON.stringify(draft, null, 2),
+      result_text: generated.aiResultText,
       completed_at: new Date().toISOString()
     })
     .select('id')

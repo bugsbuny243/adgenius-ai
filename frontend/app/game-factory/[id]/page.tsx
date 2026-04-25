@@ -1,21 +1,19 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
+import type { ReactNode } from 'react';
 import { Nav } from '@/components/nav';
 import {
+  advanceGameFactoryProjectAction,
   approveReleaseAction,
-  commitUnityRepoAction,
-  generateGameAction,
-  prepareReleaseAction,
-  publishReleaseAction,
+  resolveGameFactoryPrimaryAction,
   refreshBuildStatusAction,
-  startBuildAction
 } from '@/app/game-factory/actions';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { gameFactoryStatusLabel } from '@/lib/game-factory/ui';
 
 export const dynamic = 'force-dynamic';
 
-function PrimaryButton({ children }: { children: string }) {
+function PrimaryButton({ children }: { children: ReactNode }) {
   return <button className="rounded-lg bg-neon px-4 py-2 font-semibold text-ink">{children}</button>;
 }
 
@@ -41,6 +39,21 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
 
   const latestError = releaseJob?.error_message || buildJob?.error_message || generationJob?.error_message || null;
   const hasGooglePlayIntegration = (integrations ?? []).length > 0;
+  const primaryAction = await resolveGameFactoryPrimaryAction(id, user.id);
+  const actionLabels: Record<string, string> = {
+    generate: 'Oyunu oluştur',
+    commit: 'Unity repo’ya gönder',
+    building_message: 'Unity repo hazırlanıyor',
+    start_build: 'Build başlat',
+    refresh_build: 'Build durumunu kontrol et',
+    download_aab: 'AAB indir',
+    missing_aab: 'Build durumunu kontrol et',
+    release_page: hasGooglePlayIntegration ? 'Google Play’e gönder' : 'Yayına hazırla',
+    approve_release: 'Yayını onayla',
+    publishing_release: 'Yayın detaylarını görüntüle',
+    retry_on_release_page: 'Yayın detaylarını görüntüle',
+    published_details: 'Yayın detaylarını görüntüle'
+  };
 
   return (
     <main>
@@ -82,81 +95,51 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
           <h2 className="mb-3 text-lg font-semibold">Sonraki adım</h2>
 
           {(() => {
-            if (project.status === 'draft' || project.status === 'brief_created') {
-              return (
-                <form action={generateGameAction.bind(null, id)}>
-                  <PrimaryButton>Oyunu oluştur</PrimaryButton>
-                </form>
-              );
-            }
-            if (project.status === 'generated' || project.status === 'ready_for_build') {
-              return (
-                <form action={startBuildAction.bind(null, id)}>
-                  <PrimaryButton>Build başlat</PrimaryButton>
-                </form>
-              );
-            }
-            if (project.status === 'building') {
-              return (
-                <form action={refreshBuildStatusAction.bind(null, id)}>
-                  <PrimaryButton>Build durumunu kontrol et</PrimaryButton>
-                </form>
-              );
-            }
-            if (project.status === 'build_succeeded' && artifact?.file_url) {
+            if (primaryAction === 'download_aab' && artifact?.file_url) {
               return (
                 <a className="inline-flex rounded-lg bg-neon px-4 py-2 font-semibold text-ink" href={artifact.file_url} target="_blank" rel="noreferrer">
                   AAB indir
                 </a>
               );
             }
-            if (project.status === 'build_failed') {
+            if (primaryAction === 'missing_aab') {
               return (
-                <form action={startBuildAction.bind(null, id)}>
-                  <PrimaryButton>Build&apos;i tekrar dene</PrimaryButton>
-                </form>
+                <div className="space-y-2">
+                  <p className="rounded-lg border border-amber-300/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+                    Build başarılı görünüyor ancak AAB dosyası henüz bulunamadı.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <form action={refreshBuildStatusAction.bind(null, id)}>
+                      <PrimaryButton>Build durumunu yenile</PrimaryButton>
+                    </form>
+                    <Link href={`/game-factory/${id}/builds`} className="inline-flex rounded-lg border border-white/20 px-4 py-2">
+                      Build geçmişini aç
+                    </Link>
+                  </div>
+                </div>
               );
             }
-            if (project.status === 'release_ready') {
-              return (
-                <form action={prepareReleaseAction.bind(null, id)}>
-                  <PrimaryButton>Yayına hazırla</PrimaryButton>
-                </form>
-              );
+            if (primaryAction === 'building_message') {
+              return <p className="text-sm text-white/70">Unity repo hazırlanıyor</p>;
             }
-            if (project.status === 'awaiting_user_approval') {
-              return (
-                <form action={approveReleaseAction.bind(null, id)}>
-                  <PrimaryButton>Yayını onayla</PrimaryButton>
-                </form>
-              );
-            }
-            if (project.status === 'publishing') {
-              return (
-                <form action={refreshBuildStatusAction.bind(null, id)}>
-                  <PrimaryButton>Yayın durumunu kontrol et</PrimaryButton>
-                </form>
-              );
-            }
-            if (project.status === 'publish_failed') {
-              return (
-                <form action={publishReleaseAction.bind(null, id)}>
-                  <input type="hidden" name="confirm_publish" value="yes" />
-                  <PrimaryButton>Yayını tekrar dene</PrimaryButton>
-                </form>
-              );
-            }
-            if (project.status === 'published') {
+            if (primaryAction === 'release_page' || primaryAction === 'publishing_release' || primaryAction === 'retry_on_release_page' || primaryAction === 'published_details') {
               return (
                 <Link href={`/game-factory/${id}/release`} className="inline-flex rounded-lg bg-neon px-4 py-2 font-semibold text-ink">
-                  Yayın detaylarını görüntüle
+                  {actionLabels[primaryAction]}
                 </Link>
+              );
+            }
+            if (primaryAction === 'approve_release') {
+              return (
+                <form action={approveReleaseAction.bind(null, id)}>
+                  <PrimaryButton>Devam et · {actionLabels[primaryAction]}</PrimaryButton>
+                </form>
               );
             }
 
             return (
-              <form action={commitUnityRepoAction.bind(null, id)}>
-                <PrimaryButton>Devam et</PrimaryButton>
+              <form action={advanceGameFactoryProjectAction.bind(null, id)}>
+                <PrimaryButton>Devam et · {actionLabels[primaryAction] ?? 'Devam et'}</PrimaryButton>
               </form>
             );
           })()}
@@ -172,19 +155,7 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
             <p className="text-white/70">AAB henüz hazır değil.</p>
           )}
 
-          {!hasGooglePlayIntegration ? (
-            <div className="mt-2 rounded-lg border border-amber-300/30 bg-amber-500/10 p-3 text-amber-100 space-y-2">
-              <h3 className="font-semibold">Google Play bağlantısı gerekli</h3>
-              <p>Koschei’nin oyununuzu Play Console hesabınıza gönderebilmesi için Google Play bağlantısı eklemeniz gerekir. İsterseniz şimdilik AAB dosyasını indirip manuel yükleyebilirsiniz.</p>
-              <div className="flex flex-wrap gap-2">
-                <Link href="/settings/integrations/google-play" className="rounded-lg border border-amber-200/60 px-3 py-2 text-xs">Google Play bağlantısı ekle</Link>
-                {artifact?.file_url ? (
-                  <a className="rounded-lg border border-amber-200/60 px-3 py-2 text-xs" href={artifact.file_url} target="_blank" rel="noreferrer">AAB indir</a>
-                ) : null}
-                <button disabled className="rounded-lg border border-amber-200/30 px-3 py-2 text-xs opacity-60">Daha sonra</button>
-              </div>
-            </div>
-          ) : null}
+          {!hasGooglePlayIntegration && artifact?.file_url ? <p className="text-xs text-white/60">Google Play’e gönderme adımında bağlantı kontrolü yapılır.</p> : null}
         </article>
 
         <details className="rounded-xl border border-white/10 bg-black/20 p-4">

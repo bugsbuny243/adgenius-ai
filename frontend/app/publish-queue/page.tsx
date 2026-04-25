@@ -1,6 +1,6 @@
 import { Nav } from '@/components/nav';
 import { getAppContextOrRedirect } from '@/lib/app-context';
-import { deriveQueuePreview, toPlatformLabel, toQueueStateHint, toQueueStatusLabel } from '@/lib/publish-queue';
+import { deriveQueuePreview, toPlatformLabel, toQueueActionLabel, toQueueStateHint, toQueueStatusLabel } from '@/lib/publish-queue';
 import { updatePublishStatusAction } from '@/app/composer/actions';
 
 export const dynamic = 'force-dynamic';
@@ -72,11 +72,11 @@ export default async function PublishQueuePage() {
                   <p className="mt-2 text-white/80">İçerik özeti: {preview.summary}</p>
                   <p className="text-xs text-white/60">Proje: {relatedProject?.name ?? 'Bağlı proje yok'}</p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button name="status" value="queued" className="rounded-md border border-white/20 px-2 py-1">queued</button>
-                    <button name="status" value="preparing" className="rounded-md border border-white/20 px-2 py-1">preparing</button>
-                    <button name="status" value="waiting_for_approval" className="rounded-md border border-white/20 px-2 py-1">waiting_for_approval</button>
-                    <button name="status" value="published" className="rounded-md border border-white/20 px-2 py-1">published</button>
-                    <button name="status" value="failed" className="rounded-md border border-white/20 px-2 py-1">failed</button>
+                    <button name="status" value="queued" className="rounded-md border border-white/20 px-2 py-1">{toQueueActionLabel('queued')}</button>
+                    <button name="status" value="preparing" className="rounded-md border border-white/20 px-2 py-1">{toQueueActionLabel('preparing')}</button>
+                    <button name="status" value="waiting_for_approval" className="rounded-md border border-white/20 px-2 py-1">{toQueueActionLabel('waiting_for_approval')}</button>
+                    <button name="status" value="published" className="rounded-md border border-white/20 px-2 py-1">{toQueueActionLabel('published')}</button>
+                    <button name="status" value="failed" className="rounded-md border border-white/20 px-2 py-1">{toQueueActionLabel('failed')}</button>
                   </div>
                 </form>
               );

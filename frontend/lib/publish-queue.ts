@@ -5,7 +5,7 @@ export function toQueueStatusLabel(status: QueueStatus): string {
   if (status === 'queued') return 'Sıraya alındı';
   if (status === 'preparing' || status === 'processing') return 'Hazırlanıyor';
   if (status === 'waiting_for_approval' || status === 'draft') return 'Onay bekliyor';
-  if (status === 'published') return 'Yayınlandı';
+  if (status === 'published') return 'Tamamlandı';
   if (status === 'failed') return 'Başarısız';
   return status;
 }
@@ -14,9 +14,18 @@ export function toQueueStateHint(status: QueueStatus): string {
   if (status === 'queued') return 'Sırada';
   if (status === 'preparing' || status === 'processing') return 'Manuel yayın hazırlığı sürüyor';
   if (status === 'waiting_for_approval' || status === 'draft') return 'Kullanıcı onayı bekleniyor';
-  if (status === 'published') return 'Yayın hedefi tamamlandı';
+  if (status === 'published') return 'İşlem tamamlandı';
   if (status === 'failed') return 'Tekrar denenebilir';
   return 'Durum bilgisi sınırlı';
+}
+
+export function toQueueActionLabel(status: QueueStatus): string {
+  if (status === 'queued') return 'Sıraya al';
+  if (status === 'preparing' || status === 'processing') return 'Hazırlanıyor olarak işaretle';
+  if (status === 'waiting_for_approval' || status === 'draft') return 'Onay bekliyor olarak işaretle';
+  if (status === 'published') return 'Manuel tamamlandı';
+  if (status === 'failed') return 'Başarısız olarak işaretle';
+  return 'Durumu güncelle';
 }
 
 export function toPlatformLabel(platform: string | null): string {

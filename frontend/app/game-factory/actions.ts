@@ -241,6 +241,65 @@ export async function startBuildAction(projectId: string) {
   return triggerBuildAction(projectId);
 }
 
+type GameFactoryPrimaryActionKey =
+  | 'generate'
+  | 'commit'
+  | 'building_message'
+  | 'start_build'
+  | 'refresh_build'
+  | 'download_aab'
+  | 'missing_aab'
+  | 'release_page'
+  | 'approve_release'
+  | 'publishing_release'
+  | 'retry_on_release_page'
+  | 'published_details';
+
+export async function resolveGameFactoryPrimaryAction(projectId: string, userId: string): Promise<GameFactoryPrimaryActionKey> {
+  const supabase = await createSupabaseServerClient();
+  const { data: project } = await supabase.from('game_projects').select('id, status').eq('id', projectId).eq('user_id', userId).maybeSingle();
+  if (!project) return 'generate';
+
+  if (project.status === 'draft' || project.status === 'brief_created') return 'generate';
+  if (project.status === 'generated') return 'commit';
+  if (project.status === 'committing') return 'building_message';
+  if (project.status === 'ready_for_build') return 'start_build';
+  if (project.status === 'building') return 'refresh_build';
+  if (project.status === 'release_ready') return 'release_page';
+  if (project.status === 'awaiting_user_approval') return 'approve_release';
+  if (project.status === 'publishing') return 'publishing_release';
+  if (project.status === 'publish_failed') return 'retry_on_release_page';
+  if (project.status === 'published') return 'published_details';
+  if (project.status === 'build_failed') return 'start_build';
+
+  if (project.status === 'build_succeeded') {
+    const { data: artifact } = await supabase
+      .from('game_artifacts')
+      .select('id')
+      .eq('game_project_id', project.id)
+      .eq('artifact_type', 'aab')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return artifact ? 'download_aab' : 'missing_aab';
+  }
+
+  return 'commit';
+}
+
+export async function advanceGameFactoryProjectAction(projectId: string) {
+  const { user } = await getCurrentUser();
+  const next = await resolveGameFactoryPrimaryAction(projectId, user.id);
+
+  if (next === 'generate') return generateGameAction(projectId);
+  if (next === 'commit') return commitUnityRepoAction(projectId);
+  if (next === 'start_build') return startBuildAction(projectId);
+  if (next === 'refresh_build' || next === 'missing_aab') return refreshBuildStatusAction(projectId);
+  if (next === 'approve_release') return approveReleaseAction(projectId);
+
+  redirect(`/game-factory/${projectId}`);
+}
+
 export async function refreshBuildStatusAction(projectId: string) {
   const { supabase, user } = await getCurrentUser();
   const project = await getOwnedProject(projectId, user.id);

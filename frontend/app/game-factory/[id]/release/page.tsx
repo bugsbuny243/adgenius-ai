@@ -27,6 +27,7 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
   if (!project) notFound();
 
   const selectedIntegration = (integrations ?? []).find((integration) => integration.id === project.google_play_integration_id) ?? null;
+  const shouldShowConnectionWarning = Boolean(releaseJob?.error_message && /google play bağlantısı gerekli/i.test(releaseJob.error_message));
 
   return (
     <main>
@@ -94,29 +95,23 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
           </form>
         ) : null}
 
-        {(integrations ?? []).length === 0 ? (
-          <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100 space-y-2">
-            <h3 className="font-semibold">Google Play bağlantısı gerekli</h3>
-            <p>Koschei’nin oyununuzu Play Console hesabınıza gönderebilmesi için Google Play bağlantısı eklemeniz gerekir. İsterseniz şimdilik AAB dosyasını indirip manuel yükleyebilirsiniz.</p>
-            <div className="flex flex-wrap gap-2">
-              <Link href="/settings/integrations/google-play" className="inline-flex rounded-lg border border-amber-200/60 px-3 py-2 text-xs">
-                Google Play bağlantısı ekle
-              </Link>
-              {artifact?.file_url ? (
-                <a className="inline-flex rounded-lg border border-amber-200/60 px-3 py-2 text-xs" href={artifact.file_url}>
-                  AAB indir
-                </a>
-              ) : null}
-              <button type="button" className="rounded-lg border border-amber-200/40 px-3 py-2 text-xs opacity-80">
-                Daha sonra
-              </button>
-            </div>
-          </div>
-        ) : (
+        {artifact?.file_url ? (
           <form action={publishReleaseAction.bind(null, id)} className="space-y-2">
             <PublishButton label="Google Play’e gönder" />
           </form>
+        ) : (
+          <p className="text-sm text-white/70">Google Play yayını için önce AAB dosyasının oluşması gerekir.</p>
         )}
+
+        {shouldShowConnectionWarning ? (
+          <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100 space-y-2">
+            <h3 className="font-semibold">Google Play bağlantısı gerekli</h3>
+            <p>Google Play’e gönderebilmek için önce Google Play bağlantınızı ekleyin veya projeye atayın.</p>
+            <Link href="/settings/integrations/google-play" className="inline-flex rounded-lg border border-amber-200/60 px-3 py-2 text-xs">
+              Google Play bağlantısı ekle
+            </Link>
+          </div>
+        ) : null}
 
         {releaseJob?.error_message ? (
           <p className="rounded-lg border border-red-400/40 bg-red-950/30 p-3 text-sm text-red-200">{releaseJob.error_message}</p>

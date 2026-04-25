@@ -19,7 +19,7 @@ const OWNER_LINKS = [
 export function OwnerShell({ workspaceName, role, isSuperOwner, children }: OwnerShellProps) {
   return (
     <main>
-      <Nav showOwnerLink={isSuperOwner} showSuperOwnerBadge={isSuperOwner} />
+      <Nav showOwnerLink showSuperOwnerBadge={isSuperOwner} />
       <section className="mb-4 rounded-xl border border-amber-300/40 bg-amber-500/10 p-4">
         <p className="text-xs uppercase tracking-[0.2em] text-amber-100">Owner Control Plane</p>
         <h1 className="mt-1 text-xl font-semibold">{workspaceName}</h1>
@@ -28,15 +28,13 @@ export function OwnerShell({ workspaceName, role, isSuperOwner, children }: Owne
           {isSuperOwner ? ' • super owner override active' : ''}
         </p>
       </section>
-      {isSuperOwner ? (
-        <section className="mb-4 flex flex-wrap gap-2">
-          {OWNER_LINKS.map((link) => (
-            <Link key={link.href} href={link.href} className="rounded-lg border border-white/15 px-3 py-2 text-sm hover:border-neon">
-              {link.label}
-            </Link>
-          ))}
-        </section>
-      ) : null}
+      <section className="mb-4 flex flex-wrap gap-2">
+        {OWNER_LINKS.map((link) => (
+          <Link key={link.href} href={link.href} className="rounded-lg border border-white/15 px-3 py-2 text-sm hover:border-neon">
+            {link.label}
+          </Link>
+        ))}
+      </section>
       {children}
     </main>
   );

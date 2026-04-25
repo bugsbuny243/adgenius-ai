@@ -3,7 +3,7 @@ export const GAME_FACTORY_STATUS_LABELS: Record<string, string> = {
   brief_created: 'Hazırlanıyor',
   generating: 'Hazırlanıyor',
   generated: 'Oyun dosyaları oluşturuldu',
-  committing: 'Build için hazırlanıyor',
+  committing: 'Unity repo hazırlanıyor',
   ready_for_build: 'Build için hazır',
   building: 'Build alınıyor',
   build_succeeded: 'AAB hazır',
@@ -18,6 +18,6 @@ export const GAME_FACTORY_STATUS_LABELS: Record<string, string> = {
 };
 
 export function gameFactoryStatusLabel(status: string | null | undefined): string {
-  if (!status) return 'Hazırlanıyor';
-  return GAME_FACTORY_STATUS_LABELS[status] ?? 'Hazırlanıyor';
+  if (!status) return '—';
+  return GAME_FACTORY_STATUS_LABELS[status] ?? status;
 }

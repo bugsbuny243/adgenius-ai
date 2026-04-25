@@ -22,7 +22,6 @@ const FALLBACK_ENGINE_NAME = 'Koschei AI motoru';
 const QUOTA_ERROR_CODE = 'provider_quota_exceeded';
 const QUOTA_ERROR_MESSAGE = 'Kullanım limiti veya kredi durumu nedeniyle çalışma başlatılamadı.';
 const RATE_LIMIT_ERROR_CODE = 'provider_rate_limited';
-const MOCK_FALLBACK_FLAG = process.env.MOCK_AI_ON_FAILURE === 'true';
 
 function toRunFailureMessage(input: string): string {
   const code = input.trim().toLowerCase();
@@ -31,7 +30,7 @@ function toRunFailureMessage(input: string): string {
   if (code === 'run_timeout') return 'Geçici servis yoğunluğu oluştu. Lütfen biraz sonra tekrar deneyin.';
   if (code === 'empty_result') return 'Çalışma tamamlanamadı. Lütfen girdiyi sadeleştirip tekrar deneyin.';
   if (code.startsWith('run_update_failed:')) return 'Çalışma tamamlandı ancak sonuç kaydı yazılırken sorun oluştu.';
-  return 'Çalışma tamamlanamadı. Lütfen girdiyi sadeleştirip tekrar deneyin.';
+  return 'AI sağlayıcısı geçici olarak yanıt veremedi. Lütfen tekrar deneyin.';
 }
 
 function isQuotaOrBillingFailure(input: string): boolean {
@@ -87,7 +86,7 @@ function toSafeRuntimeErrorMessage(input: unknown): string {
     return 'Geçici servis yoğunluğu oluştu. Lütfen biraz sonra tekrar deneyin.';
   }
 
-  return 'Çalışma tamamlanamadı. Lütfen girdiyi sadeleştirip tekrar deneyin.';
+  return 'AI sağlayıcısı geçici olarak yanıt veremedi. Lütfen tekrar deneyin.';
 }
 
 function resolveWorkflowFieldsFromMetadata(metadata: unknown): {
@@ -731,36 +730,6 @@ export async function POST(request: Request) {
     const message = toRunFailureMessage(errorCode);
     const safeRuntimeMessage = toSafeRuntimeErrorMessage(error);
     const finalMessage = errorCode === 'run_failed' ? safeRuntimeMessage : message;
-
-    if (errorCode === QUOTA_ERROR_CODE && MOCK_FALLBACK_FLAG) {
-      const mockResult = [
-        '[MOCK_AI_ON_FAILURE etkin]',
-        'Bu içerik, AI sağlayıcısı kota/billing hatası verdiği için test amaçlı fallback olarak üretildi.',
-        '',
-        `Orijinal istem özeti: ${userInput.slice(0, 400)}`
-      ].join('\n');
-
-      await serviceSupabase
-        .from('agent_runs')
-        .update({
-          result_text: mockResult,
-          status: 'completed',
-          error_message: null,
-          completed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          metadata: {
-            ...(run.metadata ?? {}),
-            ...(requestMetadata ?? {}),
-            ai_engine: FALLBACK_ENGINE_NAME,
-            fallback_mode: 'mock_ai_on_failure'
-          }
-        })
-        .eq('id', runId)
-        .eq('user_id', user.id)
-        .eq('workspace_id', membership.workspace_id);
-
-      return NextResponse.json({ ok: true, runId, result: mockResult, fallback: true });
-    }
 
     await serviceSupabase
       .from('agent_runs')

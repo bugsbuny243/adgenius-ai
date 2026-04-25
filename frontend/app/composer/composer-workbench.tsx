@@ -7,9 +7,11 @@ import { SocialOutputPanel } from '@/components/agent-editor/SocialOutputPanel';
 type ComposerWorkbenchProps = {
   projects: Array<{ id: string; name: string }>;
   createContentJobAction: (formData: FormData) => void;
+  youtubeConnected: boolean;
+  bloggerConnected: boolean;
 };
 
-export function ComposerWorkbench({ projects, createContentJobAction }: ComposerWorkbenchProps) {
+export function ComposerWorkbench({ projects, createContentJobAction, youtubeConnected, bloggerConnected }: ComposerWorkbenchProps) {
   const [brief, setBrief] = useState('');
   const [agentType, setAgentType] = useState('Koschei Social Agent');
   const [contentType, setContentType] = useState('Video metni');
@@ -89,8 +91,8 @@ export function ComposerWorkbench({ projects, createContentJobAction }: Composer
         <h3 className="mb-2 text-lg font-semibold">Sosyal çıktı önizleme</h3>
         <SocialOutputPanel
           projectId={projectId || null}
-          youtubeConnected={false}
-          bloggerConnected={false}
+          youtubeConnected={youtubeConnected}
+          bloggerConnected={bloggerConnected}
           youtubeTitle={brief ? `🎯 ${brief.slice(0, 70)}` : null}
           youtubeDescription={brief || null}
           instagramCaption={brief || null}
