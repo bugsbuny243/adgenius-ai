@@ -27,7 +27,13 @@
 
 1. Unity template repo erişimi API token ile sağlanır.
 2. Game Factory yalnızca güvenli üretilmiş dosya yollarını günceller.
-3. Secret dosyalar (`.env`, `.jks`, `.keystore`, servis hesabı dosyaları) commit edilmez.
+3. Unity template, aşağıdaki üretilen dosyaları runtime/editor tarafında okumalıdır:
+   - `Assets/Koschei/Generated/game_factory_brief.json`
+   - `Assets/Koschei/Generated/koschei-game-config.json`
+   - `Assets/Koschei/Generated/KoscheiGeneratedGameConfig.cs`
+4. Oyun davranışı farklılaşması bu konfigürasyon dosyalarından gelir (ör. renkler, hız, zıplama, skor etiketi, sürüm metadata).
+5. Üretilen dosyalar secret içermez; sadece oyun içerik/oynanış konfigürasyonu taşır.
+6. Secret dosyalar (`.env`, `.jks`, `.keystore`, servis hesabı dosyaları) commit edilmez.
 
 ## Google Play servis hesabı gereksinimleri
 
@@ -67,3 +73,15 @@
 - Unity service account kimlik bilgileri commit edilmez.
 - Secret değerler loglanmaz.
 - Otomatik yayınlama yapılmaz, yayın için kullanıcı onayı zorunludur.
+
+## Migration bağımlılıkları (fresh kurulum notu)
+
+`20260425_game_factory_integrations_and_release_guardrails.sql` migration'ı, mevcut Game Factory temel şemasına bağımlıdır.
+
+Fresh bir Supabase projesine uygulanacaksa önce aşağıdakiler mevcut olmalıdır:
+
+- `public.touch_updated_at()` fonksiyonu
+- `public.owns_game_project(game_project_id uuid)` fonksiyonu
+- Temel tablolar: `game_projects`, `game_briefs`, `game_build_jobs`, `game_artifacts`, `game_release_jobs`
+
+Production'da bu temel şema zaten varsa mevcut migration doğrudan uygulanabilir.

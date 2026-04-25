@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { encryptCredentials, serializeEncryptedCredentials } from '@/lib/credentials-encryption';
+import { validateGooglePlayServiceAccount } from '@/lib/game-factory/providers/google-play-publisher-provider';
 
 function normalizeTrack(value: string): 'production' | 'closed' | 'internal' {
   if (value === 'closed' || value === 'internal') return value;
@@ -42,11 +43,14 @@ export async function saveGooglePlayIntegrationAction(formData: FormData) {
   }
 
   const clientEmail = typeof parsedJson.client_email === 'string' ? parsedJson.client_email.trim() : '';
-  if (!clientEmail) {
-    throw new Error('Service account JSON içinde client_email alanı bulunmalıdır.');
+  const privateKey = typeof parsedJson.private_key === 'string' ? parsedJson.private_key.trim() : '';
+  if (!clientEmail || !privateKey) {
+    throw new Error('Service account JSON içinde client_email ve private_key alanları bulunmalıdır.');
   }
 
-  const encryptedCredentials = serializeEncryptedCredentials(encryptCredentials(JSON.stringify(parsedJson)));
+  const normalizedJson = JSON.stringify(parsedJson);
+  const encryptedCredentials = serializeEncryptedCredentials(encryptCredentials(normalizedJson));
+  const validation = await validateGooglePlayServiceAccount(normalizedJson);
 
   const { error } = await supabase.from('user_integrations').insert({
     user_id: user.id,
@@ -55,9 +59,9 @@ export async function saveGooglePlayIntegrationAction(formData: FormData) {
     encrypted_credentials: encryptedCredentials,
     service_account_email: clientEmail,
     default_track: defaultTrack,
-    status: 'connected',
+    status: validation.status,
     last_validated_at: new Date().toISOString(),
-    error_message: null
+    error_message: validation.errorMessage
   });
 
   if (error) {
@@ -66,5 +70,5 @@ export async function saveGooglePlayIntegrationAction(formData: FormData) {
 
   revalidatePath('/settings/integrations/google-play');
   revalidatePath('/game-factory');
-  redirect('/settings/integrations/google-play?status=connected');
+  redirect(`/settings/integrations/google-play?status=${validation.status}`);
 }

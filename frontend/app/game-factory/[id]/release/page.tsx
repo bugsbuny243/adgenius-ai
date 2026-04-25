@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { Nav } from '@/components/nav';
 import { PublishButton } from '@/components/game-factory/publish-button';
-import { publishReleaseAction, setProjectGooglePlayIntegrationAction, updateReleaseNotesAction } from '@/app/game-factory/actions';
+import { approveReleaseAction, publishReleaseAction, setProjectGooglePlayIntegrationAction, updateReleaseNotesAction } from '@/app/game-factory/actions';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
@@ -94,6 +94,12 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
         </form>
 
         <p className="text-sm text-white/80">Yayın için önce kullanıcı onayı verilmeli ve ardından açık onay ile başlatılmalıdır.</p>
+
+        {releaseJob?.status === 'awaiting_user_approval' ? (
+          <form action={approveReleaseAction.bind(null, id)}>
+            <button className="rounded-lg border border-white/20 px-3 py-2 text-sm">Kullanıcı onayı ver</button>
+          </form>
+        ) : null}
 
         <form action={publishReleaseAction.bind(null, id)} className="space-y-2">
           <PublishButton label="Yayınla" />

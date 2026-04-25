@@ -32,7 +32,7 @@ export default async function GameFactorySettingsPage({ params }: { params: Prom
         .maybeSingle()
     : { data: null };
 
-  const hasGithubRepo = Boolean(project.unity_repo_owner && project.unity_repo_name && process.env.GITHUB_UNITY_REPO_TOKEN);
+  const hasGithubRepoEnv = Boolean(process.env.GITHUB_UNITY_REPO_OWNER && process.env.GITHUB_UNITY_REPO_NAME && process.env.GITHUB_UNITY_REPO_TOKEN);
   const hasUnityBuildAutomation = Boolean(
     process.env.UNITY_ORG_ID &&
       process.env.UNITY_PROJECT_ID &&
@@ -59,9 +59,9 @@ export default async function GameFactorySettingsPage({ params }: { params: Prom
 
         <div className="grid gap-2 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/85">
           <h2 className="text-lg font-semibold">Bağlantı durumu</h2>
-          <p>GitHub Unity repo: {statusLabel(hasGithubRepo)}</p>
+          <p>GitHub Unity repo env: {statusLabel(hasGithubRepoEnv)}</p>
           <p>Unity Build Automation: {statusLabel(hasUnityBuildAutomation)}</p>
-          <p>Google Play integration: {statusLabel(Boolean(selectedIntegration && selectedIntegration.status === 'connected'))}</p>
+          <p>Selected Google Play integration: {statusLabel(Boolean(selectedIntegration && selectedIntegration.status === 'connected'))}</p>
         </div>
 
         <div className="flex gap-2">
