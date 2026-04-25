@@ -143,13 +143,13 @@ export function createUnityGameBriefFromPrompt(prompt: string): Record<string, u
   const cleanPrompt = prompt.trim();
 
   return {
-    planningOnly: true,
+    productionReady: true,
     sourcePrompt: cleanPrompt,
     detectedGenre: template.genre,
     templateSlug: template.slug,
     suggestedCoreLoop: `${template.genre} gameplay loop with mobile-first controls`,
     targetPlatform: 'android',
-    notes: 'Mock planning brief only. No Unity execution performed in Next.js.'
+    notes: 'Bu özet Unity build hattına gönderilmek üzere hazırlanmıştır.'
   };
 }
 
@@ -164,7 +164,7 @@ export function selectUnityTemplateForPrompt(prompt: string): UnityGameTemplate 
   return UNITY_TEMPLATE_SEEDS.find((template) => template.genre === detectedGenre) ?? UNITY_TEMPLATE_SEEDS[0];
 }
 
-export function createMockUnityBuildJobPayload(input: {
+export function createUnityBuildJobPayload(input: {
   unityGameProjectId: string;
   appName: string;
   packageName: string;
@@ -204,7 +204,7 @@ export function validateUnityGameProjectDraft(input: Partial<UnityGameProjectDra
   }
 
   if (input.targetPlatform && input.targetPlatform !== 'android') {
-    errors.push('Only android target platform is supported in this planning layer.');
+    errors.push('Only android target platform is supported in this production layer.');
   }
 
   if (input.templateSlug && !UNITY_TEMPLATE_SEEDS.some((template) => template.slug === input.templateSlug)) {

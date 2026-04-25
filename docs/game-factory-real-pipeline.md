@@ -13,9 +13,8 @@
 - `UNITY_BUILD_TARGET_ID`
 - `UNITY_SERVICE_ACCOUNT_KEY_ID`
 - `UNITY_SERVICE_ACCOUNT_SECRET_KEY`
-- `GOOGLE_PLAY_PACKAGE_NAME`
-- `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64`
 - `GOOGLE_PLAY_DEFAULT_TRACK` (varsayılan: `production`)
+- `KOSCHEI_CREDENTIALS_ENCRYPTION_KEY`
 
 ## Unity Build Automation target kurulumu
 
@@ -33,8 +32,9 @@
 ## Google Play servis hesabı gereksinimleri
 
 1. Servis hesabına Play Console'da uygulama yayın izinleri verilmelidir.
-2. JSON anahtar dosyası repo dışında güvenli secret store'da tutulmalıdır.
-3. Uygulama içinde yalnızca `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64` env değeri okunur.
+2. JSON anahtar dosyası kullanıcı bazlı entegrasyon kaydında şifrelenerek saklanır.
+3. Şifreleme anahtarı için `KOSCHEI_CREDENTIALS_ENCRYPTION_KEY` zorunludur.
+4. Global Google Play credential env değişkenleri kullanılmaz.
 
 ## Gerçek pipeline adımları
 

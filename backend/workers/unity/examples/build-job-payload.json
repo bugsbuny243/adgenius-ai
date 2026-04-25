@@ -6,7 +6,7 @@
   "targetPlatform": "android",
   "buildType": "development",
   "gameBrief": {
-    "planningOnly": true,
+    "productionReady": true,
     "detectedGenre": "puzzle",
     "targetSessionMinutes": 5,
     "coreLoop": "Match tiles, trigger combos, clear stage goals"
