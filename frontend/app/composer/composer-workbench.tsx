@@ -13,7 +13,7 @@ type ComposerWorkbenchProps = {
 
 export function ComposerWorkbench({ projects, createContentJobAction, youtubeConnected, bloggerConnected }: ComposerWorkbenchProps) {
   const [brief, setBrief] = useState('');
-  const [agentType, setAgentType] = useState('Koschei Social Agent');
+  const [agentType, setAgentType] = useState('Koschei Channel Planner');
   const [contentType, setContentType] = useState('Video metni');
   const [projectId, setProjectId] = useState('');
   const [youtube, setYoutube] = useState(true);
@@ -37,9 +37,9 @@ export function ComposerWorkbench({ projects, createContentJobAction, youtubeCon
         <h2 className="text-xl font-semibold">Composer</h2>
         <label className="block text-sm">Agent
           <select name="agent_type" value={agentType} onChange={(event) => setAgentType(event.target.value)} className="mt-2 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2">
-            <option>Koschei Social Agent</option>
-            <option>Koschei Research Agent</option>
-            <option>Koschei Publisher Assistant</option>
+            <option>Koschei Blogger Agent</option>
+            <option>Koschei Channel Planner</option>
+            <option>Koschei Game Factory</option>
           </select>
         </label>
         <label className="block text-sm">İçerik türü

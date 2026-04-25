@@ -4,12 +4,7 @@ import { PublicSiteNav } from '@/components/public-site-nav';
 const agentLibrary = [
   { name: 'Blogger Agent', desc: 'Blog içeriği, SEO başlığı ve yayın hazırlığı oluşturur.', status: 'Aktif' },
   { name: 'YouTube Channel Planner', desc: 'Video serisi planı, bölüm akışı ve yayın takvimi çıkarır.', status: 'Aktif' },
-  { name: 'Game Factory', desc: 'Prompttan oyun üret, Unity build al, AAB çıktısını yönet.', status: 'Aktif' },
-  { name: 'Play Publisher Assistant', desc: 'Mağaza metinleri, sürüm notları ve yayın öncesi kontrol listesi üretir.', status: 'Yayın akışı' },
-  { name: 'Sheets Agent', desc: 'Tablo tabanlı iş takibi, içerik planı ve operasyon listeleri düzenler.', status: 'Aktif' },
-  { name: 'Gmail Business Assistant', desc: 'İş e-postalarını taslaklar, yanıt önerileri ve takip aksiyonları hazırlar.', status: 'Aktif' },
-  { name: 'SEO / Indexing Agent', desc: 'Teknik SEO kontrolü, başlık önerileri ve indeksleme hazırlığı yapar.', status: 'Yakında' },
-  { name: 'Research Agent', desc: 'Konu analizi yapar, kaynak notları ve kısa araştırma raporları üretir.', status: 'Aktif' }
+  { name: 'Game Factory', desc: 'Prompttan oyun üret, Unity build al, AAB çıktısını yönet.', status: 'Aktif' }
 ] as const;
 
 export default function HomePage() {
@@ -54,7 +49,7 @@ export default function HomePage() {
 
       <section className="space-y-4">
         <h2 className="text-2xl font-semibold">Agent Library</h2>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {agentLibrary.map((agent) => (
             <article key={agent.name} className="rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="flex items-center justify-between gap-2">
