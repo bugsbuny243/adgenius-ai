@@ -51,8 +51,8 @@ export async function POST(request: Request) {
       unity_game_project_id: projectId,
       workspace_id: context.workspaceId,
       requested_by: context.userId,
-      build_target: buildTargetId,
-      build_type: 'android',
+      build_target: 'android',
+      build_type: 'release',
       status: 'failed',
       queued_at: queuedAt,
       error_message: unityError.message
@@ -81,13 +81,14 @@ export async function POST(request: Request) {
       unity_game_project_id: projectId,
       workspace_id: context.workspaceId,
       requested_by: context.userId,
-      build_target: buildTargetId,
-      build_type: 'android',
+      build_target: 'android',
+      build_type: 'release',
       status: 'queued',
       queued_at: queuedAt,
       metadata: {
         unityBuildNumber: unityResponse.build,
-        unityBuildTargetId: unityResponse.buildTargetId
+        unityBuildTargetId: buildTargetId,
+        unityReturnedBuildTargetId: unityResponse.buildTargetId
       }
     })
     .select('id')
