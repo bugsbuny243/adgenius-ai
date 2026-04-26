@@ -3,12 +3,6 @@ const requiredServerEnv = [
   'SUPABASE_URL',
   'SUPABASE_ANON_KEY',
   'SUPABASE_SERVICE_ROLE_KEY',
-  'AI_PROVIDER',
-  'OPENAI_MODEL_PRIMARY',
-  'OPENAI_MODEL_REASONING',
-  'OPENAI_MODEL_FAST',
-  'OPENAI_MODEL_LIGHT',
-  'OPENAI_REASONING_EFFORT',
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
   'GOOGLE_REDIRECT_URI'
@@ -24,7 +18,8 @@ function missingKeys(keys) {
 
 const missingPublic = missingKeys(requiredPublicEnv);
 const baseMissingServer = missingKeys(requiredServerEnv);
-const provider = (process.env.AI_PROVIDER || '').trim().toLowerCase();
+const rawProvider = process.env.AI_PROVIDER;
+const provider = rawProvider && rawProvider.trim().toLowerCase() === 'openai' ? 'openai' : 'groq';
 const providerSpecificMissing =
   provider === 'groq'
     ? missingKeys(['GROQ_API_KEY'])

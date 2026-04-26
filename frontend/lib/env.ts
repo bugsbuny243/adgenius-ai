@@ -38,6 +38,13 @@ function hasValue(value: string | undefined): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+function resolveAiProvider(rawProvider: string | null): 'groq' | 'openai' {
+  const normalized = rawProvider?.trim().toLowerCase();
+  if (normalized === 'openai') return 'openai';
+  if (normalized === 'groq') return 'groq';
+  return 'groq';
+}
+
 function readServerEnv(name: ServerEnvKey): string | null {
   const value = process.env[name];
   return hasValue(value) ? value : null;
@@ -89,11 +96,15 @@ export function getEnvDiagnostics() {
   const isServerRuntime = typeof window === 'undefined';
   const publicEnv = getPublicEnv();
   const serverEnv = getServerEnv();
-  const provider = serverEnv.AI_PROVIDER?.trim().toLowerCase();
+  const provider = resolveAiProvider(serverEnv.AI_PROVIDER);
 
   const missingPublicEnv = PUBLIC_ENV_KEYS.filter((key) => !publicEnv[key]);
   const missingServerEnv = isServerRuntime
     ? SERVER_ENV_KEYS.filter((key) => {
+        if (key === 'AI_PROVIDER') return false;
+        if (key === 'GROQ_MODEL') return false;
+        if (provider === 'groq' && key.startsWith('OPENAI_MODEL_')) return false;
+        if (provider === 'groq' && key === 'OPENAI_REASONING_EFFORT') return false;
         if (provider === 'groq' && key === 'OPENAI_API_KEY') return false;
         if (provider !== 'groq' && key === 'GROQ_API_KEY') return false;
         return !serverEnv[key];
@@ -108,7 +119,7 @@ export function getEnvDiagnostics() {
       if (provider === 'groq') {
         return Boolean(serverEnv.GROQ_API_KEY);
       }
-      return Boolean(serverEnv.AI_PROVIDER && serverEnv.OPENAI_API_KEY);
+      return Boolean(serverEnv.OPENAI_API_KEY);
     })(),
     githubUnity: Boolean(serverEnv.GITHUB_UNITY_REPO_OWNER && serverEnv.GITHUB_UNITY_REPO_NAME && serverEnv.GITHUB_UNITY_REPO_TOKEN),
     unityBuild: Boolean(
