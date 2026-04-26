@@ -3,7 +3,7 @@
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { createSupabaseActionServerClient } from '@/lib/supabase-server';
+import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { normalizeProjectItemType } from '@/lib/project-item-types';
 import { UUID_PATTERN, toCanonicalAgentSlug } from '@/lib/agents';
 import { getWorkspaceContext } from '@/lib/workspace';
@@ -116,7 +116,7 @@ export async function runAgentAction(agentId: string, formData: FormData) {
     redirect(`/agents/${agentId}?error=İstem gerekli.`);
   }
 
-  const serverSupabase = await createSupabaseActionServerClient();
+  const serverSupabase = await createSupabaseServerClient();
   const {
     data: { user: currentUser }
   } = await serverSupabase.auth.getUser();
@@ -300,7 +300,7 @@ export async function rerunAgentAction(agentId: string, formData: FormData) {
     redirect(`/agents/${agentId}?error=Yeniden çalıştırma için kaynak run seçilemedi.`);
   }
 
-  const serverSupabase = await createSupabaseActionServerClient();
+  const serverSupabase = await createSupabaseServerClient();
   const {
     data: { user: currentUser }
   } = await serverSupabase.auth.getUser();
@@ -360,7 +360,7 @@ export async function saveOutputAction(agentId: string, formData: FormData) {
     redirect(`/agents/${agentId}?error=Çalıştırma kimliği eksik.`);
   }
 
-  const serverSupabase = await createSupabaseActionServerClient();
+  const serverSupabase = await createSupabaseServerClient();
   const {
     data: { user: currentUser }
   } = await serverSupabase.auth.getUser();
@@ -433,7 +433,7 @@ export async function createProjectItemFromOutputAction(agentId: string, runIdPa
     redirect(`/agents/${agentId}?error=Proje öğesi için tüm alanları doldurun.`);
   }
 
-  const serverSupabase = await createSupabaseActionServerClient();
+  const serverSupabase = await createSupabaseServerClient();
   const {
     data: { user: currentUser }
   } = await serverSupabase.auth.getUser();
@@ -487,7 +487,7 @@ export async function attachSavedOutputToProjectAction(agentId: string, runIdPar
     redirect(`/agents/${agentId}?error=Proje seçimi zorunludur.`);
   }
 
-  const serverSupabase = await createSupabaseActionServerClient();
+  const serverSupabase = await createSupabaseServerClient();
   const {
     data: { user: currentUser }
   } = await serverSupabase.auth.getUser();
@@ -545,7 +545,7 @@ export async function queueSocialPublishAction(agentId: string, runIdParam: stri
     redirect(`/agents/${agentId}?run_id=${runIdParam}&error=Yayın kuyruğu için geçerli platform seçin.`);
   }
 
-  const serverSupabase = await createSupabaseActionServerClient();
+  const serverSupabase = await createSupabaseServerClient();
   const {
     data: { user: currentUser }
   } = await serverSupabase.auth.getUser();

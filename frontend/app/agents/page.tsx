@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import { Nav } from '@/components/nav';
 import { PublicSiteNav } from '@/components/public-site-nav';
-import { createSupabaseReadonlyServerClient } from '@/lib/supabase-server';
+import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { FINAL_AGENT_CARDS } from '@/lib/agents';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AgentsPage() {
-  const supabase = await createSupabaseReadonlyServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();
