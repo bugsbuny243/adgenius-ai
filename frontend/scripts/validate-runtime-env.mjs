@@ -3,7 +3,6 @@ const requiredServerEnv = [
   'SUPABASE_URL',
   'SUPABASE_ANON_KEY',
   'SUPABASE_SERVICE_ROLE_KEY',
-  'OPENAI_API_KEY',
   'AI_PROVIDER',
   'OPENAI_MODEL_PRIMARY',
   'OPENAI_MODEL_REASONING',
@@ -24,7 +23,13 @@ function missingKeys(keys) {
 }
 
 const missingPublic = missingKeys(requiredPublicEnv);
-const missingServer = missingKeys(requiredServerEnv);
+const baseMissingServer = missingKeys(requiredServerEnv);
+const provider = (process.env.AI_PROVIDER || '').trim().toLowerCase();
+const providerSpecificMissing =
+  provider === 'groq'
+    ? missingKeys(['GROQ_API_KEY'])
+    : missingKeys(['OPENAI_API_KEY']);
+const missingServer = [...baseMissingServer, ...providerSpecificMissing];
 
 if (missingPublic.length || missingServer.length) {
   const details = [
