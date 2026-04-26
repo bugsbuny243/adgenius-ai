@@ -1,16 +1,9 @@
 insert into public.agent_types (slug, name, description, is_active, system_prompt)
 values
   (
-    'business_general',
-    'Koschei İşletme Genel Agent',
-    'İşletme operasyonları, süreç iyileştirme ve günlük karar akışları için genel destek üretir.',
-    true,
-    'Türkçe yaz. Kısa özet, uygulanabilir adımlar ve net çıktı üret.'
-  ),
-  (
-    'blogger',
-    'Koschei Blogger Agent',
-    'Blog yazısı planı, SEO başlıkları ve yayın öncesi içerik hazırlığı üretir.',
+    'game_agent',
+    'Koschei Game Agent',
+    'Oyun fikrini üretim planına dönüştürür, build hattı için üretim adımlarını yönetir.',
     true,
     'Türkçe yaz. Kısa özet, uygulanabilir adımlar ve net çıktı üret.'
   ),
@@ -22,9 +15,16 @@ values
     'Türkçe yaz. Kısa özet, uygulanabilir adımlar ve net çıktı üret.'
   ),
   (
-    'game_factory',
-    'Koschei Game Factory',
-    'Oyun fikrini görev planına çevirir, build hattı için üretim adımlarını yönetir.',
+    'blogger_agent',
+    'Koschei Blogger Agent',
+    'Blog yazısı planı, SEO başlıkları ve yayın öncesi içerik hazırlığı üretir.',
+    true,
+    'Türkçe yaz. Kısa özet, uygulanabilir adımlar ve net çıktı üret.'
+  ),
+  (
+    'business_agent',
+    'Koschei İşletme Agent',
+    'İşletme operasyonları, süreç iyileştirme ve günlük karar akışları için genel destek üretir.',
     true,
     'Türkçe yaz. Kısa özet, uygulanabilir adımlar ve net çıktı üret.'
   )
@@ -35,5 +35,6 @@ set
   is_active = excluded.is_active,
   system_prompt = coalesce(public.agent_types.system_prompt, excluded.system_prompt);
 
-delete from public.agent_types
-where slug not in ('business_general', 'blogger', 'youtube_agent', 'game_factory');
+update public.agent_types
+set is_active = false
+where slug not in ('game_agent', 'youtube_agent', 'blogger_agent', 'business_agent');

@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createSupabaseActionServerClient } from '@/lib/supabase-server';
 import { normalizeProjectItemType } from '@/lib/project-item-types';
+import { UUID_PATTERN, toCanonicalAgentSlug } from '@/lib/agents';
 import { getWorkspaceContext } from '@/lib/workspace';
 
 const SUPPORTED_SOCIAL_PLATFORMS = ['youtube', 'instagram', 'tiktok'] as const;
@@ -69,6 +70,16 @@ function toUserFacingRunError(errorCode: string, fallbackMessage?: string): stri
   return 'Çalışma tamamlanamadı. Lütfen girdiyi sadeleştirip tekrar deneyin.';
 }
 
+
+
+async function resolveAgentType(serverSupabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, agentIdentifier: string) {
+  const query = serverSupabase.from('agent_types').select('id, slug').eq('is_active', true);
+  if (UUID_PATTERN.test(agentIdentifier)) {
+    return query.eq('id', agentIdentifier).maybeSingle();
+  }
+  const canonical = toCanonicalAgentSlug(agentIdentifier) ?? agentIdentifier;
+  return query.eq('slug', canonical).maybeSingle();
+}
 function isRedirectControlFlowError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
   const digest = 'digest' in error ? String((error as { digest?: unknown }).digest ?? '') : '';
@@ -126,7 +137,7 @@ export async function runAgentAction(agentId: string, formData: FormData) {
   const { workspaceId: currentWorkspaceId, userId: currentUserId } = await getWorkspaceContext();
 
   const [agentRes, projectRes] = await Promise.all([
-    serverSupabase.from('agent_types').select('id').eq('id', agentId).eq('is_active', true).maybeSingle(),
+    resolveAgentType(serverSupabase, agentId),
     projectId
       ? serverSupabase
           .from('projects')
@@ -166,7 +177,7 @@ export async function runAgentAction(agentId: string, formData: FormData) {
     .insert({
       workspace_id: currentWorkspaceId,
       user_id: currentUserId,
-      agent_type_id: agentId,
+      agent_type_id: agent.id,
       user_input: prompt,
       metadata: {
         project_id: projectId,
@@ -200,7 +211,7 @@ export async function runAgentAction(agentId: string, formData: FormData) {
       },
       body: JSON.stringify({
         runId: run.id,
-        agentTypeId: agentId,
+        agentTypeId: agent.id,
         userInput: prompt,
         projectId,
         metadata: {
@@ -266,7 +277,8 @@ export async function runAgentAction(agentId: string, formData: FormData) {
         error_message: safeMessage,
         result_text: null,
         completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        metadata: { source: 'agent_detail' }
       })
       .eq('id', run.id)
       .eq('workspace_id', currentWorkspaceId)
@@ -299,13 +311,18 @@ export async function rerunAgentAction(agentId: string, formData: FormData) {
 
   const { workspaceId: currentWorkspaceId, userId: currentUserId } = await getWorkspaceContext();
 
+  const { data: agent } = await resolveAgentType(serverSupabase, agentId);
+  if (!agent) {
+    redirect(`/agents/${agentId}?error=Agent bulunamadı.`);
+  }
+
   const { data: sourceRun } = await serverSupabase
     .from('agent_runs')
     .select('id, user_input, metadata')
     .eq('id', sourceRunId)
     .eq('workspace_id', currentWorkspaceId)
     .eq('user_id', currentUserId)
-    .eq('agent_type_id', agentId)
+    .eq('agent_type_id', agent.id)
     .maybeSingle();
 
   if (!sourceRun?.user_input) {
@@ -383,7 +400,8 @@ export async function saveOutputAction(agentId: string, formData: FormData) {
       .update({
         title,
         content: run.result_text,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        metadata: { source: 'agent_detail' }
       })
       .eq('id', existingOutput.id)
       .eq('workspace_id', currentWorkspaceId)
@@ -394,7 +412,8 @@ export async function saveOutputAction(agentId: string, formData: FormData) {
       user_id: currentUserId,
       agent_run_id: run.id,
       title,
-      content: run.result_text
+      content: run.result_text,
+      metadata: { source: 'agent_detail' }
     });
   }
 
@@ -506,7 +525,8 @@ export async function attachSavedOutputToProjectAction(agentId: string, runIdPar
     user_id: currentUserId,
     agent_run_id: run.id,
     title,
-    content: run.result_text
+    content: run.result_text,
+    metadata: { source: 'agent_detail' }
   });
 
   revalidatePath('/saved');
