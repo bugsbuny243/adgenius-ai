@@ -1,5 +1,5 @@
 import { getApiAuthContext, json } from '@/app/api/game-factory/_auth';
-import { triggerBuild } from '@/lib/unity-bridge';
+import { UnityApiError, triggerBuild } from '@/lib/unity-bridge';
 
 type BuildRequest = { projectId: string };
 
@@ -30,7 +30,45 @@ export async function POST(request: Request) {
   const buildTargetId = process.env.UNITY_BUILD_TARGET_ID?.trim();
   if (!buildTargetId) return json({ ok: false, error: 'UNITY_BUILD_TARGET_ID eksik.' }, 500);
 
-  const unityResponse = await triggerBuild(buildTargetId);
+  let unityResponse: Awaited<ReturnType<typeof triggerBuild>>;
+  try {
+    unityResponse = await triggerBuild(buildTargetId);
+  } catch (error) {
+    const unityError = error instanceof UnityApiError ? error : new UnityApiError('Unity build tetikleme hatası.');
+    console.error('[game-factory/build] Unity trigger failed', {
+      status: unityError.status ?? null,
+      message: unityError.message,
+      endpointPath: unityError.endpointPath ?? `/orgs/:org/projects/:project/buildtargets/${buildTargetId}/builds`,
+      authMode: unityError.authMode
+    });
+
+    const queuedAt = new Date().toISOString();
+    await context.supabase.from('unity_build_jobs').insert({
+      unity_game_project_id: projectId,
+      workspace_id: context.workspaceId,
+      requested_by: context.userId,
+      build_target: buildTargetId,
+      build_type: 'android',
+      status: 'failed',
+      queued_at: queuedAt,
+      error_message: unityError.message
+    });
+
+    await context.supabase
+      .from('unity_game_projects')
+      .update({ status: 'failed' })
+      .eq('id', projectId)
+      .eq('workspace_id', context.workspaceId)
+      .eq('user_id', context.userId);
+
+    return json(
+      {
+        ok: false,
+        error: 'Unity build başlatılamadı. Unity kimlik doğrulaması veya build target ayarlarını kontrol edin.'
+      },
+      502
+    );
+  }
 
   const queuedAt = new Date().toISOString();
   const { data: insertedJob, error: jobError } = await context.supabase

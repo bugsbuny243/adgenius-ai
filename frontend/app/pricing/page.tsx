@@ -1,4 +1,3 @@
-import { AdSenseSlot } from '@/components/ads/AdSenseSlot';
 import { PublicSiteNav } from '@/components/public-site-nav';
 import { GameAgentPackageCard } from '@/components/pricing/game-agent-package-card';
 import { GAME_AGENT_PACKAGES } from '@/lib/game-agent-pricing';
@@ -21,8 +20,6 @@ export default function PricingPage() {
           ))}
         </div>
       </section>
-
-      <AdSenseSlot slot="1000000006" hasContent className="rounded-2xl border border-white/10 bg-black/20 p-4" />
     </main>
   );
 }

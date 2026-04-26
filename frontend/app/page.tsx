@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { AdSenseSlot } from '@/components/ads/AdSenseSlot';
 import { PublicSiteNav } from '@/components/public-site-nav';
 
 const features = [
@@ -55,8 +54,6 @@ export default function HomePage() {
           Hemen Başla
         </Link>
       </section>
-
-      <AdSenseSlot slot="1000000000" hasContent className="rounded-2xl border border-white/10 bg-black/20 p-4" />
     </main>
   );
 }
