@@ -1,5 +1,5 @@
 const UNITY_BASE_URL = 'https://build-api.cloud.unity3d.com/api/v1';
-const UNITY_AUTH_MODE = 'basic_service_account';
+const UNITY_AUTH_MODE = 'unknown';
 
 export type UnityBuildStatus =
   | 'queued'
@@ -52,18 +52,28 @@ export class UnityApiError extends Error {
 function getConfig() {
   const orgId = process.env.UNITY_ORG_ID?.trim();
   const projectId = process.env.UNITY_PROJECT_ID?.trim();
+  const buildApiKey = process.env.UNITY_BUILD_API_KEY?.trim();
   const keyId = process.env.UNITY_SERVICE_ACCOUNT_KEY_ID?.trim();
   const secretKey = process.env.UNITY_SERVICE_ACCOUNT_SECRET?.trim() || process.env.UNITY_SERVICE_ACCOUNT_SECRET_KEY?.trim();
 
-  if (!orgId || !projectId || !keyId || !secretKey) {
-    throw new Error('Unity build ayarları eksik. UNITY_ORG_ID, UNITY_PROJECT_ID ve servis anahtarlarını kontrol edin.');
+  if (!orgId || !projectId || (!buildApiKey && (!keyId || !secretKey))) {
+    throw new Error('Unity build ayarları eksik. UNITY_ORG_ID, UNITY_PROJECT_ID, UNITY_BUILD_API_KEY veya servis hesap anahtarlarını kontrol edin.');
+  }
+
+  if (buildApiKey) {
+    return {
+      orgId,
+      projectId,
+      authorization: `Basic ${buildApiKey}`,
+      authMode: 'basic_build_api_key' as const
+    };
   }
 
   const raw = `${keyId}:${secretKey}`;
   const encoded = Buffer.from(raw, 'utf8').toString('base64');
   const authorization = `Basic ${encoded}`;
 
-  return { orgId, projectId, authorization };
+  return { orgId, projectId, authorization, authMode: 'basic_service_account' as const };
 }
 
 function normalizeStatus(value: unknown): UnityBuildStatus {
@@ -75,7 +85,7 @@ function normalizeStatus(value: unknown): UnityBuildStatus {
 }
 
 async function unityRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const { authorization } = getConfig();
+  const { authorization, authMode } = getConfig();
   const response = await fetch(`${UNITY_BASE_URL}${path}`, {
     ...init,
     headers: {
@@ -94,6 +104,7 @@ async function unityRequest<T>(path: string, init?: RequestInit): Promise<T> {
     status: response.status,
     endpointPath: path,
     method: init?.method ?? 'GET',
+    authMode,
     payload
   });
 
@@ -102,7 +113,7 @@ async function unityRequest<T>(path: string, init?: RequestInit): Promise<T> {
       typeof payload === 'string'
         ? payload
         : (payload as { message?: string } | null | undefined)?.message;
-    throw new UnityApiError(message || `Unity API hatası: ${response.status}`, { status: response.status, endpointPath: path });
+    throw new UnityApiError(message || `Unity API hatası: ${response.status}`, { status: response.status, endpointPath: path, authMode });
   }
 
   if (response.status === 204) {
