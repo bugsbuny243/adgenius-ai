@@ -4,7 +4,6 @@ import { revalidatePath } from 'next/cache';
 import { getAppContextOrRedirect } from '@/lib/app-context';
 import { runTextWithAiEngine } from '@/lib/ai-engine';
 import { createSocialPublishPayload, normalizeSocialContentDraft, type SocialPlatform } from '@/lib/social-content';
-import { createKnowledgeSource } from '@/lib/knowledge';
 
 const SUPPORTED_STATUS_VALUES = ['queued', 'preparing', 'waiting_for_approval', 'published', 'failed', 'draft', 'processing'] as const;
 const PLATFORM_SET = new Set<SocialPlatform>(['youtube', 'instagram', 'tiktok']);
@@ -26,40 +25,25 @@ async function generateComposerDraft(input: { brief: string; contentType: string
     'Sadece JSON döndür. Alanlar: brief, platforms, youtube_title, youtube_description, instagram_caption, tiktok_caption.'
   ].join('\n');
 
-  try {
-    const aiRun = await runTextWithAiEngine({
-      agentSlug: 'sosyal',
-      agentMode: 'script',
-      userInput: aiPrompt,
-      systemPrompt: 'Türkçe sosyal medya içerik taslağı üret. Marka güvenli, doğal ve aksiyona yönlendiren dil kullan.'
-    });
+  const aiRun = await runTextWithAiEngine({
+    agentSlug: 'youtube_agent',
+    agentMode: 'script',
+    userInput: aiPrompt,
+    systemPrompt: 'Türkçe sosyal medya içerik taslağı üret. Marka güvenli, doğal ve aksiyona yönlendiren dil kullan.'
+  });
 
-    const draft = normalizeSocialContentDraft({
-      sourceBrief: input.brief,
-      sourcePlatforms: input.platforms,
-      rawText: aiRun.text
-    });
+  const draft = normalizeSocialContentDraft({
+    sourceBrief: input.brief,
+    sourcePlatforms: input.platforms,
+    rawText: aiRun.text
+  });
 
-    return {
-      draft,
-      aiResultText: aiRun.text,
-      modelAlias: aiRun.alias,
-      usage: aiRun.usage
-    };
-  } catch {
-    const fallbackText = 'AI sağlayıcısı geçici olarak yanıt veremedi. Lütfen tekrar deneyin.';
-    const draft = normalizeSocialContentDraft({
-      sourceBrief: input.brief,
-      sourcePlatforms: input.platforms,
-      rawText: fallbackText
-    });
-    return {
-      draft,
-      aiResultText: fallbackText,
-      modelAlias: 'koschei-fast' as const,
-      usage: { inputTokens: null, outputTokens: null }
-    };
-  }
+  return {
+    draft,
+    aiResultText: aiRun.text,
+    modelAlias: aiRun.alias,
+    usage: aiRun.usage
+  };
 }
 
 export async function createContentJobAction(formData: FormData) {
@@ -74,7 +58,13 @@ export async function createContentJobAction(formData: FormData) {
   }
 
   const { supabase, userId, workspace } = await getAppContextOrRedirect();
-  const generated = await generateComposerDraft({ brief, contentType, agentType, platforms });
+
+  let generated;
+  try {
+    generated = await generateComposerDraft({ brief, contentType, agentType, platforms });
+  } catch {
+    throw new Error('AI sağlayıcısı geçici olarak yanıt veremedi. Lütfen tekrar deneyin.');
+  }
   const draft = generated.draft;
   const queuedAt = new Date().toISOString();
 
@@ -109,7 +99,10 @@ export async function createContentJobAction(formData: FormData) {
       user_id: userId,
       agent_run_id: run.id,
       title: `Composer çıktısı • ${new Date().toLocaleString('tr-TR')}`,
-      content: JSON.stringify(draft, null, 2)
+      content: JSON.stringify(draft, null, 2),
+      metadata: {
+        source: 'composer'
+      }
     })
     .select('id')
     .single();
@@ -164,30 +157,6 @@ export async function createContentJobAction(formData: FormData) {
   revalidatePath('/publish-queue');
   revalidatePath('/dashboard');
   revalidatePath('/saved');
-}
-
-export async function createKnowledgeSourceAction(formData: FormData) {
-  const title = String(formData.get('title') ?? '').trim();
-  const rawText = String(formData.get('raw_text') ?? '').trim();
-  const sourceUrl = String(formData.get('source_url') ?? '').trim();
-  const projectId = String(formData.get('project_id') ?? '').trim() || null;
-
-  if (!title || (!rawText && !sourceUrl)) return;
-
-  const { supabase, userId, workspace } = await getAppContextOrRedirect();
-  await createKnowledgeSource({
-    supabase,
-    workspaceId: workspace.workspaceId,
-    userId,
-    projectId,
-    sourceType: sourceUrl ? 'url' : 'text',
-    title,
-    rawText: rawText || null,
-    sourceUrl: sourceUrl || null,
-    metadata: { source: 'composer' }
-  });
-
-  revalidatePath('/composer');
 }
 
 export async function updatePublishStatusAction(formData: FormData) {
