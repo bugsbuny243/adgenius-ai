@@ -10,7 +10,7 @@ import {
 } from '@/lib/google-oauth';
 import { resolveAppOrigin } from '@/lib/app-origin';
 import { getServerEnv } from '@/lib/env';
-import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { createSupabaseActionServerClient } from '@/lib/supabase-server';
 import { encryptCredentials, serializeEncryptedCredentials } from '@/lib/credentials-encryption';
 
 const GOOGLE_STATE_COOKIE = 'koschei_google_oauth_state';
@@ -111,7 +111,7 @@ export async function GET(request: Request) {
     return response;
   }
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createSupabaseActionServerClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { createSupabaseActionServerClient } from '@/lib/supabase-server';
 import { tryParseEncryptedCredentials, decryptCredentials } from '@/lib/credentials-encryption';
 import { GitHubUnityRepoProvider } from '@/lib/game-factory/providers/github-unity-repo-provider';
 import { UnityCloudBuildProvider } from '@/lib/game-factory/providers/unity-cloud-build-provider';
@@ -26,7 +26,7 @@ function slugify(value: string) {
 }
 
 async function getCurrentUser() {
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createSupabaseActionServerClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();
@@ -35,7 +35,7 @@ async function getCurrentUser() {
 }
 
 async function getOwnedProject(projectId: string, userId: string) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createSupabaseActionServerClient();
   const { data: project } = await supabase.from('game_projects').select('*').eq('id', projectId).eq('user_id', userId).maybeSingle();
   return project;
 }
@@ -256,7 +256,7 @@ type GameFactoryPrimaryActionKey =
   | 'published_details';
 
 export async function resolveGameFactoryPrimaryAction(projectId: string, userId: string): Promise<GameFactoryPrimaryActionKey> {
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createSupabaseActionServerClient();
   const { data: project } = await supabase.from('game_projects').select('id, status').eq('id', projectId).eq('user_id', userId).maybeSingle();
   if (!project) return 'generate';
 

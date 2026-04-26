@@ -6,7 +6,7 @@ import { RunStatusPoller } from '@/components/agent-editor/RunStatusPoller';
 import { ResultPanel } from '@/components/agent-editor/ResultPanel';
 import { buildFormSummary, getAgentEditorConfig, parseEditorMetadata } from '@/lib/agent-editor';
 import { neutralizeVendorTerms } from '@/lib/publish-queue';
-import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { createSupabaseReadonlyServerClient } from '@/lib/supabase-server';
 import { getWorkspaceContext } from '@/lib/workspace';
 import {
   attachSavedOutputToProjectAction,
@@ -36,7 +36,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
   const { id } = await params;
   const { run_id: runIdParam, edit_run_id: editRunIdParam, error: errorParam } = await searchParams;
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createSupabaseReadonlyServerClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();

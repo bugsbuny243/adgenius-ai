@@ -1,13 +1,13 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { Nav } from '@/components/nav';
-import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { createSupabaseReadonlyServerClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
 
 export default async function GameFactoryBuildsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createSupabaseReadonlyServerClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();

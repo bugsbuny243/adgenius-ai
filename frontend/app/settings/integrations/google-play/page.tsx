@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Nav } from '@/components/nav';
-import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { createSupabaseReadonlyServerClient } from '@/lib/supabase-server';
 import { saveGooglePlayIntegrationAction } from '@/app/settings/integrations/google-play/actions';
 
 export const dynamic = 'force-dynamic';
@@ -16,7 +16,7 @@ function bannerText(status: string | undefined) {
 }
 
 export default async function GooglePlayIntegrationsPage({ searchParams }: PageProps) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createSupabaseReadonlyServerClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();

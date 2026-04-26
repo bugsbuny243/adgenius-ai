@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { createSupabaseActionServerClient } from '@/lib/supabase-server';
 import { GAME_AGENT_PACKAGE_MAP, type GameAgentPlanKey } from '@/lib/game-agent-pricing';
 
 type CheckoutPayload = {
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'invalid_plan_key' }, { status: 400 });
   }
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createSupabaseActionServerClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();

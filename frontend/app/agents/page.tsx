@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Nav } from '@/components/nav';
 import { PublicSiteNav } from '@/components/public-site-nav';
-import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { createSupabaseReadonlyServerClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +25,7 @@ function getStatusLabel(slug: string, isActive: boolean): 'Aktif' | 'Kurulum ger
 }
 
 export default async function AgentsPage() {
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createSupabaseReadonlyServerClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();

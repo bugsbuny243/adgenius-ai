@@ -8,7 +8,7 @@ import {
   resolveGameFactoryPrimaryAction,
   refreshBuildStatusAction,
 } from '@/app/game-factory/actions';
-import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { createSupabaseReadonlyServerClient } from '@/lib/supabase-server';
 import { gameFactoryStatusLabel } from '@/lib/game-factory/ui';
 
 export const dynamic = 'force-dynamic';
@@ -19,7 +19,7 @@ function PrimaryButton({ children }: { children: ReactNode }) {
 
 export default async function GameFactoryProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createSupabaseReadonlyServerClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();

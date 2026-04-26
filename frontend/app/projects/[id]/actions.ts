@@ -2,13 +2,13 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { createSupabaseActionServerClient } from '@/lib/supabase-server';
 import { normalizeProjectItemType } from '@/lib/project-item-types';
 import { normalizeProjectStatus } from '@/lib/project-status';
 import { getWorkspaceContext } from '@/lib/workspace';
 
 async function createWorkflowItem(projectId: string, payload: { itemType: string; title: string; content?: string; parentItemId?: string | null }) {
-  const serverSupabase = await createSupabaseServerClient();
+  const serverSupabase = await createSupabaseActionServerClient();
   const {
     data: { user: currentUser }
   } = await serverSupabase.auth.getUser();
@@ -91,7 +91,7 @@ export async function createDeliveryNoteAction(projectId: string, formData: Form
 export async function updateProjectStatusAction(projectId: string, formData: FormData) {
   const nextStatus = normalizeProjectStatus(formData.get('status'));
 
-  const serverSupabase = await createSupabaseServerClient();
+  const serverSupabase = await createSupabaseActionServerClient();
   const {
     data: { user: currentUser }
   } = await serverSupabase.auth.getUser();
@@ -121,7 +121,7 @@ export async function attachSavedOutputToProjectItemAction(projectId: string, fo
 
   if (!savedOutputId || !projectItemId) return;
 
-  const serverSupabase = await createSupabaseServerClient();
+  const serverSupabase = await createSupabaseActionServerClient();
   const {
     data: { user: currentUser }
   } = await serverSupabase.auth.getUser();
