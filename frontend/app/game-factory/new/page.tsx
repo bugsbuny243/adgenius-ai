@@ -1,52 +1,181 @@
-import { Nav } from '@/components/nav';
-import { createGameProjectAction } from '@/app/game-factory/actions';
+'use client';
+
+import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+
+type Platform = 'android' | 'ios';
+type GameBrief = {
+  appName: string;
+  packageName: string;
+  genre: 'runner' | 'platformer' | 'puzzle' | 'arcade' | 'casual';
+  description: string;
+  storeShortDescription: string;
+  storeFullDescription: string;
+  visualStyle: string;
+  controls: string;
+  monetization: 'ads' | 'iap' | 'free';
+  targetAge: 'kids' | 'all' | 'teens';
+  keyFeatures: string[];
+};
+
+async function getAccessToken() {
+  const supabase = createSupabaseBrowserClient();
+  if (!supabase) throw new Error('Supabase yapılandırması eksik.');
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new Error('Lütfen yeniden giriş yapın.');
+  return token;
+}
 
 export default function NewGameFactoryPage() {
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [platform, setPlatform] = useState<Platform>('android');
+  const [prompt, setPrompt] = useState('');
+  const [brief, setBrief] = useState<GameBrief | null>(null);
+  const [projectId, setProjectId] = useState<string>('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>('');
+  const router = useRouter();
+
+  const isCreateDisabled = useMemo(() => loading || prompt.trim().length < 10, [loading, prompt]);
+
+  async function createBrief() {
+    setLoading(true);
+    setError('');
+    try {
+      const token = await getAccessToken();
+      const response = await fetch('/api/game-factory/brief', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ prompt, platform })
+      });
+
+      const data = (await response.json()) as { ok: boolean; error?: string; projectId?: string; brief?: GameBrief };
+      if (!response.ok || !data.ok || !data.brief || !data.projectId) {
+        throw new Error(data.error ?? 'Brief oluşturulamadı.');
+      }
+
+      setBrief(data.brief);
+      setProjectId(data.projectId);
+      setStep(2);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Bir hata oluştu.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function approveProject() {
+    setLoading(true);
+    setError('');
+    try {
+      const token = await getAccessToken();
+      const response = await fetch('/api/game-factory/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ projectId })
+      });
+      const data = (await response.json()) as { ok: boolean; error?: string };
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error ?? 'Onay işlemi başarısız.');
+      }
+      setStep(3);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Bir hata oluştu.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function startBuild() {
+    setLoading(true);
+    setError('');
+    try {
+      const token = await getAccessToken();
+      const response = await fetch('/api/game-factory/build', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ projectId })
+      });
+      const data = (await response.json()) as { ok: boolean; error?: string };
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error ?? 'Build başlatılamadı.');
+      }
+      router.push(`/game-factory/${projectId}/builds`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Bir hata oluştu.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <main>
-      <Nav />
-      <section className="panel space-y-4">
-        <h1 className="text-3xl font-bold">Game Factory · Oyun üret</h1>
-        <form action={createGameProjectAction} className="grid gap-3 md:grid-cols-2">
-          <label className="space-y-1">
-            <span className="text-sm">Oyun adı</span>
-            <input name="name" required className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" />
-          </label>
+    <main className="panel space-y-4">
+      <h1 className="text-3xl font-bold">Yeni Oyun Projesi</h1>
+      <p className="text-sm text-white/70">Adım {step}/3</p>
 
-          <label className="space-y-1">
-            <span className="text-sm">Oyun türü</span>
-            <select name="game_type" className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2">
-              <option value="runner_2d">runner_2d</option>
-              <option value="puzzle">puzzle</option>
-              <option value="idle_clicker">idle_clicker</option>
-              <option value="arcade">arcade</option>
-              <option value="platformer">platformer</option>
-              <option value="custom">custom</option>
-            </select>
-          </label>
-
-          <label className="space-y-1 md:col-span-2">
-            <span className="text-sm">Paket adı (ör. com.koschei.generated.ornek)</span>
-            <input name="package_name" className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" />
-          </label>
-
-          <label className="space-y-1 md:col-span-2">
-            <span className="text-sm">Üretim promptu</span>
-            <textarea name="prompt" required rows={5} className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" />
-          </label>
-
-          <label className="space-y-1">
-            <span className="text-sm">Hedef platform</span>
-            <input value="Android" readOnly className="w-full rounded-lg border border-white/20 bg-black/20 px-3 py-2" />
-          </label>
-
-          <div className="flex items-end">
-            <button type="submit" className="rounded-lg bg-neon px-4 py-2 font-semibold text-ink">
-              Oyun üret
+      {step === 1 ? (
+        <section className="space-y-3 rounded-xl border border-white/10 bg-black/20 p-4">
+          <h2 className="text-xl font-semibold">1) Fikir</h2>
+          <textarea
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+            rows={7}
+            placeholder="Oyununu anlat... (örn: 'Türkçe kelime bulmaca oyunu, reklamlarla para kazan, sade görsel')"
+            className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2"
+          />
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setPlatform('android')} className={`rounded-lg px-3 py-2 ${platform === 'android' ? 'bg-neon text-ink' : 'border border-white/20'}`}>
+              Android
+            </button>
+            <button type="button" disabled className="cursor-not-allowed rounded-lg border border-white/10 px-3 py-2 text-white/50">
+              iOS (yakında)
             </button>
           </div>
-        </form>
-      </section>
+          <button type="button" disabled={isCreateDisabled} onClick={createBrief} className="rounded-lg bg-neon px-4 py-2 font-semibold text-ink disabled:opacity-50">
+            Brief Oluştur
+          </button>
+          {loading ? <p className="animate-pulse text-sm text-white/70">AI brief hazırlıyor...</p> : null}
+        </section>
+      ) : null}
+
+      {step === 2 && brief ? (
+        <section className="space-y-3 rounded-xl border border-white/10 bg-black/20 p-4 text-sm">
+          <h2 className="text-xl font-semibold">2) Brief Önizleme</h2>
+          <p><b>Uygulama adı:</b> {brief.appName}</p>
+          <p><b>Paket adı:</b> {brief.packageName}</p>
+          <p><b>Tür:</b> {brief.genre}</p>
+          <p><b>Store açıklaması:</b> {brief.storeShortDescription}</p>
+          <p><b>Görsel stil:</b> {brief.visualStyle}</p>
+          <p><b>Kontroller:</b> {brief.controls}</p>
+          <ul className="list-disc pl-5">
+            {brief.keyFeatures.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+          <div className="flex gap-2">
+            <button type="button" onClick={approveProject} disabled={loading} className="rounded-lg bg-neon px-4 py-2 font-semibold text-ink disabled:opacity-50">
+              Onayla ve Devam Et
+            </button>
+            <button type="button" onClick={() => setStep(1)} disabled={loading} className="rounded-lg border border-white/20 px-4 py-2 disabled:opacity-50">
+              Tekrar Oluştur
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {step === 3 ? (
+        <section className="space-y-3 rounded-xl border border-white/10 bg-black/20 p-4">
+          <h2 className="text-xl font-semibold">3) Build Başlat</h2>
+          <p className="text-sm text-white/70">Projen onaylandı. Şimdi ilk build işlemini başlatabilirsin.</p>
+          <button type="button" onClick={startBuild} disabled={loading} className="rounded-lg bg-neon px-4 py-2 font-semibold text-ink disabled:opacity-50">
+            Build Başlat
+          </button>
+        </section>
+      ) : null}
+
+      {error ? <p className="rounded-lg border border-red-500/30 bg-red-950/30 p-3 text-sm text-red-200">{error}</p> : null}
     </main>
   );
 }
