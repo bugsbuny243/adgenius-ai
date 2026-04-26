@@ -11,11 +11,11 @@ type AdSenseSlotProps = {
   className?: string;
 };
 
-const allowedExactRoutes = new Set(['/', '/blog', '/guides', '/about', '/pricing']);
+const allowedExactRoutes = new Set(['/', '/about', '/pricing', '/contact']);
 
 function isAllowedPublicContentRoute(pathname: string) {
   if (allowedExactRoutes.has(pathname)) return true;
-  return /^\/(blog|guides)\/[a-z0-9-]+$/.test(pathname);
+  return false;
 }
 
 export function AdSenseSlot({ slot, hasContent, className }: AdSenseSlotProps) {
