@@ -1,21 +1,32 @@
 export const GAME_PROJECT_STATUSES = [
   'draft',
-  'generating',
-  'generated',
-  'committing',
-  'ready_for_build',
+  'planned',
+  'queued',
   'building',
   'build_succeeded',
   'build_failed',
-  'release_preparing',
-  'release_ready',
-  'publishing',
-  'published',
-  'publish_failed',
-  'archived'
+  'ready_for_review',
+  'approved',
+  'rejected'
 ] as const;
 
 export type GameProjectStatus = (typeof GAME_PROJECT_STATUSES)[number];
+export type UnityGameProjectStatus =
+  | 'draft'
+  | 'planned'
+  | 'queued'
+  | 'building'
+  | 'build_succeeded'
+  | 'build_failed'
+  | 'ready_for_review'
+  | 'approved'
+  | 'rejected';
+
+export const UNITY_GAME_PROJECT_APPROVAL_STATUSES = ['pending', 'approved', 'rejected'] as const;
+export type UnityGameProjectApprovalStatus = 'pending' | 'approved' | 'rejected';
+
+export const UNITY_TARGET_PLATFORMS = ['android'] as const;
+export type UnityTargetPlatform = 'android';
 
 export const GAME_BUILD_STATUSES = ['queued', 'triggered', 'building', 'succeeded', 'failed', 'canceled'] as const;
 export type GameBuildStatus = (typeof GAME_BUILD_STATUSES)[number];
