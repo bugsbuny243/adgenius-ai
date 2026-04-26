@@ -263,7 +263,9 @@ export async function POST(request: Request) {
   }
 
   const requestedPlatform = requestBody.targetPlatform ?? requestBody.platform;
-  const targetPlatform = requestedPlatform === 'android' ? 'android' : 'android';
+  void requestedPlatform;
+  const normalizedTargetPlatform = 'android';
+  const targetPlatform = normalizedTargetPlatform;
 
   const provider = resolveAiProvider(process.env.AI_PROVIDER);
   const isGroqProvider = provider === 'groq';
@@ -408,8 +410,8 @@ export async function POST(request: Request) {
       app_name: parsed.title,
       user_prompt: prompt,
       package_name: parsed.packageName,
-      target_platform: targetPlatform,
-      status: 'brief_ready',
+      target_platform: normalizedTargetPlatform,
+      status: 'draft',
       approval_status: 'pending',
       game_brief: parsed
     })
@@ -417,8 +419,21 @@ export async function POST(request: Request) {
     .single();
 
   if (error || !data) {
+    const insertPayload = {
+      status: 'draft' as const,
+      approval_status: 'pending' as const,
+      target_platform: normalizedTargetPlatform
+    };
+    console.error('[game-factory brief]', {
+      stage: 'db_write',
+      table: 'unity_game_projects',
+      status: insertPayload.status,
+      approvalStatus: insertPayload.approval_status,
+      targetPlatform: insertPayload.target_platform,
+      message: error?.message
+    });
     logRouteError('db_write', error ?? new Error('Missing inserted row data'));
-    return json({ ok: false, error: error?.message ?? 'Kayıt oluşturulamadı.' }, 400);
+    return json({ error: 'Oyun projesi kaydedilemedi. Lütfen tekrar deneyin.' }, 400);
   }
 
   return json({ ok: true, projectId: data.id, brief: parsed });
