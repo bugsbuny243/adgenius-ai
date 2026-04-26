@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { Nav } from '@/components/nav';
 import { getAppContextOrRedirect } from '@/lib/app-context';
 import { bloggerConnector } from '@/lib/connectors/blogger';
@@ -5,6 +6,10 @@ import { youtubeConnector } from '@/lib/connectors/youtube';
 import { deriveQueuePreview, toPlatformLabel, toQueueActionLabel, toQueueStateHint, toQueueStatusLabel } from '@/lib/publish-queue';
 import { ComposerWorkbench } from './composer-workbench';
 import { createContentJobAction, updatePublishStatusAction } from './actions';
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false }
+};
 
 export const dynamic = 'force-dynamic';
 

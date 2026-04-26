@@ -2,12 +2,13 @@ import Link from 'next/link';
 
 const links = [
   { href: '/', label: 'Ana Sayfa' },
-  { href: '/agents', label: 'Ajanlar' },
-  { href: '/game-factory', label: 'Game Factory' },
+  { href: '/blog', label: 'Blog' },
+  { href: '/guides', label: 'Rehberler' },
   { href: '/pricing', label: 'Fiyatlandırma' },
   { href: '/about', label: 'Hakkımızda' },
   { href: '/contact', label: 'İletişim' },
-  { href: '/articles', label: 'Yazılar' },
+  { href: '/privacy', label: 'Gizlilik Politikası' },
+  { href: '/terms', label: 'Kullanım Koşulları' },
   { href: '/login', label: 'Giriş' }
 ] as const;
 

@@ -1,7 +1,12 @@
+import type { Metadata } from 'next';
 import { Nav } from '@/components/nav';
 import { SavedList } from '@/components/saved-list';
 import { getAppContextOrRedirect } from '@/lib/app-context';
 import { deleteSavedOutputAction } from './actions';
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false }
+};
 
 export const dynamic = 'force-dynamic';
 

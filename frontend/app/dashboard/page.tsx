@@ -1,7 +1,12 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Nav } from '@/components/nav';
 import { getAppContextOrRedirect } from '@/lib/app-context';
 import { neutralizeVendorTerms, sanitizeUserFacingEngineLabel } from '@/lib/publish-queue';
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false }
+};
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;

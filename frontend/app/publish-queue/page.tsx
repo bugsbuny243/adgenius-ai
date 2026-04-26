@@ -1,7 +1,12 @@
+import type { Metadata } from 'next';
 import { Nav } from '@/components/nav';
 import { getAppContextOrRedirect } from '@/lib/app-context';
 import { deriveQueuePreview, toPlatformLabel, toQueueActionLabel, toQueueStateHint, toQueueStatusLabel } from '@/lib/publish-queue';
 import { updatePublishStatusAction } from '@/app/composer/actions';
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false }
+};
 
 export const dynamic = 'force-dynamic';
 
