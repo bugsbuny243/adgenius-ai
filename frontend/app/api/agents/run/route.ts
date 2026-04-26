@@ -18,7 +18,7 @@ type RunRequestBody = {
 };
 
 const RUN_TIMEOUT_MS = 40_000;
-const FALLBACK_ENGINE_NAME = 'Koschei AI motoru';
+const DEFAULT_ENGINE_NAME = 'AI motoru';
 const QUOTA_ERROR_CODE = 'provider_quota_exceeded';
 const QUOTA_ERROR_MESSAGE = 'Kullanım limiti veya kredi durumu nedeniyle çalışma başlatılamadı.';
 const RATE_LIMIT_ERROR_CODE = 'provider_rate_limited';
@@ -128,75 +128,103 @@ async function upsertSavedOutputForRun(
     metadata: Record<string, unknown>;
   }
 ): Promise<string | null> {
-  const db = serviceSupabase as {
-    from: (table: string) => {
-      select: (query: string) => {
-        eq: (column: string, value: string) => {
-          eq: (column: string, value: string) => {
-            eq: (column: string, value: string) => {
-              order: (column: string, opts: { ascending: boolean }) => {
-                limit: (count: number) => { maybeSingle: () => Promise<{ data: { id?: string } | null }> };
-              };
-            };
-          };
-        };
-      };
-      update: (value: unknown) => {
-        eq: (column: string, value: string) => {
-          eq: (column: string, value: string) => {
-            eq: (column: string, value: string) => Promise<unknown>;
-          };
-        };
-      };
-      insert: (value: unknown) => {
-        select: (query: string) => { maybeSingle: () => Promise<{ data: { id?: string } | null }> };
-      };
-    };
-  };
+  const db = serviceSupabase as { from: (table: string) => any };
 
-  const existing = await db
+  const { data, error } = await db
     .from('saved_outputs')
-    .select('id')
-    .eq('workspace_id', payload.workspaceId)
-    .eq('user_id', payload.userId)
-    .eq('agent_run_id', payload.runId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (existing.data?.id) {
-    await db
-      .from('saved_outputs')
-      .update({
-        title: payload.title,
-        content: payload.content,
+    .upsert(
+      {
+        workspace_id: payload.workspaceId,
+        user_id: payload.userId,
+        agent_run_id: payload.runId,
         project_id: payload.projectId,
         project_item_id: payload.projectItemId,
+        title: payload.title,
+        content: payload.content,
         metadata: payload.metadata,
         updated_at: new Date().toISOString()
-      })
-      .eq('id', existing.data.id)
-      .eq('workspace_id', payload.workspaceId)
-      .eq('user_id', payload.userId);
-    return existing.data.id;
-  }
-
-  const inserted = await db
-    .from('saved_outputs')
-    .insert({
-      workspace_id: payload.workspaceId,
-      user_id: payload.userId,
-      agent_run_id: payload.runId,
-      project_id: payload.projectId,
-      project_item_id: payload.projectItemId,
-      title: payload.title,
-      content: payload.content,
-      metadata: payload.metadata
-    })
+      },
+      { onConflict: 'agent_run_id,user_id' }
+    )
     .select('id')
     .maybeSingle();
 
-  return inserted.data?.id ?? null;
+  if (error) {
+    throw new Error(`saved_output_upsert_failed:${error.message}`);
+  }
+
+  return data?.id ?? null;
+}
+
+async function upsertContentItem(
+  serviceSupabase: unknown,
+  payload: {
+    workspaceId: string;
+    userId: string;
+    runId: string;
+    projectId: string | null;
+    savedOutputId: string | null;
+    draft: SocialContentDraft;
+  }
+): Promise<string | null> {
+  const db = serviceSupabase as { from: (table: string) => any };
+
+  const { data, error } = await db
+    .from('content_items')
+    .upsert(
+      {
+        workspace_id: payload.workspaceId,
+        user_id: payload.userId,
+        project_id: payload.projectId,
+        run_id: payload.runId,
+        saved_output_id: payload.savedOutputId,
+        status: 'draft',
+        brief: payload.draft.brief,
+        platforms: payload.draft.platforms,
+        youtube_title: payload.draft.youtubeTitle,
+        youtube_description: payload.draft.youtubeDescription,
+        instagram_caption: payload.draft.instagramCaption,
+        tiktok_caption: payload.draft.tiktokCaption,
+        updated_at: new Date().toISOString()
+      },
+      { onConflict: 'run_id,user_id' }
+    )
+    .select('id')
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`content_item_upsert_failed:${error.message}`);
+  }
+
+  return data?.id ?? null;
+}
+
+async function queuePublishJobs(
+  serviceSupabase: unknown,
+  payload: {
+    workspaceId: string;
+    projectId: string | null;
+    contentItemId: string;
+    draft: SocialContentDraft;
+  }
+) {
+  for (const platform of payload.draft.platforms) {
+  const db = serviceSupabase as { from: (table: string) => any };
+
+    const { error } = await db.from('publish_jobs').insert({
+      workspace_id: payload.workspaceId,
+      project_id: payload.projectId,
+      content_output_id: payload.contentItemId,
+      target_platform: platform,
+      status: 'queued',
+      queued_at: new Date().toISOString(),
+      payload: createSocialPublishPayload(payload.draft, platform)
+    });
+
+    if (error) {
+      throw new Error(`publish_job_insert_failed:${error.message}`);
+    }
+  }
 }
 
 
@@ -219,97 +247,6 @@ function getAccessToken(request: Request): string | null {
   }
 
   return authorization.slice('Bearer '.length).trim() || null;
-}
-
-async function insertContentItemWithFallbacks(
-  serviceSupabase: unknown,
-  payload: {
-    workspaceId: string;
-    userId: string;
-    runId: string;
-    projectId: string | null;
-    savedOutputId: string | null;
-    draft: SocialContentDraft;
-  }
-): Promise<string | null> {
-  const candidates = [
-    {
-      workspace_id: payload.workspaceId,
-      user_id: payload.userId,
-      project_id: payload.projectId,
-      run_id: payload.runId,
-      saved_output_id: payload.savedOutputId,
-      status: 'draft',
-      brief: payload.draft.brief,
-      platforms: payload.draft.platforms,
-      youtube_title: payload.draft.youtubeTitle,
-      youtube_description: payload.draft.youtubeDescription,
-      instagram_caption: payload.draft.instagramCaption,
-      tiktok_caption: payload.draft.tiktokCaption
-    },
-    {
-      workspace_id: payload.workspaceId,
-      user_id: payload.userId,
-      project_id: payload.projectId,
-      run_id: payload.runId,
-      saved_output_id: payload.savedOutputId,
-      brief: payload.draft.brief,
-      platforms: payload.draft.platforms,
-      youtube_title: payload.draft.youtubeTitle,
-      youtube_description: payload.draft.youtubeDescription,
-      instagram_caption: payload.draft.instagramCaption,
-      tiktok_caption: payload.draft.tiktokCaption
-    }
-  ];
-
-  for (const candidate of candidates) {
-    const { data, error } = await ((serviceSupabase as { from: (table: string) => { insert: (value: unknown) => { select: (query: string) => { maybeSingle: () => Promise<{ data: { id?: string } | null; error: { message?: string } | null }> } } } }).from('content_items')).insert(candidate).select('id').maybeSingle();
-    if (!error && data?.id) {
-      return data.id;
-    }
-  }
-
-  return null;
-}
-
-async function insertPublishJobsWithFallbacks(
-  serviceSupabase: unknown,
-  payload: {
-    workspaceId: string;
-    projectId: string | null;
-    contentItemId: string;
-    draft: SocialContentDraft;
-  }
-) {
-  for (const platform of payload.draft.platforms) {
-    const candidates = [
-      {
-        workspace_id: payload.workspaceId,
-        project_id: payload.projectId,
-        content_output_id: payload.contentItemId,
-        target_platform: platform,
-        status: 'queued',
-        queued_at: new Date().toISOString(),
-        payload: createSocialPublishPayload(payload.draft, platform)
-      },
-      {
-        workspace_id: payload.workspaceId,
-        project_id: payload.projectId,
-        content_output_id: payload.contentItemId,
-        target_platform: platform,
-        status: 'draft',
-        queued_at: new Date().toISOString(),
-        payload: createSocialPublishPayload(payload.draft, platform)
-      }
-    ];
-
-    for (const candidate of candidates) {
-      const { error } = await ((serviceSupabase as { from: (table: string) => { insert: (value: unknown) => Promise<{ error: { message?: string } | null }> } }).from('publish_jobs')).insert(candidate);
-      if (!error) {
-        break;
-      }
-    }
-  }
 }
 
 export async function POST(request: Request) {
@@ -520,7 +457,7 @@ export async function POST(request: Request) {
         metadata: {
           ...(run.metadata ?? {}),
           ...(requestMetadata ?? {}),
-          ai_engine: FALLBACK_ENGINE_NAME
+          ai_engine: DEFAULT_ENGINE_NAME
         }
       })
       .eq('id', runId)
@@ -607,121 +544,66 @@ export async function POST(request: Request) {
     const workflowFields = resolveWorkflowFieldsFromMetadata({ ...(run.metadata ?? {}), ...(requestMetadata ?? {}) });
     const resolvedProjectId = workflowFields.projectId ?? projectId;
 
-    await upsertSavedOutputForRun(serviceSupabase, {
-      workspaceId: membership.workspace_id,
-      userId: user.id,
-      runId,
-      title: agentType.slug === 'sosyal' ? 'Sosyal medya çıktısı' : 'Agent çıktısı',
-      content: resultText,
-      projectId: resolvedProjectId,
-      projectItemId: workflowFields.projectItemId,
-      metadata: {
-        ...(workflowFields.workflowMetadata ?? {}),
-        source: 'agents_run_route'
-      }
-    });
-
-    if (agentType.slug === 'sosyal') {
-      const preferredPlatform =
-        requestEditorState && typeof requestEditorState.platform === 'string' ? requestEditorState.platform.toLowerCase() : null;
-      const requestedPlatforms =
-        requestEditorState && typeof requestEditorState.platforms !== 'undefined' ? requestEditorState.platforms : null;
-      const platforms: SocialPlatform[] = normalizePlatforms([...(preferredPlatform ? [preferredPlatform] : []), ...(Array.isArray(requestedPlatforms) ? requestedPlatforms : [])]);
-
-      const draft = normalizeSocialContentDraft({
-        sourceBrief: userInput,
-        sourcePlatforms: platforms,
-        rawText: resultText
+    try {
+      const savedOutputId = await upsertSavedOutputForRun(serviceSupabase, {
+        workspaceId: membership.workspace_id,
+        userId: user.id,
+        runId,
+        title: agentType.slug === 'sosyal' ? 'Sosyal medya çıktısı' : 'Agent çıktısı',
+        content: resultText,
+        projectId: resolvedProjectId,
+        projectItemId: workflowFields.projectItemId,
+        metadata: {
+          ...(workflowFields.workflowMetadata ?? {}),
+          source: 'agents_run_route'
+        }
       });
 
-      const { data: existingSavedOutput } = await serviceSupabase
-        .from('saved_outputs')
-        .select('id')
-        .eq('workspace_id', membership.workspace_id)
-        .eq('user_id', user.id)
-        .eq('agent_run_id', runId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      if (agentType.slug === 'sosyal') {
+        const preferredPlatform =
+          requestEditorState && typeof requestEditorState.platform === 'string' ? requestEditorState.platform.toLowerCase() : null;
+        const requestedPlatforms =
+          requestEditorState && typeof requestEditorState.platforms !== 'undefined' ? requestEditorState.platforms : null;
+        const platforms: SocialPlatform[] = normalizePlatforms([...(preferredPlatform ? [preferredPlatform] : []), ...(Array.isArray(requestedPlatforms) ? requestedPlatforms : [])]);
 
-      let savedOutputId: string | null = null;
-      if (existingSavedOutput?.id) {
-        savedOutputId = existingSavedOutput.id;
-        await serviceSupabase
-          .from('saved_outputs')
-          .update({
-            project_id: resolvedProjectId,
-            title: 'Sosyal medya çıktısı',
-            content: resultText,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingSavedOutput.id)
-          .eq('workspace_id', membership.workspace_id)
-          .eq('user_id', user.id);
-      } else {
-        const { data: savedOutput } = await serviceSupabase
-          .from('saved_outputs')
-          .insert({
-            workspace_id: membership.workspace_id,
-            user_id: user.id,
-            project_id: resolvedProjectId,
-            agent_run_id: runId,
-            title: 'Sosyal medya çıktısı',
-            content: resultText
-          })
-          .select('id')
-          .maybeSingle();
-        savedOutputId = savedOutput?.id ?? null;
-      }
-
-      const { data: existingContentItem } = await serviceSupabase
-        .from('content_items')
-        .select('id')
-        .eq('workspace_id', membership.workspace_id)
-        .eq('user_id', user.id)
-        .eq('run_id', runId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      let contentItemId: string | null = null;
-      if (existingContentItem?.id) {
-        contentItemId = existingContentItem.id;
-        await serviceSupabase
-          .from('content_items')
-          .update({
-            project_id: resolvedProjectId,
-            saved_output_id: savedOutputId,
-            brief: draft.brief,
-            platforms: draft.platforms,
-            youtube_title: draft.youtubeTitle,
-            youtube_description: draft.youtubeDescription,
-            instagram_caption: draft.instagramCaption,
-            tiktok_caption: draft.tiktokCaption,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingContentItem.id)
-          .eq('workspace_id', membership.workspace_id)
-          .eq('user_id', user.id);
-      } else {
-        contentItemId = await insertContentItemWithFallbacks(serviceSupabase, {
-          workspaceId: membership.workspace_id,
-          userId: user.id,
-          runId,
-          projectId: resolvedProjectId,
-          savedOutputId,
-          draft
+        const draft = normalizeSocialContentDraft({
+          sourceBrief: userInput,
+          sourcePlatforms: platforms,
+          rawText: resultText
         });
-      }
 
-      if (contentItemId) {
-        await insertPublishJobsWithFallbacks(serviceSupabase, {
-          workspaceId: membership.workspace_id,
-          projectId: resolvedProjectId,
-          contentItemId,
-          draft
-        });
+        if (membership.workspace_id && user.id && draft.brief && Array.isArray(draft.platforms) && draft.platforms.length > 0) {
+          const contentItemId = await upsertContentItem(serviceSupabase, {
+            workspaceId: membership.workspace_id,
+            userId: user.id,
+            runId,
+            projectId: resolvedProjectId,
+            savedOutputId,
+            draft
+          });
+
+          const shouldQueueForPublish =
+            requestEditorState && typeof requestEditorState.queue_for_publish === 'boolean'
+              ? requestEditorState.queue_for_publish
+              : false;
+
+          if (contentItemId && shouldQueueForPublish) {
+            await queuePublishJobs(serviceSupabase, {
+              workspaceId: membership.workspace_id,
+              projectId: resolvedProjectId,
+              contentItemId,
+              draft
+            });
+          }
+        }
       }
+    } catch (persistenceError) {
+      console.error('[agents/run] Secondary persistence failed after successful AI run', {
+        runId,
+        userId: user.id,
+        workspaceId: membership.workspace_id,
+        error: persistenceError instanceof Error ? persistenceError.message : persistenceError
+      });
     }
 
     return NextResponse.json({ ok: true, runId, result: resultText });
@@ -741,7 +623,7 @@ export async function POST(request: Request) {
         metadata: {
           ...(run.metadata ?? {}),
           ...(requestMetadata ?? {}),
-          ai_engine: FALLBACK_ENGINE_NAME
+          ai_engine: DEFAULT_ENGINE_NAME
         }
       })
       .eq('id', runId)
