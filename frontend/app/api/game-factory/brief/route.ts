@@ -1,4 +1,3 @@
-import OpenAI from 'openai';
 import { getApiAuthContext, json } from '@/app/api/game-factory/_auth';
 import { requireActiveGameAgentPackage } from '@/lib/game-agent-access';
 
@@ -56,7 +55,14 @@ type ParseFailureReason =
   | 'missing_release_notes'
   | 'empty_ai_response';
 
-const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
+const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-120b';
+
+function resolveAiProvider(rawProvider: string | undefined): 'groq' | 'openai' {
+  const normalized = rawProvider?.trim().toLowerCase();
+  if (normalized === 'openai') return 'openai';
+  if (normalized === 'groq') return 'groq';
+  return 'groq';
+}
 
 const GAME_BRIEF_SCHEMA = {
   type: 'object',
@@ -259,7 +265,7 @@ export async function POST(request: Request) {
   const requestedPlatform = requestBody.targetPlatform ?? requestBody.platform;
   const targetPlatform = requestedPlatform === 'android' ? 'android' : 'android';
 
-  const provider = process.env.AI_PROVIDER?.trim().toLowerCase() || 'openai';
+  const provider = resolveAiProvider(process.env.AI_PROVIDER);
   const isGroqProvider = provider === 'groq';
   const model = isGroqProvider
     ? process.env.GROQ_MODEL?.trim() || DEFAULT_GROQ_MODEL
@@ -286,6 +292,7 @@ export async function POST(request: Request) {
     if (isGroqProvider) {
       aiText = await callGroqBriefModel(prompt, targetPlatform, model);
     } else {
+      const { default: OpenAI } = await import('openai');
       const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
       const response = await client.responses.create({
         model,
@@ -374,7 +381,7 @@ export async function POST(request: Request) {
         reason
       });
       return json(
-        { ok: false, error: 'AI yanıtı beklenen JSON alanlarını içermiyor. Lütfen tekrar deneyin.' },
+        { ok: false, error: "Oyun brief'i oluşturulamadı. Lütfen fikri biraz daha net yazıp tekrar deneyin." },
         422
       );
     }
@@ -387,7 +394,10 @@ export async function POST(request: Request) {
       details: error instanceof Error ? error.message : String(error)
     });
     logRouteError('ai_parse', error, { rawAiResponse: aiText.slice(0, 1200) });
-    return json({ ok: false, error: 'AI yanıtı geçerli JSON formatında değil. Lütfen tekrar deneyin.' }, 422);
+    return json(
+      { ok: false, error: "Oyun brief'i oluşturulamadı. Lütfen fikri biraz daha net yazıp tekrar deneyin." },
+      422
+    );
   }
 
   const { data, error } = await context.supabase
