@@ -1,18 +1,135 @@
-export type UnityBuildStatus = 'queued' | 'claimed' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+import 'server-only';
 
-export type UnityGameProjectStatus =
-  | 'draft'
-  | 'planned'
+const UNITY_BASE_URL = 'https://build-api.cloud.unity3d.com/api/v1';
+
+export type UnityBuildStatus =
   | 'queued'
-  | 'building'
-  | 'build_succeeded'
-  | 'build_failed'
-  | 'ready_for_review'
-  | 'approved'
-  | 'rejected';
+  | 'sentToBuilder'
+  | 'started'
+  | 'restarted'
+  | 'success'
+  | 'failure'
+  | 'canceled'
+  | 'unknown';
 
-export type UnityApprovalStatus = 'pending' | 'approved' | 'rejected';
+export interface UnityBuildResponse {
+  build: number;
+  buildTargetId: string;
+  status: UnityBuildStatus;
+  created: string;
+  links?: { download_primary?: { href: string } };
+}
 
+export interface UnityBuildTarget {
+  buildtargetid: string;
+  name?: string;
+  platform?: string;
+  [key: string]: unknown;
+}
+
+type UnityBuildRaw = {
+  build?: number;
+  buildtargetid?: string;
+  status?: string;
+  created?: string;
+  finished?: string;
+  links?: { download_primary?: { href?: string } };
+};
+
+function getConfig() {
+  const orgId = process.env.UNITY_ORG_ID?.trim();
+  const projectId = process.env.UNITY_PROJECT_ID?.trim();
+  const keyId = process.env.UNITY_SERVICE_ACCOUNT_KEY_ID?.trim();
+  const secretKey = process.env.UNITY_SERVICE_ACCOUNT_SECRET_KEY?.trim();
+
+  if (!orgId || !projectId || !keyId || !secretKey) {
+    throw new Error('Unity build ayarları eksik. UNITY_ORG_ID, UNITY_PROJECT_ID ve servis anahtarlarını kontrol edin.');
+  }
+
+  const authorization = `Basic ${Buffer.from(`${keyId}:${secretKey}`, 'utf8').toString('base64')}`;
+
+  return { orgId, projectId, authorization };
+}
+
+function normalizeStatus(value: unknown): UnityBuildStatus {
+  if (typeof value !== 'string') return 'unknown';
+  if (value === 'queued' || value === 'sentToBuilder' || value === 'started' || value === 'restarted' || value === 'success' || value === 'failure' || value === 'canceled') {
+    return value;
+  }
+  return 'unknown';
+}
+
+async function unityRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const { authorization } = getConfig();
+  const response = await fetch(`${UNITY_BASE_URL}${path}`, {
+    ...init,
+    headers: {
+      Authorization: authorization,
+      'Content-Type': 'application/json',
+      ...(init?.headers ?? {})
+    },
+    cache: 'no-store'
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Unity API hatası: ${response.status}`);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return (await response.json()) as T;
+}
+
+function mapBuild(raw: UnityBuildRaw): UnityBuildResponse {
+  return {
+    build: typeof raw.build === 'number' ? raw.build : 0,
+    buildTargetId: raw.buildtargetid ?? '',
+    status: normalizeStatus(raw.status),
+    created: raw.created ?? new Date(0).toISOString(),
+    links: raw.links?.download_primary?.href ? { download_primary: { href: raw.links.download_primary.href } } : undefined
+  };
+}
+
+export async function triggerBuild(buildTargetId: string): Promise<UnityBuildResponse> {
+  const { orgId, projectId } = getConfig();
+  const data = await unityRequest<UnityBuildRaw>(`/orgs/${orgId}/projects/${projectId}/buildtargets/${buildTargetId}/builds`, {
+    method: 'POST',
+    body: JSON.stringify({ clean: false, delay: 0 })
+  });
+
+  return mapBuild({ ...data, buildtargetid: data.buildtargetid ?? buildTargetId });
+}
+
+export async function getBuildStatus(buildTargetId: string, buildNumber: number): Promise<UnityBuildResponse & { finished?: string }> {
+  const { orgId, projectId } = getConfig();
+  const data = await unityRequest<UnityBuildRaw>(`/orgs/${orgId}/projects/${projectId}/buildtargets/${buildTargetId}/builds/${buildNumber}`);
+  const mapped = mapBuild({ ...data, buildtargetid: data.buildtargetid ?? buildTargetId });
+  return { ...mapped, finished: data.finished };
+}
+
+export async function cancelBuild(buildTargetId: string, buildNumber: number): Promise<void> {
+  const { orgId, projectId } = getConfig();
+  await unityRequest<void>(`/orgs/${orgId}/projects/${projectId}/buildtargets/${buildTargetId}/builds/${buildNumber}`, {
+    method: 'DELETE'
+  });
+}
+
+export async function getBuilds(buildTargetId: string, limit = 10): Promise<(UnityBuildResponse & { finished?: string })[]> {
+  const { orgId, projectId } = getConfig();
+  const data = await unityRequest<UnityBuildRaw[]>(`/orgs/${orgId}/projects/${projectId}/buildtargets/${buildTargetId}/builds?per_page=${limit}`);
+  return (Array.isArray(data) ? data : []).map((item) => ({ ...mapBuild({ ...item, buildtargetid: item.buildtargetid ?? buildTargetId }), finished: item.finished }));
+}
+
+export async function getBuildTargets(): Promise<UnityBuildTarget[]> {
+  const { orgId, projectId } = getConfig();
+  const data = await unityRequest<UnityBuildTarget[]>(`/orgs/${orgId}/projects/${projectId}/buildtargets`);
+  return Array.isArray(data) ? data : [];
+}
+
+// Geriye dönük uyumluluk (owner araçları).
 export type UnityGameTemplate = {
   slug: string;
   title: string;
@@ -52,116 +169,32 @@ export const UNITY_TEMPLATE_SEEDS: UnityGameTemplate[] = [
     unityVersion: '2022.3 LTS',
     supportedPlatforms: ['android'],
     complexity: 'low',
-    metadata: { camera: 'side', sessionLengthMinutes: 3 }
-  },
-  {
-    slug: 'quiz_mobile',
-    title: 'Mobile Quiz Challenge',
-    genre: 'quiz',
-    description: 'Prompt-driven quiz shell with categories, scoring, and streak bonuses.',
-    unityVersion: '2022.3 LTS',
-    supportedPlatforms: ['android'],
-    complexity: 'low',
-    metadata: { rounds: 10, supportsLocalization: true }
-  },
-  {
-    slug: 'idle_clicker_mobile',
-    title: 'Idle Clicker Tycoon',
-    genre: 'idle',
-    description: 'Idle and tap progression loop with upgrade systems and balancing hooks.',
-    unityVersion: '2022.3 LTS',
-    supportedPlatforms: ['android'],
-    complexity: 'medium',
-    metadata: { offlineProgress: true, economyLayers: 2 }
-  },
-  {
-    slug: 'puzzle_match_mobile',
-    title: 'Puzzle Match Mobile',
-    genre: 'puzzle',
-    description: 'Grid puzzle gameplay with combo scoring and level-based challenge curves.',
-    unityVersion: '2022.3 LTS',
-    supportedPlatforms: ['android'],
-    complexity: 'medium',
-    metadata: { boardSize: '8x8', moveLimitMode: true }
-  },
-  {
-    slug: 'platformer_2d_mobile',
-    title: '2D Platformer Mobile',
-    genre: 'platformer',
-    description: 'Touch-friendly platformer framework with checkpoints and stage progression.',
-    unityVersion: '2022.3 LTS',
-    supportedPlatforms: ['android'],
-    complexity: 'medium',
-    metadata: { controls: 'touch', checkpointSystem: true }
+    metadata: {}
   }
 ];
 
-export const UNITY_BUILD_STATUS_LABELS: Record<UnityBuildStatus, string> = {
-  queued: 'Queued',
-  claimed: 'Claimed by worker',
-  running: 'Running build',
-  succeeded: 'Build succeeded',
-  failed: 'Build failed',
-  cancelled: 'Cancelled'
-};
-
-export const UNITY_PROJECT_STATUS_LABELS: Record<UnityGameProjectStatus, string> = {
-  draft: 'Draft',
-  planned: 'Planned',
-  queued: 'Queued',
-  building: 'Building',
-  build_succeeded: 'Build succeeded',
-  build_failed: 'Build failed',
-  ready_for_review: 'Ready for review',
-  approved: 'Approved',
-  rejected: 'Rejected'
-};
-
-const PROMPT_GENRE_MAP: Array<{ genre: UnityGameTemplate['genre']; keywords: string[] }> = [
-  { genre: 'runner', keywords: ['runner', 'endless run', 'running game'] },
-  { genre: 'quiz', keywords: ['quiz', 'trivia', 'question'] },
-  { genre: 'puzzle', keywords: ['puzzle', 'match', 'logic'] },
-  { genre: 'idle', keywords: ['idle', 'clicker', 'incremental'] },
-  { genre: 'platformer', keywords: ['platformer', 'jump', 'side scroller'] }
-];
-
 export function normalizePackageName(appName: string): string {
-  const normalizedGame = appName
+  const slug = appName
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
     .filter(Boolean)
-    .join('_')
-    .replace(/_+/g, '_') || 'game';
-
-  return `com.koschei.generated.${normalizedGame}`;
-}
-
-export function createUnityGameBriefFromPrompt(prompt: string): Record<string, unknown> {
-  const template = selectUnityTemplateForPrompt(prompt);
-  const cleanPrompt = prompt.trim();
-
-  return {
-    productionReady: true,
-    sourcePrompt: cleanPrompt,
-    detectedGenre: template.genre,
-    templateSlug: template.slug,
-    suggestedCoreLoop: `${template.genre} gameplay loop with mobile-first controls`,
-    targetPlatform: 'android',
-    notes: 'Bu özet Unity build hattına gönderilmek üzere hazırlanmıştır.'
-  };
+    .join('') || 'game';
+  return `com.koschei.generated.${slug}`;
 }
 
 export function selectUnityTemplateForPrompt(prompt: string): UnityGameTemplate {
-  const normalized = prompt.toLowerCase();
-  const detectedGenre = PROMPT_GENRE_MAP.find(({ keywords }) => keywords.some((keyword) => normalized.includes(keyword)))?.genre;
+  void prompt;
+  return UNITY_TEMPLATE_SEEDS[0];
+}
 
-  if (!detectedGenre) {
-    return UNITY_TEMPLATE_SEEDS[0];
-  }
-
-  return UNITY_TEMPLATE_SEEDS.find((template) => template.genre === detectedGenre) ?? UNITY_TEMPLATE_SEEDS[0];
+export function createUnityGameBriefFromPrompt(prompt: string): Record<string, unknown> {
+  return {
+    sourcePrompt: prompt,
+    templateSlug: UNITY_TEMPLATE_SEEDS[0].slug,
+    targetPlatform: 'android'
+  };
 }
 
 export function createUnityBuildJobPayload(input: {
@@ -172,13 +205,11 @@ export function createUnityBuildJobPayload(input: {
   buildType?: 'development' | 'release';
   requestedOutput?: 'apk' | 'aab';
 }): UnityBuildJob {
-  const template = selectUnityTemplateForPrompt(input.userPrompt);
-
   return {
     unityGameProjectId: input.unityGameProjectId,
     appName: input.appName,
     packageName: input.packageName,
-    templateSlug: template.slug,
+    templateSlug: UNITY_TEMPLATE_SEEDS[0].slug,
     targetPlatform: 'android',
     buildType: input.buildType ?? 'development',
     gameBrief: createUnityGameBriefFromPrompt(input.userPrompt),
@@ -188,28 +219,8 @@ export function createUnityBuildJobPayload(input: {
 
 export function validateUnityGameProjectDraft(input: Partial<UnityGameProjectDraft>): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
-
-  if (!input.appName?.trim()) {
-    errors.push('App name is required.');
-  }
-
-  if (!input.userPrompt?.trim()) {
-    errors.push('Prompt is required.');
-  }
-
-  if (!input.packageName?.trim()) {
-    errors.push('Package name is required.');
-  } else if (!/^com\.[a-z0-9_]+(?:\.[a-z0-9_]+)+$/.test(input.packageName)) {
-    errors.push('Package name must follow reverse-domain style (e.g. com.koschei.generated.my_game).');
-  }
-
-  if (input.targetPlatform && input.targetPlatform !== 'android') {
-    errors.push('Only android target platform is supported in this production layer.');
-  }
-
-  if (input.templateSlug && !UNITY_TEMPLATE_SEEDS.some((template) => template.slug === input.templateSlug)) {
-    errors.push('Template slug is not recognized.');
-  }
-
+  if (!input.appName?.trim()) errors.push('App name is required.');
+  if (!input.userPrompt?.trim()) errors.push('Prompt is required.');
+  if (!input.packageName?.trim()) errors.push('Package name is required.');
   return { ok: errors.length === 0, errors };
 }
