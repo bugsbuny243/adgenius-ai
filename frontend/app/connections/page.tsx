@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Nav } from '@/components/nav';
 import { bloggerConnector } from '@/lib/connectors/blogger';
@@ -6,6 +7,10 @@ import { tiktokConnector } from '@/lib/connectors/tiktok';
 import { youtubeConnector } from '@/lib/connectors/youtube';
 import type { ConnectorStatus } from '@/lib/connectors/types';
 import { getEnvDiagnostics } from '@/lib/env';
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false }
+};
 
 export const dynamic = 'force-dynamic';
 

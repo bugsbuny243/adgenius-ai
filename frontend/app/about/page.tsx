@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { AdSenseSlot } from '@/components/ads/AdSenseSlot';
 import { PublicSiteNav } from '@/components/public-site-nav';
 
 export const metadata: Metadata = {
@@ -22,6 +23,7 @@ export default function AboutPage() {
         Harici platformlar ve hesaplar daima kullanıcı kontrolünde kalır; kritik adımlar kullanıcı onayı olmadan
         başlatılmaz.
       </p>
+      <AdSenseSlot slot="1000000005" hasContent className="rounded-2xl border border-white/10 bg-black/20 p-4" />
     </main>
   );
 }
