@@ -89,16 +89,22 @@ export function getEnvDiagnostics() {
   const isServerRuntime = typeof window === 'undefined';
   const publicEnv = getPublicEnv();
   const serverEnv = getServerEnv();
+  const provider = serverEnv.AI_PROVIDER?.trim().toLowerCase();
 
   const missingPublicEnv = PUBLIC_ENV_KEYS.filter((key) => !publicEnv[key]);
-  const missingServerEnv = isServerRuntime ? SERVER_ENV_KEYS.filter((key) => !serverEnv[key]) : [];
+  const missingServerEnv = isServerRuntime
+    ? SERVER_ENV_KEYS.filter((key) => {
+        if (provider === 'groq' && key === 'OPENAI_API_KEY') return false;
+        if (provider !== 'groq' && key === 'GROQ_API_KEY') return false;
+        return !serverEnv[key];
+      })
+    : [];
   const publicReady = missingPublicEnv.length === 0;
 
   const groupReadiness = {
     core: hasValue(serverEnv.APP_ORIGIN ?? undefined),
     supabase: publicReady && Boolean(serverEnv.SUPABASE_URL && serverEnv.SUPABASE_ANON_KEY && serverEnv.SUPABASE_SERVICE_ROLE_KEY),
     ai: (() => {
-      const provider = serverEnv.AI_PROVIDER?.trim().toLowerCase();
       if (provider === 'groq') {
         return Boolean(serverEnv.GROQ_API_KEY);
       }

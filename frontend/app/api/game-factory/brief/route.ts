@@ -48,9 +48,15 @@ type ParseFailureReason =
   | 'missing_title'
   | 'missing_summary'
   | 'missing_mechanics'
+  | 'missing_store_short_description'
+  | 'missing_store_full_description'
+  | 'missing_visual_style'
+  | 'missing_controls'
+  | 'missing_monetization_notes'
+  | 'missing_release_notes'
   | 'empty_ai_response';
 
-const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-120b';
+const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
 
 const GAME_BRIEF_SCHEMA = {
   type: 'object',
@@ -121,14 +127,7 @@ async function callGroqBriefModel(prompt: string, targetPlatform: 'android', mod
             '- Sadece JSON döndür.'
         }
       ],
-      response_format: {
-        type: 'json_schema',
-        json_schema: {
-          name: 'game_factory_brief',
-          strict: true,
-          schema: GAME_BRIEF_SCHEMA
-        }
-      }
+      response_format: { type: 'json_object' }
     })
   });
 
@@ -190,13 +189,8 @@ function normalizeBrief(raw: Record<string, unknown>, prompt: string, platform: 
   const summary = isNonEmptyString(raw.summary) ? raw.summary.trim() : '';
   const slug = isNonEmptyString(raw.slug) ? toSlug(raw.slug) : toSlug(title);
   const mechanics = toMechanics(raw.mechanics);
-  const fallbackSummary = summary || 'Mobil cihazlar için hızlı tempolu sade bir koşu oyunu.';
-  const storeShortDescription = isNonEmptyString(raw.storeShortDescription)
-    ? raw.storeShortDescription.trim()
-    : fallbackSummary.slice(0, 80);
-  const storeFullDescription = isNonEmptyString(raw.storeFullDescription)
-    ? raw.storeFullDescription.trim()
-    : `${fallbackSummary} Oyuncu reflekslerini kullanarak engelleri aşar ve skorunu artırır.`;
+  const storeShortDescription = isNonEmptyString(raw.storeShortDescription) ? raw.storeShortDescription.trim() : '';
+  const storeFullDescription = isNonEmptyString(raw.storeFullDescription) ? raw.storeFullDescription.trim() : '';
 
   const gameType = raw.gameType === 'runner_2d' ? 'runner_2d' : inferRunnerFromPrompt(prompt) ? 'runner_2d' : '';
   const finalSlug = slug || toSlug(title);
@@ -212,14 +206,10 @@ function normalizeBrief(raw: Record<string, unknown>, prompt: string, platform: 
     gameType: gameType as 'runner_2d',
     targetPlatform: platform,
     mechanics,
-    visualStyle: isNonEmptyString(raw.visualStyle) ? raw.visualStyle.trim() : 'Basit 2D mobil görsel stil.',
-    controls: isNonEmptyString(raw.controls) ? raw.controls.trim() : 'Ekrana dokunarak karakteri kontrol et.',
-    monetizationNotes: isNonEmptyString(raw.monetizationNotes)
-      ? raw.monetizationNotes.trim()
-      : /reklam|ads|admob/i.test(prompt)
-        ? 'Ödüllü reklam ve geçiş reklamına uygun yapı.'
-        : 'Mobil oyunda reklam entegrasyonuna uygun sade yapı.',
-    releaseNotes: isNonEmptyString(raw.releaseNotes) ? raw.releaseNotes.trim() : 'İlk Android sürümü.',
+    visualStyle: isNonEmptyString(raw.visualStyle) ? raw.visualStyle.trim() : '',
+    controls: isNonEmptyString(raw.controls) ? raw.controls.trim() : '',
+    monetizationNotes: isNonEmptyString(raw.monetizationNotes) ? raw.monetizationNotes.trim() : '',
+    releaseNotes: isNonEmptyString(raw.releaseNotes) ? raw.releaseNotes.trim() : '',
     storeShortDescription,
     storeFullDescription
   };
@@ -230,6 +220,12 @@ function getParseFailureReason(brief: GameBrief): ParseFailureReason | null {
   if (!isNonEmptyString(brief.summary)) return 'missing_summary';
   if (brief.gameType !== 'runner_2d') return 'invalid_json';
   if (!Array.isArray(brief.mechanics) || brief.mechanics.length === 0) return 'missing_mechanics';
+  if (!isNonEmptyString(brief.visualStyle)) return 'missing_visual_style';
+  if (!isNonEmptyString(brief.controls)) return 'missing_controls';
+  if (!isNonEmptyString(brief.monetizationNotes)) return 'missing_monetization_notes';
+  if (!isNonEmptyString(brief.releaseNotes)) return 'missing_release_notes';
+  if (!isNonEmptyString(brief.storeShortDescription)) return 'missing_store_short_description';
+  if (!isNonEmptyString(brief.storeFullDescription)) return 'missing_store_full_description';
   return null;
 }
 
@@ -378,7 +374,7 @@ export async function POST(request: Request) {
         reason
       });
       return json(
-        { ok: false, error: "Oyun brief'i oluşturulamadı. Lütfen fikri biraz daha net yazıp tekrar deneyin." },
+        { ok: false, error: 'AI yanıtı beklenen JSON alanlarını içermiyor. Lütfen tekrar deneyin.' },
         422
       );
     }
@@ -391,10 +387,7 @@ export async function POST(request: Request) {
       details: error instanceof Error ? error.message : String(error)
     });
     logRouteError('ai_parse', error, { rawAiResponse: aiText.slice(0, 1200) });
-    return json(
-      { ok: false, error: "Oyun brief'i oluşturulamadı. Lütfen fikri biraz daha net yazıp tekrar deneyin." },
-      422
-    );
+    return json({ ok: false, error: 'AI yanıtı geçerli JSON formatında değil. Lütfen tekrar deneyin.' }, 422);
   }
 
   const { data, error } = await context.supabase
