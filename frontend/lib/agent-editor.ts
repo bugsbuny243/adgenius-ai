@@ -645,6 +645,27 @@ export const agentEditorConfigs: Record<AgentEditorSlug, AgentEditorConfig> = {
   }
 };
 
+const FINAL_AGENT_EDITOR_CONFIGS: Record<'youtube_agent' | 'blogger_agent' | 'business_agent', AgentEditorConfig> = {
+  youtube_agent: {
+    ...agentEditorConfigs.sosyal,
+    slug: 'youtube_agent',
+    title: 'Koschei YouTube Agent Editörü',
+    shortHelp: 'YouTube odaklı içerik, başlık ve yayın planı çıktısı üretir.'
+  },
+  blogger_agent: {
+    ...agentEditorConfigs.icerik,
+    slug: 'blogger_agent',
+    title: 'Koschei Blogger Agent Editörü',
+    shortHelp: 'Blog planı, bölüm akışı ve SEO odaklı içerik taslağı üretir.'
+  },
+  business_agent: {
+    ...agentEditorConfigs.yazilim,
+    slug: 'business_agent',
+    title: 'Koschei İşletme Agent Editörü',
+    shortHelp: 'İş süreçleri, karar adımları ve uygulanabilir operasyon planı üretir.'
+  }
+};
+
 function normalizeValue(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
@@ -662,6 +683,7 @@ function interpolateTemplate(template: string, state: EditorState, fallback: str
 
 export function getAgentEditorConfig(slug?: string | null): AgentEditorConfig {
   if (!slug) return GENERIC_AGENT_CONFIG;
+  if (slug in FINAL_AGENT_EDITOR_CONFIGS) return FINAL_AGENT_EDITOR_CONFIGS[slug as 'youtube_agent' | 'blogger_agent' | 'business_agent'];
   return agentEditorConfigs[(slug as AgentEditorSlug)] ?? GENERIC_AGENT_CONFIG;
 }
 
