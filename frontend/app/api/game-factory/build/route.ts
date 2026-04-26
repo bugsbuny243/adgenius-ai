@@ -1,4 +1,5 @@
 import { getApiAuthContext, json } from '@/app/api/game-factory/_auth';
+import { requireActiveGameAgentPackage } from '@/lib/game-agent-access';
 import { UnityApiError, triggerBuild } from '@/lib/unity-bridge';
 
 type BuildRequest = { projectId: string };
@@ -6,6 +7,9 @@ type BuildRequest = { projectId: string };
 export async function POST(request: Request) {
   const context = await getApiAuthContext(request);
   if (context instanceof Response) return context;
+
+  const packageGateResponse = await requireActiveGameAgentPackage(context.supabase, context.userId, context.workspaceId);
+  if (packageGateResponse) return packageGateResponse;
 
   const body = (await request.json()) as Partial<BuildRequest>;
   const projectId = body.projectId?.trim();

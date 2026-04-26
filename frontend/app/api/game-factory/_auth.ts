@@ -5,6 +5,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 type AuthContext = {
   supabase: SupabaseClient;
   userId: string;
+  userEmail: string | null;
   workspaceId: string;
 };
 
@@ -58,7 +59,7 @@ export async function getApiAuthContext(request: Request): Promise<AuthContext |
     return unauthorized('Çalışma alanı bulunamadı.');
   }
 
-  return { supabase, userId: user.id, workspaceId: membership.workspace_id };
+  return { supabase, userId: user.id, userEmail: user.email ?? null, workspaceId: membership.workspace_id };
 }
 
 export function json(body: unknown, status = 200) {
