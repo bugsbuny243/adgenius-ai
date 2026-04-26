@@ -48,7 +48,18 @@ export async function POST(request: Request) {
   });
 
   const text = typeof response.output_text === 'string' ? response.output_text : '';
-  const parsed = JSON.parse(cleanJsonFence(text)) as GameBrief;
+  let parsed: GameBrief;
+  try {
+    parsed = JSON.parse(cleanJsonFence(text)) as GameBrief;
+  } catch {
+    return json(
+      {
+        ok: false,
+        error: "Oyun brief'i oluşturulamadı. Lütfen promptu biraz daha net yazıp tekrar deneyin."
+      },
+      422
+    );
+  }
 
   const { data, error } = await context.supabase
     .from('unity_game_projects')

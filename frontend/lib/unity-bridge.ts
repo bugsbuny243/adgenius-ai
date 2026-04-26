@@ -1,6 +1,5 @@
-import 'server-only';
-
 const UNITY_BASE_URL = 'https://build-api.cloud.unity3d.com/api/v1';
+const UNITY_AUTH_MODE = 'basic_service_account';
 
 export type UnityBuildStatus =
   | 'queued'
@@ -36,17 +35,33 @@ type UnityBuildRaw = {
   links?: { download_primary?: { href?: string } };
 };
 
+export class UnityApiError extends Error {
+  status?: number;
+  endpointPath?: string;
+  authMode: string;
+
+  constructor(message: string, options?: { status?: number; endpointPath?: string; authMode?: string }) {
+    super(message);
+    this.name = 'UnityApiError';
+    this.status = options?.status;
+    this.endpointPath = options?.endpointPath;
+    this.authMode = options?.authMode ?? UNITY_AUTH_MODE;
+  }
+}
+
 function getConfig() {
   const orgId = process.env.UNITY_ORG_ID?.trim();
   const projectId = process.env.UNITY_PROJECT_ID?.trim();
   const keyId = process.env.UNITY_SERVICE_ACCOUNT_KEY_ID?.trim();
-  const secretKey = process.env.UNITY_SERVICE_ACCOUNT_SECRET_KEY?.trim();
+  const secretKey = process.env.UNITY_SERVICE_ACCOUNT_SECRET?.trim() || process.env.UNITY_SERVICE_ACCOUNT_SECRET_KEY?.trim();
 
   if (!orgId || !projectId || !keyId || !secretKey) {
     throw new Error('Unity build ayarları eksik. UNITY_ORG_ID, UNITY_PROJECT_ID ve servis anahtarlarını kontrol edin.');
   }
 
-  const authorization = `Basic ${Buffer.from(`${keyId}:${secretKey}`, 'utf8').toString('base64')}`;
+  const raw = `${keyId}:${secretKey}`;
+  const encoded = Buffer.from(raw, 'utf8').toString('base64');
+  const authorization = `Basic ${encoded}`;
 
   return { orgId, projectId, authorization };
 }
@@ -73,7 +88,7 @@ async function unityRequest<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || `Unity API hatası: ${response.status}`);
+    throw new UnityApiError(text || `Unity API hatası: ${response.status}`, { status: response.status, endpointPath: path });
   }
 
   if (response.status === 204) {

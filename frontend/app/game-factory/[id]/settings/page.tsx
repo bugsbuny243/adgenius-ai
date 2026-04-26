@@ -38,7 +38,7 @@ export default async function GameFactorySettingsPage({ params }: { params: Prom
       process.env.UNITY_PROJECT_ID &&
       process.env.UNITY_BUILD_TARGET_ID &&
       process.env.UNITY_SERVICE_ACCOUNT_KEY_ID &&
-      process.env.UNITY_SERVICE_ACCOUNT_SECRET_KEY
+      (process.env.UNITY_SERVICE_ACCOUNT_SECRET || process.env.UNITY_SERVICE_ACCOUNT_SECRET_KEY)
   );
 
   return (
