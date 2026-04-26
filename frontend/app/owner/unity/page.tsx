@@ -8,7 +8,7 @@ import {
   normalizePackageName,
   selectUnityTemplateForPrompt,
   validateUnityGameProjectDraft
-} from '@/lib/unity-bridge';
+} from '@/lib/unity-shared';
 
 const DEFAULT_PROMPT = 'Create a colorful mobile puzzle game with quick sessions and score combos.';
 
