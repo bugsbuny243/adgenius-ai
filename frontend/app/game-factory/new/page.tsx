@@ -6,17 +6,19 @@ import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 
 type Platform = 'android' | 'ios';
 type GameBrief = {
-  appName: string;
+  title: string;
+  slug: string;
   packageName: string;
-  genre: 'runner' | 'platformer' | 'puzzle' | 'arcade' | 'casual';
-  description: string;
-  storeShortDescription: string;
-  storeFullDescription: string;
+  summary: string;
+  gameType: 'runner_2d';
+  targetPlatform: 'android';
+  mechanics: string[];
   visualStyle: string;
   controls: string;
-  monetization: 'ads' | 'iap' | 'free';
-  targetAge: 'kids' | 'all' | 'teens';
-  keyFeatures: string[];
+  monetizationNotes: string;
+  releaseNotes: string;
+  storeShortDescription: string;
+  storeFullDescription: string;
 };
 
 async function getAccessToken() {
@@ -48,10 +50,17 @@ export default function NewGameFactoryPage() {
       const response = await fetch('/api/game-factory/brief', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ prompt, platform })
+        body: JSON.stringify({ prompt, targetPlatform: platform })
       });
 
-      const data = (await response.json()) as { ok: boolean; error?: string; projectId?: string; brief?: GameBrief };
+      const raw = await response.text();
+      let data: { ok: boolean; error?: string; projectId?: string; brief?: GameBrief };
+      try {
+        data = JSON.parse(raw) as { ok: boolean; error?: string; projectId?: string; brief?: GameBrief };
+      } catch {
+        throw new Error('Brief oluşturulurken sunucu yanıtı okunamadı.');
+      }
+
       if (!response.ok || !data.ok || !data.brief || !data.projectId) {
         throw new Error(data.error ?? 'Brief oluşturulamadı.');
       }
@@ -61,6 +70,7 @@ export default function NewGameFactoryPage() {
       setStep(2);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Bir hata oluştu.');
+      setStep(1);
     } finally {
       setLoading(false);
     }
@@ -143,14 +153,15 @@ export default function NewGameFactoryPage() {
       {step === 2 && brief ? (
         <section className="space-y-3 rounded-xl border border-white/10 bg-black/20 p-4 text-sm">
           <h2 className="text-xl font-semibold">2) Brief Önizleme</h2>
-          <p><b>Uygulama adı:</b> {brief.appName}</p>
+          <p><b>Oyun adı:</b> {brief.title}</p>
           <p><b>Paket adı:</b> {brief.packageName}</p>
-          <p><b>Tür:</b> {brief.genre}</p>
-          <p><b>Store açıklaması:</b> {brief.storeShortDescription}</p>
+          <p><b>Oyun tipi:</b> {brief.gameType}</p>
+          <p><b>Özet:</b> {brief.summary}</p>
+          <p><b>Store kısa açıklama:</b> {brief.storeShortDescription}</p>
           <p><b>Görsel stil:</b> {brief.visualStyle}</p>
           <p><b>Kontroller:</b> {brief.controls}</p>
           <ul className="list-disc pl-5">
-            {brief.keyFeatures.map((item) => (
+            {brief.mechanics.map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>
