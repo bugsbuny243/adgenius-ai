@@ -16,8 +16,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <footer className="mt-12 space-y-4 border-t border-white/10 pt-6 text-sm text-white/70">
             <nav className="flex flex-wrap gap-4">
               <Link href="/" className="transition hover:text-neon">Ana Sayfa</Link>
-              <Link href="/blog" className="transition hover:text-neon">Blog</Link>
-              <Link href="/guides" className="transition hover:text-neon">Rehberler</Link>
               <Link href="/about" className="transition hover:text-neon">Hakkımızda</Link>
               <Link href="/contact" className="transition hover:text-neon">İletişim</Link>
               <Link href="/privacy" className="transition hover:text-neon">Gizlilik Politikası</Link>

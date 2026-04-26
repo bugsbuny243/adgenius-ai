@@ -2,14 +2,12 @@ import Link from 'next/link';
 
 const links = [
   { href: '/', label: 'Ana Sayfa' },
-  { href: '/blog', label: 'Blog' },
-  { href: '/guides', label: 'Rehberler' },
   { href: '/pricing', label: 'Fiyatlandırma' },
   { href: '/about', label: 'Hakkımızda' },
   { href: '/contact', label: 'İletişim' },
   { href: '/privacy', label: 'Gizlilik Politikası' },
   { href: '/terms', label: 'Kullanım Koşulları' },
-  { href: '/login', label: 'Giriş' }
+  { href: '/signin', label: 'Giriş' }
 ] as const;
 
 export function PublicSiteNav() {

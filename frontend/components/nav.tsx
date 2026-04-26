@@ -7,12 +7,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 
 const userLinks = [
   { href: '/dashboard', label: 'Dashboard' },
-  { href: '/agents', label: 'Ajanlar' },
   { href: '/game-factory', label: 'Game Factory' },
-  { href: '/composer', label: 'Composer' },
-  { href: '/publish-queue', label: 'Yayın Kuyruğu' },
-  { href: '/saved', label: 'Kaydedilenler' },
-  { href: '/connections', label: 'Bağlantılar' },
   { href: '/settings', label: 'Ayarlar' }
 ] as const satisfies ReadonlyArray<{ href: Route; label: string }>;
 
@@ -49,25 +44,20 @@ export function Nav({ showOwnerLink = false, showSuperOwnerBadge = false }: NavP
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-lilac">Koschei</p>
           <h1 className="text-2xl font-semibold">Koschei AI</h1>
-          <p className="text-xs text-white/55">AI destekli üretim alanı</p>
+          <p className="text-xs text-white/55">AI destekli oyun üretim alanı</p>
           {showSuperOwnerBadge ? (
             <p className="mt-2 inline-flex rounded-full border border-amber-300/60 bg-amber-400/10 px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-amber-100">
               Super Owner
             </p>
           ) : null}
         </div>
-        <div className="hidden items-center gap-2 md:flex">
-          <Link href="/upgrade" className="rounded-xl border border-neon/60 px-4 py-2 text-sm text-neon transition hover:bg-neon/10">
-            Planı Yükselt
-          </Link>
-          <button
-            type="button"
-            onClick={handleSignOut}
-            className="rounded-xl border border-white/10 px-4 py-2 text-sm transition hover:border-neon hover:text-neon"
-          >
-            Çıkış
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="hidden rounded-xl border border-white/10 px-4 py-2 text-sm transition hover:border-neon hover:text-neon md:block"
+        >
+          Çıkış
+        </button>
       </div>
 
       <div className="hidden space-y-2 md:block">
@@ -101,14 +91,6 @@ export function Nav({ showOwnerLink = false, showSuperOwnerBadge = false }: NavP
             })}
           </div>
         ) : null}
-        <div className="flex flex-wrap gap-2">
-          <Link href="/projects" className={`rounded-xl border px-3 py-1.5 text-xs ${pathname === '/projects' || pathname.startsWith('/projects/') ? 'border-white/40 text-white' : 'border-white/10 text-white/60 hover:text-white/85'}`}>
-            Projeler
-          </Link>
-          <Link href="/runs" className={`rounded-xl border px-3 py-1.5 text-xs ${pathname === '/runs' || pathname.startsWith('/runs/') ? 'border-white/40 text-white' : 'border-white/10 text-white/60 hover:text-white/85'}`}>
-            Çalıştırmalar
-          </Link>
-        </div>
       </div>
 
       <details className="w-full md:hidden">
@@ -122,9 +104,6 @@ export function Nav({ showOwnerLink = false, showSuperOwnerBadge = false }: NavP
               </Link>
             );
           })}
-          <p className="px-1 pt-2 text-[11px] uppercase tracking-wide text-white/45">İkincil</p>
-          <Link href="/projects" className={`rounded-xl border px-4 py-2 text-sm ${pathname === '/projects' || pathname.startsWith('/projects/') ? 'border-white/40 text-white' : 'border-white/10 text-white/70'}`}>Projeler</Link>
-          <Link href="/runs" className={`rounded-xl border px-4 py-2 text-sm ${pathname === '/runs' || pathname.startsWith('/runs/') ? 'border-white/40 text-white' : 'border-white/10 text-white/70'}`}>Çalıştırmalar</Link>
           {showOwnerLink ? ownerLinks.map((link) => {
             const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
             return (
@@ -133,9 +112,6 @@ export function Nav({ showOwnerLink = false, showSuperOwnerBadge = false }: NavP
               </Link>
             );
           }) : null}
-          <Link href="/upgrade" className="rounded-xl border border-neon/60 px-4 py-2 text-sm text-neon">
-            Planı Yükselt
-          </Link>
           <button type="button" onClick={handleSignOut} className="rounded-xl border border-white/10 px-4 py-2 text-left text-sm">
             Çıkış
           </button>

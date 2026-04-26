@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { Nav } from '@/components/nav';
-import { getAppContextOrRedirect } from '@/lib/app-context';
-import { neutralizeVendorTerms, sanitizeUserFacingEngineLabel } from '@/lib/publish-queue';
+import { createSupabaseReadonlyServerClient } from '@/lib/supabase-server';
+import { getWorkspaceContextOrNull } from '@/lib/workspace';
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false }
@@ -11,61 +12,51 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-function toDisplayStatus(status: string): string {
-  if (status === 'completed') return 'Tamamlandı';
-  if (status === 'processing') return 'İşleniyor';
-  if (status === 'pending') return 'Sırada';
-  if (status === 'failed') return 'Hata';
-  return status;
-}
-
-function getRunAgentName(value: unknown): string {
-  if (!value) return 'Agent çalışması';
-  if (Array.isArray(value)) {
-    const first = value[0] as { name?: string } | undefined;
-    return first?.name ?? 'Agent çalışması';
-  }
-  if (typeof value === 'object' && value && 'name' in (value as Record<string, unknown>)) {
-    const name = (value as { name?: string }).name;
-    return name ?? 'Agent çalışması';
-  }
-  return 'Agent çalışması';
+function toTurkishDate(value: string | null | undefined): string {
+  if (!value) return '—';
+  return new Date(value).toLocaleDateString('tr-TR');
 }
 
 export default async function DashboardPage() {
-  const { supabase, workspace } = await getAppContextOrRedirect();
+  const supabase = await createSupabaseReadonlyServerClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
 
-  const monthStart = new Date();
-  monthStart.setUTCDate(1);
-  monthStart.setUTCHours(0, 0, 0, 0);
+  if (!user) redirect('/signin');
 
-  const [subscriptionRes, usageRes, recentRunsRes, agentsRes] = await Promise.all([
+  const workspace = await getWorkspaceContextOrNull();
+  if (!workspace) redirect('/signin');
+
+  const [subscriptionRes, usageRes, projectsRes] = await Promise.all([
     supabase
       .from('subscriptions')
-      .select('plan_name, run_limit')
+      .select('plan_name, run_limit, status')
       .eq('workspace_id', workspace.workspaceId)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
     supabase
-      .from('agent_runs')
-      .select('id', { count: 'exact', head: true })
+      .from('usage_counters')
+      .select('*')
       .eq('workspace_id', workspace.workspaceId)
-      .gte('created_at', monthStart.toISOString()),
+      .order('updated_at', { ascending: false })
+      .limit(20),
     supabase
-      .from('agent_runs')
-      .select('id, status, model_name, error_message, user_input, result_text, created_at, agent_types(name)')
-      .eq('workspace_id', workspace.workspaceId)
+      .from('game_projects')
+      .select('id, name, status, created_at')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
-      .limit(3),
-    supabase.from('agent_types').select('id, name').eq('is_active', true).limit(4)
+      .limit(5)
   ]);
 
-  const runLimit = subscriptionRes.data?.run_limit ?? 30;
-  const usedRuns = usageRes.count ?? 0;
-  const remaining = Math.max(0, runLimit - usedRuns);
-  const percent = Math.min(100, Math.round((usedRuns / Math.max(1, runLimit)) * 100));
-  const lastRunDate = recentRunsRes.data?.[0]?.created_at;
+  const subscription = subscriptionRes.data;
+  const usageItems = usageRes.data ?? [];
+  const projects = projectsRes.data ?? [];
+
+  const planName = subscription?.plan_name ?? 'free';
+  const planTier = planName.toLowerCase() === 'free' ? 'free' : 'paid';
+  const usageSummary = usageItems.length;
 
   return (
     <main>
@@ -74,53 +65,44 @@ export default async function DashboardPage() {
       <section className="panel mb-4">
         <p className="text-xs uppercase tracking-wide text-lilac">Dashboard</p>
         <h2 className="mt-1 text-xl font-semibold">{workspace.workspaceName}</h2>
-        <p className="text-sm text-white/70">Plan, kullanım ve son çalışmaları buradan takip edebilirsiniz.</p>
+        <p className="text-sm text-white/70">Plan, kullanım ve oyun projeleri özetinizi buradan takip edin.</p>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <MetricCard title="Aktif plan" value={subscriptionRes.data?.plan_name ?? 'Ücretsiz'} />
-          <MetricCard title="Kullanım" value={`${usedRuns} / ${runLimit}`} />
-          <MetricCard title="Kalan hak" value={String(remaining)} />
-          <MetricCard title="Son çalışma" value={lastRunDate ? new Date(lastRunDate).toLocaleDateString('tr-TR') : 'Kayıt yok'} />
-        </div>
-
-        <div className="mt-3 h-2 rounded-full bg-white/10">
-          <div className="h-full rounded-full bg-neon" style={{ width: `${percent}%` }} />
+          <MetricCard title="Plan" value={String(planName)} />
+          <MetricCard title="Plan tipi" value={planTier} />
+          <MetricCard title="Plan durumu" value={subscription?.status ?? 'active'} />
+          <MetricCard title="Kullanım kaydı" value={String(usageSummary)} />
         </div>
       </section>
 
       <section className="panel mb-4">
-        <h3 className="mb-3 text-lg font-semibold">Hızlı agent başlat</h3>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {(agentsRes.data ?? []).map((agent) => (
-            <Link key={agent.id} href={`/agents/${agent.id}`} className="rounded-lg border border-white/10 bg-black/20 p-3 hover:border-neon">
-              <p className="font-medium">{agent.name}</p>
-              <p className="text-xs text-white/60">Koschei AI motoru</p>
-            </Link>
-          ))}
-        </div>
+        <h3 className="text-lg font-semibold">Game Factory</h3>
+        <p className="mt-1 text-sm text-white/70">Yeni oyun üretim süreci başlatmak veya mevcut işleri yönetmek için Game Factory ekranına gidin.</p>
+        <Link href="/game-factory" className="mt-4 inline-flex rounded-xl bg-neon px-6 py-3 text-base font-semibold text-ink">
+          Game Factory&apos;ye Git
+        </Link>
       </section>
 
       <section className="panel">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Son 3 çalışma</h3>
-          <Link href="/runs" className="rounded-lg border border-white/20 px-3 py-1.5 text-sm hover:border-neon">
-            Tüm çalışmaları aç
+          <h3 className="text-lg font-semibold">Son oyun projeleri</h3>
+          <Link href="/game-factory" className="rounded-lg border border-white/20 px-3 py-1.5 text-sm hover:border-neon">
+            Tüm projeleri aç
           </Link>
         </div>
 
-        {(recentRunsRes.data ?? []).length === 0 ? (
+        {projects.length === 0 ? (
           <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/70">
-            Henüz çalışma yok. Agentlar ekranından ilk çalıştırmayı başlat.
+            Henüz oyun projesi yok.
           </p>
         ) : (
           <div className="space-y-2">
-            {(recentRunsRes.data ?? []).map((run) => (
-              <div key={run.id} className="rounded-lg border border-white/10 bg-black/20 p-3 text-sm">
-                <p className="font-medium">{getRunAgentName(run.agent_types)}</p>
-                <p className="text-xs text-white/65">{toDisplayStatus(run.status)} • {sanitizeUserFacingEngineLabel(run.model_name)}</p>
-                <p className="line-clamp-2 text-white/75">{run.result_text || run.user_input || 'İçerik yok.'}</p>
-                {run.error_message ? <p className="text-xs text-red-200">{neutralizeVendorTerms(run.error_message)}</p> : null}
-              </div>
+            {projects.map((project) => (
+              <article key={project.id} className="rounded-lg border border-white/10 bg-black/20 p-3 text-sm">
+                <p className="font-medium">{project.name}</p>
+                <p className="text-xs text-white/65">Durum: {project.status}</p>
+                <p className="text-xs text-white/65">Tarih: {toTurkishDate(project.created_at)}</p>
+              </article>
             ))}
           </div>
         )}

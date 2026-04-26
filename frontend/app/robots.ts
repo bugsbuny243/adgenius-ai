@@ -7,8 +7,8 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: '*',
-        allow: ['/', '/blog', '/guides', '/about', '/pricing', '/contact', '/privacy', '/terms'],
-        disallow: ['/dashboard', '/agents', '/game-factory', '/composer', '/publish-queue', '/saved', '/projects', '/connections', '/settings', '/login', '/register', '/auth']
+        allow: ['/', '/about', '/pricing', '/contact', '/privacy', '/terms', '/cookies'],
+        disallow: ['/dashboard', '/game-factory', '/settings', '/owner', '/signin', '/signup', '/login', '/auth']
       }
     ],
     sitemap: `${baseUrl}/sitemap.xml`

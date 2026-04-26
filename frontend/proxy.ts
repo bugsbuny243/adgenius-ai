@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { getPublicEnv } from '@/lib/env';
 
-const PROTECTED_ROUTES = ['/dashboard', '/agents', '/projects', '/composer', '/runs', '/saved', '/connections', '/settings', '/upgrade', '/owner'];
+const PROTECTED_ROUTES = ['/dashboard', '/game-factory', '/settings', '/owner'];
 const AUTH_ROUTES = ['/signin', '/signup', '/login'];
 const SIGN_IN_ROUTE = '/signin';
 
@@ -94,12 +94,7 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     '/dashboard/:path*',
-    '/agents/:path*',
-    '/projects/:path*',
-    '/composer/:path*',
-    '/runs/:path*',
-    '/saved/:path*',
-    '/connections/:path*',
+    '/game-factory/:path*',
     '/settings/:path*',
     '/owner/:path*',
     '/login',
