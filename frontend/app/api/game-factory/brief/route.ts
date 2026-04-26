@@ -38,48 +38,91 @@ function logRouteError(stage: 'request_parse' | 'ai_call' | 'ai_parse' | 'db_wri
   });
 }
 
-function stripJsonFences(raw: string): string {
-  const trimmed = raw.trim();
-  if (!trimmed) return '';
-
-  const noFence = trimmed
-    .replace(/^```json\s*/i, '')
-    .replace(/^```\s*/i, '')
-    .replace(/\s*```$/i, '')
-    .trim();
-
-  const firstBrace = noFence.indexOf('{');
-  const lastBrace = noFence.lastIndexOf('}');
-  if (firstBrace === -1 || lastBrace === -1 || firstBrace >= lastBrace) {
-    return noFence;
-  }
-
-  return noFence.slice(firstBrace, lastBrace + 1);
-}
-
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
-function isValidBrief(parsed: unknown): parsed is GameBrief {
-  if (!parsed || typeof parsed !== 'object') return false;
-  const value = parsed as Record<string, unknown>;
+type ParseFailureReason =
+  | 'invalid_json'
+  | 'missing_title'
+  | 'missing_summary'
+  | 'missing_mechanics'
+  | 'empty_ai_response';
 
-  return (
-    isNonEmptyString(value.title) &&
-    isNonEmptyString(value.slug) &&
-    isNonEmptyString(value.packageName) &&
-    isNonEmptyString(value.summary) &&
-    value.gameType === 'runner_2d' &&
-    value.targetPlatform === 'android' &&
-    Array.isArray(value.mechanics) && value.mechanics.length > 0 && value.mechanics.every(isNonEmptyString) &&
-    isNonEmptyString(value.visualStyle) &&
-    isNonEmptyString(value.controls) &&
-    isNonEmptyString(value.monetizationNotes) &&
-    isNonEmptyString(value.releaseNotes) &&
-    isNonEmptyString(value.storeShortDescription) &&
-    isNonEmptyString(value.storeFullDescription)
-  );
+function toSlug(input: string): string {
+  return input
+    .toLocaleLowerCase('tr-TR')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/ı/g, 'i')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-{2,}/g, '-');
+}
+
+function toMechanics(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter(isNonEmptyString).map((entry) => entry.trim());
+  }
+  if (isNonEmptyString(value)) {
+    return value
+      .split(/\n|,|;|•|-/g)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function inferRunnerFromPrompt(prompt: string): boolean {
+  return /(runner|sonsuz koşu|koşu|engel|zıpla|zipl)/i.test(prompt);
+}
+
+function normalizeBrief(raw: Record<string, unknown>, prompt: string, platform: 'android'): GameBrief {
+  const title = isNonEmptyString(raw.title) ? raw.title.trim() : '';
+  const summary = isNonEmptyString(raw.summary) ? raw.summary.trim() : '';
+  const slug = isNonEmptyString(raw.slug) ? toSlug(raw.slug) : toSlug(title);
+  const mechanics = toMechanics(raw.mechanics);
+  const fallbackSummary = summary || 'Mobil cihazlar için hızlı tempolu sade bir koşu oyunu.';
+  const storeShortDescription = isNonEmptyString(raw.storeShortDescription)
+    ? raw.storeShortDescription.trim()
+    : fallbackSummary.slice(0, 80);
+  const storeFullDescription = isNonEmptyString(raw.storeFullDescription)
+    ? raw.storeFullDescription.trim()
+    : `${fallbackSummary} Oyuncu reflekslerini kullanarak engelleri aşar ve skorunu artırır.`;
+
+  const gameType = raw.gameType === 'runner_2d' ? 'runner_2d' : inferRunnerFromPrompt(prompt) ? 'runner_2d' : '';
+  const finalSlug = slug || toSlug(title);
+  const packageName = isNonEmptyString(raw.packageName)
+    ? raw.packageName.trim()
+    : `com.koschei.generated.${finalSlug.replace(/-/g, '') || 'game'}`;
+
+  return {
+    title,
+    slug: finalSlug || 'oyun',
+    packageName,
+    summary,
+    gameType: gameType as 'runner_2d',
+    targetPlatform: platform,
+    mechanics,
+    visualStyle: isNonEmptyString(raw.visualStyle) ? raw.visualStyle.trim() : 'Basit 2D mobil görsel stil.',
+    controls: isNonEmptyString(raw.controls) ? raw.controls.trim() : 'Ekrana dokunarak karakteri kontrol et.',
+    monetizationNotes: isNonEmptyString(raw.monetizationNotes)
+      ? raw.monetizationNotes.trim()
+      : /reklam|ads|admob/i.test(prompt)
+        ? 'Ödüllü reklam ve geçiş reklamına uygun yapı.'
+        : 'Mobil oyunda reklam entegrasyonuna uygun sade yapı.',
+    releaseNotes: isNonEmptyString(raw.releaseNotes) ? raw.releaseNotes.trim() : 'İlk Android sürümü.',
+    storeShortDescription,
+    storeFullDescription
+  };
+}
+
+function getParseFailureReason(brief: GameBrief): ParseFailureReason | null {
+  if (!isNonEmptyString(brief.title)) return 'missing_title';
+  if (!isNonEmptyString(brief.summary)) return 'missing_summary';
+  if (brief.gameType !== 'runner_2d') return 'invalid_json';
+  if (!Array.isArray(brief.mechanics) || brief.mechanics.length === 0) return 'missing_mechanics';
+  return null;
 }
 
 export async function POST(request: Request) {
@@ -118,6 +161,13 @@ export async function POST(request: Request) {
 
   let aiText = '';
   try {
+    console.info('[game-factory brief]', {
+      stage: 'ai_call_started',
+      model,
+      promptLength: prompt.length,
+      platform: targetPlatform
+    });
+
     const response = await client.responses.create({
       model,
       input: [
@@ -126,7 +176,8 @@ export async function POST(request: Request) {
           content: [
             {
               type: 'input_text',
-              text: 'Sen bir oyun tasarımcısısın. Sadece geçerli JSON yanıtı üret. Başka metin, markdown veya açıklama ekleme.'
+              text:
+                'Sen bir oyun tasarımcısısın. SADECE geçerli bir JSON nesnesi döndür. Markdown, kod bloğu, açıklama, yorum veya ek metin yazma.'
             }
           ]
         },
@@ -138,8 +189,8 @@ export async function POST(request: Request) {
               text:
                 `Kullanıcı oyun fikri: ${prompt}\n` +
                 `Hedef platform: ${targetPlatform}\n\n` +
-                'Aşağıdaki şemaya tam uyan bir JSON nesnesi üret:\n' +
-                '{"title":"string","slug":"string","packageName":"string","summary":"string","gameType":"runner_2d","targetPlatform":"android","mechanics":["string"],"visualStyle":"string","controls":"string","monetizationNotes":"string","releaseNotes":"string","storeShortDescription":"string","storeFullDescription":"string"}'
+                'Yalnızca aşağıdaki alanlarla bir JSON nesnesi üret. Yanıtta sadece JSON olsun:\n' +
+                '{"title":"Gece Koşucusu","slug":"gece-kosucusu","packageName":"com.koschei.generated.gecekosucusu","summary":"Kısa oyun özeti","gameType":"runner_2d","targetPlatform":"android","mechanics":["Tek dokunuşla zıplama","Otomatik koşu","Engellerden kaçınma","Skor toplama","Oyun bitti ve tekrar başlatma"],"visualStyle":"Basit 2D gece şehir atmosferi, neon mavi ve mor tonlar","controls":"Ekrana dokununca karakter zıplar.","monetizationNotes":"Reklam eklemeye uygun sade mobil oyun yapısı.","releaseNotes":"İlk Android sürümü.","storeShortDescription":"Gece atmosferinde hızlı ve sade 2D runner oyunu.","storeFullDescription":"Gece Koşucusu, karanlık şehir yolunda geçen sade ve hızlı bir 2D runner oyunudur. Oyuncu ekrana dokunarak zıplar, engellerden kaçınır ve en yüksek skoru yapmaya çalışır."}'
             }
           ]
         }
@@ -188,10 +239,30 @@ export async function POST(request: Request) {
     } as never);
 
     aiText = typeof response.output_text === 'string' ? response.output_text.trim() : '';
+    console.info('[game-factory brief]', {
+      stage: 'ai_response_received',
+      rawResponseLength: aiText.length,
+      rawResponsePreview: aiText.slice(0, 800)
+    });
+
     if (!aiText) {
-      return json({ ok: false, error: 'AI sağlayıcısı boş yanıt döndürdü. Lütfen tekrar deneyin.' }, 502);
+      console.error('[game-factory brief]', {
+        stage: 'ai_parse_failed',
+        reason: 'empty_ai_response'
+      });
+      return json(
+        { ok: false, error: "Oyun brief'i oluşturulamadı. Lütfen fikri biraz daha net yazıp tekrar deneyin." },
+        502
+      );
     }
   } catch (error) {
+    const reason = error instanceof Error && /json_schema|response_format|not supported|unsupported/i.test(error.message)
+      ? 'unsupported_model_json_mode'
+      : 'openai_error';
+    console.error('[game-factory brief]', {
+      stage: 'ai_parse_failed',
+      reason
+    });
     logRouteError('ai_call', error);
     return json(
       { ok: false, error: "Oyun brief'i oluşturulamadı. Lütfen fikri biraz daha net yazıp tekrar deneyin." },
@@ -201,12 +272,26 @@ export async function POST(request: Request) {
 
   let parsed: GameBrief;
   try {
-    const sanitized = stripJsonFences(aiText);
-    parsed = JSON.parse(sanitized) as GameBrief;
-    if (!isValidBrief(parsed)) {
-      throw new Error('AI response JSON shape is invalid.');
+    const normalized = normalizeBrief(JSON.parse(aiText) as Record<string, unknown>, prompt, targetPlatform);
+    const reason = getParseFailureReason(normalized);
+    if (reason) {
+      console.error('[game-factory brief]', {
+        stage: 'ai_parse_failed',
+        reason
+      });
+      return json(
+        { ok: false, error: "Oyun brief'i oluşturulamadı. Lütfen fikri biraz daha net yazıp tekrar deneyin." },
+        422
+      );
     }
+    parsed = normalized;
   } catch (error) {
+    const reason = error instanceof SyntaxError ? 'invalid_json' : 'invalid_json';
+    console.error('[game-factory brief]', {
+      stage: 'ai_parse_failed',
+      reason,
+      details: error instanceof Error ? error.message : String(error)
+    });
     logRouteError('ai_parse', error, { rawAiResponse: aiText.slice(0, 1200) });
     return json(
       { ok: false, error: "Oyun brief'i oluşturulamadı. Lütfen fikri biraz daha net yazıp tekrar deneyin." },
