@@ -7,7 +7,7 @@ import { ResultPanel } from '@/components/agent-editor/ResultPanel';
 import { buildFormSummary, getAgentEditorConfig, parseEditorMetadata } from '@/lib/agent-editor';
 import { UUID_PATTERN, toAgentRouteBySlug, toCanonicalAgentSlug } from '@/lib/agents';
 import { neutralizeVendorTerms } from '@/lib/publish-queue';
-import { createSupabaseReadonlyServerClient } from '@/lib/supabase-server';
+import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getWorkspaceContext } from '@/lib/workspace';
 import {
   attachSavedOutputToProjectAction,
@@ -37,7 +37,7 @@ export default async function AgentDetailPage({ params, searchParams }: AgentDet
   const { id: rawId } = await params;
   const { run_id: runIdParam, edit_run_id: editRunIdParam, error: errorParam } = await searchParams;
 
-  const supabase = await createSupabaseReadonlyServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();
