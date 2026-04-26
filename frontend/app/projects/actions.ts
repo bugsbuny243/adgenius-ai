@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { createSupabaseActionServerClient } from '@/lib/supabase-server';
 import { getWorkspaceContext } from '@/lib/workspace';
 
 export async function createProjectAction(formData: FormData) {
@@ -11,7 +11,7 @@ export async function createProjectAction(formData: FormData) {
 
   if (!name) return;
 
-  const serverSupabase = await createSupabaseServerClient();
+  const serverSupabase = await createSupabaseActionServerClient();
   const {
     data: { user: currentUser }
   } = await serverSupabase.auth.getUser();

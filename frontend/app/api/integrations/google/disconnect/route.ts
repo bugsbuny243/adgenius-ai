@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getServerEnv } from '@/lib/env';
 import { resolveAppOrigin } from '@/lib/app-origin';
-import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { createSupabaseActionServerClient } from '@/lib/supabase-server';
 import { getWorkspaceContextOrNull } from '@/lib/workspace';
 
 export async function POST(request: Request) {
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     return NextResponse.redirect(new URL('/signin?google=auth_required', appOrigin));
   }
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createSupabaseActionServerClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();

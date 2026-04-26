@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { createSupabaseActionServerClient } from '@/lib/supabase-server';
 import { encryptCredentials, serializeEncryptedCredentials } from '@/lib/credentials-encryption';
 import { validateGooglePlayServiceAccount } from '@/lib/game-factory/providers/google-play-publisher-provider';
 
@@ -12,7 +12,7 @@ function normalizeTrack(value: string): 'production' | 'closed' | 'internal' {
 }
 
 export async function saveGooglePlayIntegrationAction(formData: FormData) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createSupabaseActionServerClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();

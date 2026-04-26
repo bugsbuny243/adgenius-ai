@@ -4,7 +4,7 @@ import { Nav } from '@/components/nav';
 import { ProjectStatusBadge } from '@/components/projects/ProjectStatusBadge';
 import { ProjectTimeline } from '@/components/projects/ProjectTimeline';
 import { ProjectWorkflowPanel } from '@/components/projects/ProjectWorkflowPanel';
-import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { createSupabaseReadonlyServerClient } from '@/lib/supabase-server';
 import { buildWorkflowTimeline, filterItemsByType, findLatestItem, type WorkflowItemRecord } from '@/lib/project-workflow';
 import { getWorkspaceContext } from '@/lib/workspace';
 import {
@@ -24,7 +24,7 @@ export const revalidate = 0;
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createSupabaseReadonlyServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/signin');
 
