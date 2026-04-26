@@ -4,7 +4,9 @@ const SERVER_ENV_KEYS = [
   'SUPABASE_ANON_KEY',
   'SUPABASE_SERVICE_ROLE_KEY',
   'OPENAI_API_KEY',
+  'GROQ_API_KEY',
   'AI_PROVIDER',
+  'GROQ_MODEL',
   'OPENAI_MODEL_PRIMARY',
   'OPENAI_MODEL_REASONING',
   'OPENAI_MODEL_FAST',
@@ -57,7 +59,9 @@ export function getServerEnv(): Record<ServerEnvKey, string | null> {
     SUPABASE_ANON_KEY: readServerEnv('SUPABASE_ANON_KEY'),
     SUPABASE_SERVICE_ROLE_KEY: readServerEnv('SUPABASE_SERVICE_ROLE_KEY'),
     OPENAI_API_KEY: readServerEnv('OPENAI_API_KEY'),
+    GROQ_API_KEY: readServerEnv('GROQ_API_KEY'),
     AI_PROVIDER: readServerEnv('AI_PROVIDER'),
+    GROQ_MODEL: readServerEnv('GROQ_MODEL'),
     OPENAI_MODEL_PRIMARY: readServerEnv('OPENAI_MODEL_PRIMARY'),
     OPENAI_MODEL_REASONING: readServerEnv('OPENAI_MODEL_REASONING'),
     OPENAI_MODEL_FAST: readServerEnv('OPENAI_MODEL_FAST'),
@@ -93,7 +97,13 @@ export function getEnvDiagnostics() {
   const groupReadiness = {
     core: hasValue(serverEnv.APP_ORIGIN ?? undefined),
     supabase: publicReady && Boolean(serverEnv.SUPABASE_URL && serverEnv.SUPABASE_ANON_KEY && serverEnv.SUPABASE_SERVICE_ROLE_KEY),
-    ai: Boolean(serverEnv.AI_PROVIDER && serverEnv.OPENAI_API_KEY),
+    ai: (() => {
+      const provider = serverEnv.AI_PROVIDER?.trim().toLowerCase();
+      if (provider === 'groq') {
+        return Boolean(serverEnv.GROQ_API_KEY);
+      }
+      return Boolean(serverEnv.AI_PROVIDER && serverEnv.OPENAI_API_KEY);
+    })(),
     githubUnity: Boolean(serverEnv.GITHUB_UNITY_REPO_OWNER && serverEnv.GITHUB_UNITY_REPO_NAME && serverEnv.GITHUB_UNITY_REPO_TOKEN),
     unityBuild: Boolean(
       serverEnv.UNITY_ORG_ID &&
