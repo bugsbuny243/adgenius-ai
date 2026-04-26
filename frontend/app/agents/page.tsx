@@ -6,8 +6,9 @@ import { createSupabaseServerClient } from '@/lib/supabase-server';
 export const dynamic = 'force-dynamic';
 
 const REQUIREMENT_BY_SLUG: Record<string, string> = {
+  business_general: 'Kullanıcı onayı gerekir',
   blogger: 'Hesap bağlantısı gerekebilir',
-  channel_planner: 'Kullanıcı onayı gerekir',
+  youtube_agent: 'YouTube bağlantısı önerilir',
   game_factory: 'Build kredisi gerekebilir'
 };
 
@@ -17,7 +18,7 @@ function getRequirement(slug: string): string {
 
 function getStatusLabel(slug: string, isActive: boolean): 'Aktif' | 'Kurulum gerekli' | 'Yakında' {
   if (!isActive) return 'Yakında';
-  if (slug === 'blogger' || slug === 'channel_planner') {
+  if (slug === 'blogger' || slug === 'youtube_agent') {
     return 'Kurulum gerekli';
   }
   return 'Aktif';

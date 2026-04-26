@@ -2,8 +2,9 @@ import Link from 'next/link';
 import { PublicSiteNav } from '@/components/public-site-nav';
 
 const marketingAgents = [
+  { name: 'Koschei İşletme Genel Agent', description: 'İşletme operasyonları ve genel süreç yönetimi için karar destek çıktıları üretir.' },
   { name: 'Koschei Blogger Agent', description: 'Blog planı, SEO başlıkları ve yayın hazırlığı üretir.' },
-  { name: 'Koschei Channel Planner', description: 'Video serileri için içerik akışı ve takvim oluşturur.' },
+  { name: 'Koschei YouTube Agent', description: 'YouTube içerik fikri, başlık, açıklama ve yayın planı oluşturur.' },
   { name: 'Koschei Game Factory', description: 'Oyun fikrini üretim planına dönüştürür ve süreç adımlarını toplar.' }
 ] as const;
 
