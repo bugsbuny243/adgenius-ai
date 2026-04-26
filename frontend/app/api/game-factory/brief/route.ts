@@ -50,6 +50,113 @@ type ParseFailureReason =
   | 'missing_mechanics'
   | 'empty_ai_response';
 
+const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-120b';
+
+const GAME_BRIEF_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: [
+    'title',
+    'slug',
+    'packageName',
+    'summary',
+    'gameType',
+    'targetPlatform',
+    'mechanics',
+    'visualStyle',
+    'controls',
+    'monetizationNotes',
+    'releaseNotes',
+    'storeShortDescription',
+    'storeFullDescription'
+  ],
+  properties: {
+    title: { type: 'string', minLength: 1 },
+    slug: { type: 'string', minLength: 1 },
+    packageName: { type: 'string', minLength: 1 },
+    summary: { type: 'string', minLength: 1 },
+    gameType: { type: 'string', enum: ['runner_2d'] },
+    targetPlatform: { type: 'string', enum: ['android'] },
+    mechanics: { type: 'array', minItems: 1, items: { type: 'string', minLength: 1 } },
+    visualStyle: { type: 'string', minLength: 1 },
+    controls: { type: 'string', minLength: 1 },
+    monetizationNotes: { type: 'string', minLength: 1 },
+    releaseNotes: { type: 'string', minLength: 1 },
+    storeShortDescription: { type: 'string', minLength: 1 },
+    storeFullDescription: { type: 'string', minLength: 1 }
+  }
+} as const;
+
+async function callGroqBriefModel(prompt: string, targetPlatform: 'android', model: string): Promise<string> {
+  const groqApiKey = process.env.GROQ_API_KEY?.trim();
+  if (!groqApiKey) {
+    throw new Error('missing_groq_key');
+  }
+
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${groqApiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'Sen bir oyun tasarımcısısın. SADECE geçerli bir JSON nesnesi döndür. Markdown, kod bloğu, açıklama, yorum veya ek metin yazma.'
+        },
+        {
+          role: 'user',
+          content:
+            `Kullanıcı oyun fikri: ${prompt}\n` +
+            `Hedef platform: ${targetPlatform}\n\n` +
+            'Aşağıdaki alanlarla bir oyun brief JSON nesnesi üret:\n' +
+            'title, slug, packageName, summary, gameType, targetPlatform, mechanics, visualStyle, controls, monetizationNotes, releaseNotes, storeShortDescription, storeFullDescription\n\n' +
+            'Kurallar:\n' +
+            '- gameType değeri kesinlikle "runner_2d" olmalı.\n' +
+            '- targetPlatform değeri kesinlikle "android" olmalı.\n' +
+            '- mechanics en az 1 maddelik dizi olmalı.\n' +
+            '- Sadece JSON döndür.'
+        }
+      ],
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'game_factory_brief',
+          strict: true,
+          schema: GAME_BRIEF_SCHEMA
+        }
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`groq_http_${response.status}:${errorBody.slice(0, 300)}`);
+  }
+
+  const payload = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string | Array<{ type?: string; text?: string }> } }>;
+  };
+
+  const rawContent = payload.choices?.[0]?.message?.content;
+  if (typeof rawContent === 'string') {
+    return rawContent.trim();
+  }
+
+  if (Array.isArray(rawContent)) {
+    const text = rawContent
+      .map((item) => (typeof item?.text === 'string' ? item.text : ''))
+      .join('\n')
+      .trim();
+    return text;
+  }
+
+  return '';
+}
+
 function toSlug(input: string): string {
   return input
     .toLocaleLowerCase('tr-TR')
@@ -156,93 +263,78 @@ export async function POST(request: Request) {
   const requestedPlatform = requestBody.targetPlatform ?? requestBody.platform;
   const targetPlatform = requestedPlatform === 'android' ? 'android' : 'android';
 
-  if (!process.env.OPENAI_API_KEY) {
+  const provider = process.env.AI_PROVIDER?.trim().toLowerCase() || 'openai';
+  const isGroqProvider = provider === 'groq';
+  const model = isGroqProvider
+    ? process.env.GROQ_MODEL?.trim() || DEFAULT_GROQ_MODEL
+    : process.env.OPENAI_MODEL_PRIMARY?.trim() || 'gpt-4o';
+
+  if (isGroqProvider) {
+    if (!process.env.GROQ_API_KEY?.trim()) {
+      return json({ ok: false, error: 'GROQ_API_KEY eksik.' }, 500);
+    }
+  } else if (!process.env.OPENAI_API_KEY?.trim()) {
     return json({ ok: false, error: 'OPENAI_API_KEY eksik.' }, 500);
   }
-
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const model = process.env.OPENAI_MODEL_PRIMARY?.trim() || 'gpt-4o';
 
   let aiText = '';
   try {
     console.info('[game-factory brief]', {
       stage: 'ai_call_started',
+      provider,
       model,
       promptLength: prompt.length,
       platform: targetPlatform
     });
 
-    const response = await client.responses.create({
-      model,
-      input: [
-        {
-          role: 'system',
-          content: [
-            {
-              type: 'input_text',
-              text:
-                'Sen bir oyun tasarımcısısın. SADECE geçerli bir JSON nesnesi döndür. Markdown, kod bloğu, açıklama, yorum veya ek metin yazma.'
-            }
-          ]
-        },
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'input_text',
-              text:
-                `Kullanıcı oyun fikri: ${prompt}\n` +
-                `Hedef platform: ${targetPlatform}\n\n` +
-                'Yalnızca aşağıdaki alanlarla bir JSON nesnesi üret. Yanıtta sadece JSON olsun:\n' +
-                '{"title":"Gece Koşucusu","slug":"gece-kosucusu","packageName":"com.koschei.generated.gecekosucusu","summary":"Kısa oyun özeti","gameType":"runner_2d","targetPlatform":"android","mechanics":["Tek dokunuşla zıplama","Otomatik koşu","Engellerden kaçınma","Skor toplama","Oyun bitti ve tekrar başlatma"],"visualStyle":"Basit 2D gece şehir atmosferi, neon mavi ve mor tonlar","controls":"Ekrana dokununca karakter zıplar.","monetizationNotes":"Reklam eklemeye uygun sade mobil oyun yapısı.","releaseNotes":"İlk Android sürümü.","storeShortDescription":"Gece atmosferinde hızlı ve sade 2D runner oyunu.","storeFullDescription":"Gece Koşucusu, karanlık şehir yolunda geçen sade ve hızlı bir 2D runner oyunudur. Oyuncu ekrana dokunarak zıplar, engellerden kaçınır ve en yüksek skoru yapmaya çalışır."}'
-            }
-          ]
-        }
-      ],
-      text: {
-        format: {
-          type: 'json_schema',
-          name: 'game_factory_brief',
-          strict: true,
-          schema: {
-            type: 'object',
-            additionalProperties: false,
-            required: [
-              'title',
-              'slug',
-              'packageName',
-              'summary',
-              'gameType',
-              'targetPlatform',
-              'mechanics',
-              'visualStyle',
-              'controls',
-              'monetizationNotes',
-              'releaseNotes',
-              'storeShortDescription',
-              'storeFullDescription'
-            ],
-            properties: {
-              title: { type: 'string', minLength: 1 },
-              slug: { type: 'string', minLength: 1 },
-              packageName: { type: 'string', minLength: 1 },
-              summary: { type: 'string', minLength: 1 },
-              gameType: { type: 'string', enum: ['runner_2d'] },
-              targetPlatform: { type: 'string', enum: ['android'] },
-              mechanics: { type: 'array', minItems: 1, items: { type: 'string', minLength: 1 } },
-              visualStyle: { type: 'string', minLength: 1 },
-              controls: { type: 'string', minLength: 1 },
-              monetizationNotes: { type: 'string', minLength: 1 },
-              releaseNotes: { type: 'string', minLength: 1 },
-              storeShortDescription: { type: 'string', minLength: 1 },
-              storeFullDescription: { type: 'string', minLength: 1 }
-            }
+    if (isGroqProvider) {
+      aiText = await callGroqBriefModel(prompt, targetPlatform, model);
+    } else {
+      const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const response = await client.responses.create({
+        model,
+        input: [
+          {
+            role: 'system',
+            content: [
+              {
+                type: 'input_text',
+                text:
+                  'Sen bir oyun tasarımcısısın. SADECE geçerli bir JSON nesnesi döndür. Markdown, kod bloğu, açıklama, yorum veya ek metin yazma.'
+              }
+            ]
+          },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'input_text',
+                text:
+                  `Kullanıcı oyun fikri: ${prompt}\n` +
+                  `Hedef platform: ${targetPlatform}\n\n` +
+                  'Aşağıdaki alanlarla bir oyun brief JSON nesnesi üret:\n' +
+                  'title, slug, packageName, summary, gameType, targetPlatform, mechanics, visualStyle, controls, monetizationNotes, releaseNotes, storeShortDescription, storeFullDescription\n\n' +
+                  'Kurallar:\n' +
+                  '- gameType değeri kesinlikle "runner_2d" olmalı.\n' +
+                  '- targetPlatform değeri kesinlikle "android" olmalı.\n' +
+                  '- mechanics en az 1 maddelik dizi olmalı.\n' +
+                  '- Sadece JSON döndür.'
+              }
+            ]
+          }
+        ],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'game_factory_brief',
+            strict: true,
+            schema: GAME_BRIEF_SCHEMA
           }
         }
-      }
-    } as never);
+      } as never);
 
-    aiText = typeof response.output_text === 'string' ? response.output_text.trim() : '';
+      aiText = typeof response.output_text === 'string' ? response.output_text.trim() : '';
+    }
     console.info('[game-factory brief]', {
       stage: 'ai_response_received',
       rawResponseLength: aiText.length,
@@ -262,7 +354,9 @@ export async function POST(request: Request) {
   } catch (error) {
     const reason = error instanceof Error && /json_schema|response_format|not supported|unsupported/i.test(error.message)
       ? 'unsupported_model_json_mode'
-      : 'openai_error';
+      : isGroqProvider
+        ? 'groq_error'
+        : 'openai_error';
     console.error('[game-factory brief]', {
       stage: 'ai_parse_failed',
       reason
