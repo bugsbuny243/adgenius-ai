@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import type { GameAgentPackage } from '@/lib/game-agent-pricing';
+import type { GameAgentPlan } from '@/lib/game-agent-plans';
 
 type Props = {
-  plan: GameAgentPackage;
+  plan: GameAgentPlan;
 };
 
 export function GameAgentPackageCard({ plan }: Props) {
@@ -42,14 +42,25 @@ export function GameAgentPackageCard({ plan }: Props) {
 
   return (
     <article className="rounded-2xl border border-white/10 bg-black/20 p-6">
-      <p className="text-xs uppercase tracking-wide text-lilac">Game Factory Paketi</p>
+      <p className="text-xs uppercase tracking-wide text-lilac">Game Agent Paketi</p>
       <h3 className="mt-1 text-2xl font-semibold">{plan.name}</h3>
-      <p className="mt-2 text-xl font-bold text-neon">{plan.price}</p>
-      <ul className="mt-4 space-y-2 text-sm text-white/80">
-        {plan.features.map((feature) => (
+      <p className="mt-1 text-sm text-white/75">{plan.summary}</p>
+      <p className="mt-2 text-xl font-bold text-neon">{plan.priceLabel}</p>
+
+      <h4 className="mt-4 text-sm font-semibold text-white">Dahil:</h4>
+      <ul className="mt-2 space-y-1 text-sm text-white/80">
+        {plan.includes.map((feature) => (
           <li key={feature}>• {feature}</li>
         ))}
       </ul>
+
+      <h4 className="mt-4 text-sm font-semibold text-white">Dahil Değil:</h4>
+      <ul className="mt-2 space-y-1 text-sm text-white/70">
+        {plan.excludes.map((feature) => (
+          <li key={feature}>• {feature}</li>
+        ))}
+      </ul>
+
       <button
         type="button"
         onClick={handleCheckout}
@@ -58,7 +69,12 @@ export function GameAgentPackageCard({ plan }: Props) {
       >
         {isLoading ? 'Yönlendiriliyor...' : 'Shopier ile öde'}
       </button>
-      <p className="mt-3 text-xs text-white/60">Paket aktivasyonu, ödeme doğrulaması veya admin onayı sonrası yapılır.</p>
+
+      <ul className="mt-3 space-y-1 text-xs text-white/60">
+        {plan.warnings.map((warning) => (
+          <li key={warning}>• {warning}</li>
+        ))}
+      </ul>
     </article>
   );
 }

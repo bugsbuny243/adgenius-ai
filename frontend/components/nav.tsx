@@ -12,19 +12,18 @@ const userLinks = [
 ] as const satisfies ReadonlyArray<{ href: Route; label: string }>;
 
 const ownerLinks = [
-  { href: '/owner/system', label: 'Sistem Durumu' },
-  { href: '/owner/unity', label: 'Unity Operasyon' },
-  { href: '/owner/ads', label: 'Reklam Yönetimi' },
+  { href: '/owner', label: 'Genel Bakış' },
+  { href: '/owner/users', label: 'Kullanıcılar' },
   { href: '/owner/payments', label: 'Ödemeler' },
-  { href: '/owner/users', label: 'Kullanım / Limitler' }
+  { href: '/owner/subscriptions', label: 'Abonelikler' },
+  { href: '/owner/integrations', label: 'Sistem Entegrasyonları' }
 ] as const satisfies ReadonlyArray<{ href: Route; label: string }>;
 
 type NavProps = {
   showOwnerLink?: boolean;
-  showSuperOwnerBadge?: boolean;
 };
 
-export function Nav({ showOwnerLink = false, showSuperOwnerBadge = false }: NavProps) {
+export function Nav({ showOwnerLink = false }: NavProps) {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -45,11 +44,6 @@ export function Nav({ showOwnerLink = false, showSuperOwnerBadge = false }: NavP
           <p className="text-xs uppercase tracking-[0.2em] text-lilac">Koschei</p>
           <h1 className="text-2xl font-semibold">Koschei AI</h1>
           <p className="text-xs text-white/55">AI destekli oyun üretim alanı</p>
-          {showSuperOwnerBadge ? (
-            <p className="mt-2 inline-flex rounded-full border border-amber-300/60 bg-amber-400/10 px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-amber-100">
-              Super Owner
-            </p>
-          ) : null}
         </div>
         <button
           type="button"

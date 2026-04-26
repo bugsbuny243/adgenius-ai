@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { getApiAuthContext, json } from '@/app/api/game-factory/_auth';
+import { requireActiveGameAgentPackage } from '@/lib/game-agent-access';
 
 type BriefRequest = {
   prompt?: unknown;
@@ -128,6 +129,9 @@ function getParseFailureReason(brief: GameBrief): ParseFailureReason | null {
 export async function POST(request: Request) {
   const context = await getApiAuthContext(request);
   if (context instanceof Response) return context;
+
+  const packageGateResponse = await requireActiveGameAgentPackage(context.supabase, context.userId, context.workspaceId);
+  if (packageGateResponse) return packageGateResponse;
 
   let requestBody: BriefRequest;
   try {

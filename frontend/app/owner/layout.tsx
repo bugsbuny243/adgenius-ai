@@ -1,15 +1,12 @@
-import { getOwnerAccessContextOrRedirect } from '@/lib/owner-access';
+import { requirePlatformOwner } from '@/lib/owner-auth';
 import { OwnerShell } from '@/app/owner/components/owner-shell';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function OwnerLayout({ children }: { children: React.ReactNode }) {
-  const context = await getOwnerAccessContextOrRedirect();
+  const owner = await requirePlatformOwner();
+  const ownerLabel = owner.email ?? owner.id;
 
-  return (
-    <OwnerShell workspaceName={context.workspaceName} role={context.role} isSuperOwner={context.isSuperOwner}>
-      {children}
-    </OwnerShell>
-  );
+  return <OwnerShell ownerLabel={ownerLabel}>{children}</OwnerShell>;
 }

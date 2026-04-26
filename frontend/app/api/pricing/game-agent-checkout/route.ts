@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseActionServerClient } from '@/lib/supabase-server';
-import { GAME_AGENT_PACKAGE_MAP, type GameAgentPlanKey } from '@/lib/game-agent-pricing';
+import { GAME_AGENT_PLAN_MAP, type GameAgentPlanKey } from '@/lib/game-agent-plans';
 
 type CheckoutPayload = {
   planKey?: GameAgentPlanKey;
@@ -8,7 +8,7 @@ type CheckoutPayload = {
 
 export async function POST(request: Request) {
   const payload = (await request.json()) as CheckoutPayload;
-  const plan = payload.planKey ? GAME_AGENT_PACKAGE_MAP[payload.planKey] : null;
+  const plan = payload.planKey ? GAME_AGENT_PLAN_MAP[payload.planKey] : null;
 
   if (!plan) {
     return NextResponse.json({ ok: false, error: 'invalid_plan_key' }, { status: 400 });
@@ -24,14 +24,16 @@ export async function POST(request: Request) {
       user_id: user.id,
       plan_key: plan.planKey,
       provider: 'shopier',
-      currency: 'TRY',
+      currency: plan.currency,
       amount: plan.amountTry,
       status: 'pending',
       checkout_url: plan.shopierUrl,
       metadata: {
         package_name: plan.name,
+        package_price_label: plan.priceLabel,
         source: 'pricing_page',
-        product_scope: 'game_agent'
+        product_scope: 'game_agent',
+        requires_owner_approval: true
       }
     });
   }

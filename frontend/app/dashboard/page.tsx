@@ -28,7 +28,7 @@ export default async function DashboardPage() {
   const workspace = await getWorkspaceContextOrNull();
   if (!workspace) redirect('/signin');
 
-  const [subscriptionRes, usageRes, projectsRes] = await Promise.all([
+  const [subscriptionRes, usageRes, projectsRes, paymentOrdersRes] = await Promise.all([
     supabase
       .from('subscriptions')
       .select('plan_name, run_limit, status')
@@ -47,12 +47,19 @@ export default async function DashboardPage() {
       .select('id, name, status, created_at')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
+      .limit(5),
+    supabase
+      .from('payment_orders')
+      .select('id, plan_key, status, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
       .limit(5)
   ]);
 
   const subscription = subscriptionRes.data;
   const usageItems = usageRes.data ?? [];
   const projects = projectsRes.data ?? [];
+  const paymentOrders = paymentOrdersRes.data ?? [];
 
   const planName = subscription?.plan_name ?? 'free';
   const planTier = planName.toLowerCase() === 'free' ? 'free' : 'paid';
@@ -81,6 +88,19 @@ export default async function DashboardPage() {
         <Link href="/game-factory" className="mt-4 inline-flex rounded-xl bg-neon px-6 py-3 text-base font-semibold text-ink">
           Game Factory&apos;ye Git
         </Link>
+      </section>
+
+
+      <section className="panel mb-4">
+        <h3 className="text-lg font-semibold">Paket / Ödeme Durumu</h3>
+        <p className="mt-1 text-sm text-white/70">Shopier ödemeleri owner tarafından manuel onaylanır.</p>
+        <div className="mt-3 space-y-2 text-sm">
+          {paymentOrders.length === 0 ? <p className="text-white/60">Henüz paket ödeme talebi bulunmuyor.</p> : paymentOrders.map((order) => (
+            <p key={order.id} className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+              {order.plan_key} • {order.status} • {toTurkishDate(order.created_at)}
+            </p>
+          ))}
+        </div>
       </section>
 
       <section className="panel">
