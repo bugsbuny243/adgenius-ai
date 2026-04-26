@@ -86,16 +86,30 @@ async function unityRequest<T>(path: string, init?: RequestInit): Promise<T> {
     cache: 'no-store'
   });
 
+  const contentType = response.headers.get('content-type') ?? '';
+  const isJsonResponse = contentType.toLowerCase().includes('application/json');
+  const payload = isJsonResponse ? await response.json() : await response.text();
+
+  console.error('Unity API Response:', {
+    status: response.status,
+    endpointPath: path,
+    method: init?.method ?? 'GET',
+    payload
+  });
+
   if (!response.ok) {
-    const text = await response.text();
-    throw new UnityApiError(text || `Unity API hatası: ${response.status}`, { status: response.status, endpointPath: path });
+    const message =
+      typeof payload === 'string'
+        ? payload
+        : (payload as { message?: string } | null | undefined)?.message;
+    throw new UnityApiError(message || `Unity API hatası: ${response.status}`, { status: response.status, endpointPath: path });
   }
 
   if (response.status === 204) {
     return undefined as T;
   }
 
-  return (await response.json()) as T;
+  return payload as T;
 }
 
 function mapBuild(raw: UnityBuildRaw): UnityBuildResponse {
