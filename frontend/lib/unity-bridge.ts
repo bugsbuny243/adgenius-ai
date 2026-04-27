@@ -1,5 +1,6 @@
+// 📁 frontend/lib/unity-bridge.ts (TAMAMI YENİLENDİ)
+
 const UNITY_BASE_URL = 'https://build-api.cloud.unity3d.com/api/v1';
-const UNITY_AUTH_MODE = 'unknown';
 
 export type UnityBuildStatus =
   | 'queued'
@@ -45,75 +46,81 @@ export class UnityApiError extends Error {
     this.name = 'UnityApiError';
     this.status = options?.status;
     this.endpointPath = options?.endpointPath;
-    this.authMode = options?.authMode ?? UNITY_AUTH_MODE;
+    this.authMode = options?.authMode ?? 'basic_api_key';
   }
 }
 
+/**
+ * Yapılandırmayı yalnızca API anahtarı ile hazırlar.
+ * Servis hesabı yöntemi kaldırıldı (Unity Build Automation API'si için geçersiz).
+ */
 function getConfig() {
   const orgId = process.env.UNITY_ORG_ID?.trim();
   const projectId = process.env.UNITY_PROJECT_ID?.trim();
   const buildApiKey = process.env.UNITY_BUILD_API_KEY?.trim();
-  const keyId = process.env.UNITY_SERVICE_ACCOUNT_KEY_ID?.trim();
-  const secretKey = process.env.UNITY_SERVICE_ACCOUNT_SECRET?.trim() || process.env.UNITY_SERVICE_ACCOUNT_SECRET_KEY?.trim();
 
-  if (!orgId || !projectId || (!buildApiKey && (!keyId || !secretKey))) {
-    throw new Error('Unity build ayarları eksik. UNITY_ORG_ID, UNITY_PROJECT_ID, UNITY_BUILD_API_KEY veya servis hesap anahtarlarını kontrol edin.');
+  if (!orgId || !projectId) {
+    throw new Error('Unity yapılandırması eksik: UNITY_ORG_ID ve UNITY_PROJECT_ID zorunludur.');
   }
 
-  if (buildApiKey) {
-    return {
-      orgId,
-      projectId,
-      authorization: `Basic ${buildApiKey}`,
-      authMode: 'basic_build_api_key' as const
-    };
+  if (!buildApiKey) {
+    throw new Error('Unity API anahtarı eksik: UNITY_BUILD_API_KEY tanımlanmamış.');
   }
 
-  const raw = `${keyId}:${secretKey}`;
-  const encoded = Buffer.from(raw, 'utf8').toString('base64');
-  const authorization = `Basic ${encoded}`;
+  // Unity Build Automation API anahtarı formatı:
+  // Basic base64(apiKey:) yani anahtarın sonuna iki nokta üst üste konur, şifre yoktur.
+  const encoded = Buffer.from(`${buildApiKey}:`, 'utf8').toString('base64');
 
-  return { orgId, projectId, authorization, authMode: 'basic_service_account' as const };
+  return {
+    orgId,
+    projectId,
+    authorization: `Basic ${encoded}`,
+    authMode: 'basic_api_key' as const,
+  };
 }
 
 function normalizeStatus(value: unknown): UnityBuildStatus {
   if (typeof value !== 'string') return 'unknown';
-  if (value === 'queued' || value === 'sentToBuilder' || value === 'started' || value === 'restarted' || value === 'success' || value === 'failure' || value === 'canceled') {
-    return value;
-  }
-  return 'unknown';
+  const validStatuses = ['queued', 'sentToBuilder', 'started', 'restarted', 'success', 'failure', 'canceled'];
+  return validStatuses.includes(value) ? (value as UnityBuildStatus) : 'unknown';
 }
 
 async function unityRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const { authorization, authMode } = getConfig();
-  const response = await fetch(`${UNITY_BASE_URL}${path}`, {
+  const url = `${UNITY_BASE_URL}${path}`;
+
+  const response = await fetch(url, {
     ...init,
     headers: {
       Authorization: authorization,
       'Content-Type': 'application/json',
-      ...(init?.headers ?? {})
+      ...(init?.headers ?? {}),
     },
-    cache: 'no-store'
+    cache: 'no-store',
   });
 
   const contentType = response.headers.get('content-type') ?? '';
   const isJsonResponse = contentType.toLowerCase().includes('application/json');
   const payload = isJsonResponse ? await response.json() : await response.text();
 
-  console.error('Unity API Response:', {
-    status: response.status,
-    endpointPath: path,
-    method: init?.method ?? 'GET',
-    authMode,
-    payload
-  });
-
   if (!response.ok) {
     const message =
       typeof payload === 'string'
         ? payload
         : (payload as { message?: string } | null | undefined)?.message;
-    throw new UnityApiError(message || `Unity API hatası: ${response.status}`, { status: response.status, endpointPath: path, authMode });
+
+    console.error('Unity API hatası:', {
+      status: response.status,
+      path,
+      method: init?.method ?? 'GET',
+      authMode,
+      message,
+    });
+
+    throw new UnityApiError(
+      message || `Unity API hatası: ${response.status}`,
+      { status: response.status, endpointPath: path, authMode }
+    );
   }
 
   if (response.status === 204) {
@@ -129,42 +136,116 @@ function mapBuild(raw: UnityBuildRaw): UnityBuildResponse {
     buildTargetId: raw.buildtargetid ?? '',
     status: normalizeStatus(raw.status),
     created: raw.created ?? new Date(0).toISOString(),
-    links: raw.links?.download_primary?.href ? { download_primary: { href: raw.links.download_primary.href } } : undefined
+    links: raw.links?.download_primary?.href
+      ? { download_primary: { href: raw.links.download_primary.href } }
+      : undefined,
   };
 }
 
-export async function triggerBuild(buildTargetId: string): Promise<UnityBuildResponse> {
-  const { orgId, projectId } = getConfig();
-  const data = await unityRequest<UnityBuildRaw>(`/orgs/${orgId}/projects/${projectId}/buildtargets/${buildTargetId}/builds`, {
-    method: 'POST',
-    body: JSON.stringify({ clean: false, delay: 0 })
-  });
+/**
+ * Hedef adı verilmişse gerçek build hedefi UUID'sini çözer.
+ * Eğer zaten UUID formatında bir değer gönderilirse onu aynen kullanır.
+ */
+async function resolveBuildTargetId(nameOrId: string): Promise<string> {
+  // Basit UUID kontrolü: içinde tire varsa büyük ihtimalle UUID'dir.
+  if (nameOrId.includes('-')) {
+    return nameOrId;
+  }
 
-  return mapBuild({ ...data, buildtargetid: data.buildtargetid ?? buildTargetId });
+  console.log(`Build hedefi adı kullanıldı, UUID çözülüyor: "${nameOrId}"`);
+
+  try {
+    const targets = await getBuildTargets();
+    const match = targets.find(
+      (t) => t.name === nameOrId || t.buildtargetid === nameOrId
+    );
+
+    if (!match) {
+      throw new Error(
+        `"${nameOrId}" adında bir build hedefi bulunamadı. Lütfen Unity Dashboard > Build Automation > Configurations sayfasından hedef adınızı kontrol edin.`
+      );
+    }
+
+    console.log(`Hedef UUID bulundu: ${match.buildtargetid}`);
+    return match.buildtargetid;
+  } catch (error) {
+    if (error instanceof UnityApiError) {
+      throw error;
+    }
+    throw new UnityApiError(
+      `Build hedefi çözülemedi: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`
+    );
+  }
 }
 
-export async function getBuildStatus(buildTargetId: string, buildNumber: number): Promise<UnityBuildResponse & { finished?: string }> {
+/**
+ * Yeni bir build başlatır.
+ * @param buildTargetIdOrName Hedef ID'si (UUID) veya adı.
+ */
+export async function triggerBuild(buildTargetIdOrName: string): Promise<UnityBuildResponse> {
   const { orgId, projectId } = getConfig();
-  const data = await unityRequest<UnityBuildRaw>(`/orgs/${orgId}/projects/${projectId}/buildtargets/${buildTargetId}/builds/${buildNumber}`);
-  const mapped = mapBuild({ ...data, buildtargetid: data.buildtargetid ?? buildTargetId });
+  const targetId = await resolveBuildTargetId(buildTargetIdOrName);
+
+  const data = await unityRequest<UnityBuildRaw>(
+    `/orgs/${orgId}/projects/${projectId}/buildtargets/${targetId}/builds`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ clean: false, delay: 0 }),
+    }
+  );
+
+  return mapBuild({ ...data, buildtargetid: data.buildtargetid ?? targetId });
+}
+
+export async function getBuildStatus(
+  buildTargetIdOrName: string,
+  buildNumber: number
+): Promise<UnityBuildResponse & { finished?: string }> {
+  const { orgId, projectId } = getConfig();
+  const targetId = await resolveBuildTargetId(buildTargetIdOrName);
+
+  const data = await unityRequest<UnityBuildRaw>(
+    `/orgs/${orgId}/projects/${projectId}/buildtargets/${targetId}/builds/${buildNumber}`
+  );
+
+  const mapped = mapBuild({ ...data, buildtargetid: data.buildtargetid ?? targetId });
   return { ...mapped, finished: data.finished };
 }
 
-export async function cancelBuild(buildTargetId: string, buildNumber: number): Promise<void> {
+export async function cancelBuild(
+  buildTargetIdOrName: string,
+  buildNumber: number
+): Promise<void> {
   const { orgId, projectId } = getConfig();
-  await unityRequest<void>(`/orgs/${orgId}/projects/${projectId}/buildtargets/${buildTargetId}/builds/${buildNumber}`, {
-    method: 'DELETE'
-  });
+  const targetId = await resolveBuildTargetId(buildTargetIdOrName);
+
+  await unityRequest<void>(
+    `/orgs/${orgId}/projects/${projectId}/buildtargets/${targetId}/builds/${buildNumber}`,
+    { method: 'DELETE' }
+  );
 }
 
-export async function getBuilds(buildTargetId: string, limit = 10): Promise<(UnityBuildResponse & { finished?: string })[]> {
+export async function getBuilds(
+  buildTargetIdOrName: string,
+  limit = 10
+): Promise<(UnityBuildResponse & { finished?: string })[]> {
   const { orgId, projectId } = getConfig();
-  const data = await unityRequest<UnityBuildRaw[]>(`/orgs/${orgId}/projects/${projectId}/buildtargets/${buildTargetId}/builds?per_page=${limit}`);
-  return (Array.isArray(data) ? data : []).map((item) => ({ ...mapBuild({ ...item, buildtargetid: item.buildtargetid ?? buildTargetId }), finished: item.finished }));
+  const targetId = await resolveBuildTargetId(buildTargetIdOrName);
+
+  const data = await unityRequest<UnityBuildRaw[]>(
+    `/orgs/${orgId}/projects/${projectId}/buildtargets/${targetId}/builds?per_page=${limit}`
+  );
+
+  return (Array.isArray(data) ? data : []).map((item) => ({
+    ...mapBuild({ ...item, buildtargetid: item.buildtargetid ?? targetId }),
+    finished: item.finished,
+  }));
 }
 
 export async function getBuildTargets(): Promise<UnityBuildTarget[]> {
   const { orgId, projectId } = getConfig();
-  const data = await unityRequest<UnityBuildTarget[]>(`/orgs/${orgId}/projects/${projectId}/buildtargets`);
+  const data = await unityRequest<UnityBuildTarget[]>(
+    `/orgs/${orgId}/projects/${projectId}/buildtargets`
+  );
   return Array.isArray(data) ? data : [];
 }
