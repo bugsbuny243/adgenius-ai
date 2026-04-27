@@ -29,7 +29,7 @@ export function BuildRowStatusAutoRefresh({ buildId, projectId, initialStatus }:
       try {
         const supabase = createSupabaseBrowserClient();
         if (!supabase) return;
-        const token = (await supabase?.auth.getSession())?.data.session?.access_token;
+        const token = (await supabase.auth.getSession()).data.session?.access_token;
         if (!token) return;
 
         const response = await fetch('/api/game-factory/builds/refresh', {
