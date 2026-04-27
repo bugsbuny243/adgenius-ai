@@ -2,7 +2,6 @@ const PUBLIC_ENV_KEYS = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_
 const SERVER_ENV_KEYS = ['BACKEND_API_URL', 'AI_PROVIDER', 'GROQ_API_KEY', 'OPENAI_API_KEY'] as const;
 
 type PublicEnvKey = (typeof PUBLIC_ENV_KEYS)[number];
-type ServerEnvKey = (typeof SERVER_ENV_KEYS)[number];
 type OwnerEnvKey = 'OWNER_USER_ID' | 'OWNER_EMAIL';
 
 function hasValue(value: string | undefined): value is string {

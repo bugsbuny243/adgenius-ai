@@ -1,9 +1,9 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { getServerEnv } from '@/lib/env';
+import { getPublicEnv } from '@/lib/env';
 
 function getSupabaseServerConfig() {
-  const { SUPABASE_URL: url, SUPABASE_ANON_KEY: anonKey } = getServerEnv();
+  const { NEXT_PUBLIC_SUPABASE_URL: url, NEXT_PUBLIC_SUPABASE_ANON_KEY: anonKey } = getPublicEnv();
 
   if (!url || !anonKey) {
     return null;
@@ -19,7 +19,7 @@ export function isSupabaseServerConfigured() {
 async function createSupabaseClient({ writableCookies }: { writableCookies: boolean }) {
   const config = getSupabaseServerConfig();
   if (!config) {
-    throw new Error('Supabase server client could not be initialized: missing SUPABASE_URL or SUPABASE_ANON_KEY.');
+    throw new Error('Supabase server client could not be initialized: missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY.');
   }
 
   const cookieStore = await cookies();
