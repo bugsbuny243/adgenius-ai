@@ -1,16 +1,16 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 
-export function BuildStatusPoller({ activeJobId, projectId }: { activeJobId: string | null; projectId: string }) {
+export function RefreshBuildsButton({ projectId }: { projectId: string }) {
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  useEffect(() => {
-    if (!activeJobId) return;
-
-    const timer = setInterval(async () => {
+  async function onRefresh() {
+    setLoading(true);
+    try {
       const supabase = createSupabaseBrowserClient();
       const token = (await supabase?.auth.getSession())?.data.session?.access_token;
       if (!token) return;
@@ -23,11 +23,20 @@ export function BuildStatusPoller({ activeJobId, projectId }: { activeJobId: str
         },
         body: JSON.stringify({ projectId })
       });
+    } finally {
       router.refresh();
-    }, 30000);
+      setLoading(false);
+    }
+  }
 
-    return () => clearInterval(timer);
-  }, [activeJobId, projectId, router]);
-
-  return null;
+  return (
+    <button
+      type="button"
+      className="rounded-lg border border-white/20 px-3 py-2 text-sm disabled:opacity-60"
+      onClick={onRefresh}
+      disabled={loading}
+    >
+      {loading ? 'Yenileniyor...' : 'Yenile'}
+    </button>
+  );
 }
