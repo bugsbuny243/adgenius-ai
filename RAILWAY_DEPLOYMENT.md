@@ -1,21 +1,32 @@
-# Railway Deployment Split
+# Railway Deployment (Single Service)
 
-## Frontend service (`frontend`)
-Allowed env only:
+## Service
+
+- Deploy only `frontend` as one Railway Next.js service.
+- Set Railway Root Directory to `/frontend`.
+- Use public domain: `https://tradepigloball.co`.
+
+## Environment
+
+Public env:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `NEXT_PUBLIC_SITE_URL`
-- `BACKEND_API_URL`
 
-No service role and no provider secrets on frontend.
+Server-only env (used by `app/api/**`):
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `UNITY_BUILD_API_KEY`
+- `UNITY_ORG_ID`
+- `UNITY_PROJECT_ID`
+- `UNITY_BUILD_TARGET_ID`
+- `UNITY_WEBHOOK_SECRET`
+- `GROQ_API_KEY`
+- `GOOGLE_CLIENT_SECRET`
+- `GITHUB_UNITY_REPO_TOKEN`
 
-## Backend service (`backend`)
-Holds all secrets:
-- Supabase service role
-- Unity org/project/build/webhook credentials
-- GitHub Unity repo token
-- Google secrets
-- AI provider keys
-- `KOSCHEI_CREDENTIALS_ENCRYPTION_KEY`
+## Notes
 
-Frontend API routes can proxy to backend via `BACKEND_API_URL`.
+- No separate backend service.
+- No `BACKEND_API_URL` requirement for Game Factory routes.
+- Unity callback endpoint: `https://tradepigloball.co/api/unity-build-callback`.

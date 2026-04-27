@@ -27,15 +27,29 @@ export function RefreshBuildsButton({ projectId }: { projectId: string }) {
         body: JSON.stringify({ projectId })
       });
 
-      const payload = (await response.json().catch(() => null)) as { ok?: boolean; error?: string; errors?: string[] } | null;
-      if (!response.ok || payload?.ok === false) {
-        alert(payload?.errors?.[0] ?? payload?.error ?? 'Build yenileme sırasında bir hata oluştu.');
+      const contentType = response.headers.get('content-type') ?? '';
+
+      if (contentType.toLowerCase().includes('application/json')) {
+        const payload = (await response.json().catch(() => null)) as { ok?: boolean; error?: string; errors?: string[] } | null;
+        if (!response.ok || payload?.ok === false) {
+          alert(payload?.error ?? payload?.errors?.[0] ?? `HTTP ${response.status}`);
+          return;
+        }
+
+        if (payload?.errors?.length) {
+          alert(payload.errors[0]);
+        }
+
+        router.refresh();
         return;
       }
 
-      if (payload?.errors?.length) {
-        alert(payload.errors[0]);
+      const text = await response.text();
+      if (!response.ok) {
+        alert(`HTTP ${response.status}: ${text.slice(0, 300)}`);
+        return;
       }
+
       router.refresh();
     } finally {
       setLoading(false);
