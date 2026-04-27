@@ -103,10 +103,7 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
 
   return (
     <main className="panel space-y-4">
-      <BuildListAutoRefresh
-        projectId={id}
-        builds={dedupedBuilds.map((build) => ({ id: build.id, status: build.status }))}
-      />
+      <BuildListAutoRefresh builds={dedupedBuilds.map((build) => ({ id: build.id, status: build.status }))} />
       <header className="rounded-xl border border-white/10 bg-black/20 p-4">
         <h1 className="text-2xl font-bold">{project.app_name}</h1>
         <p className="text-sm text-white/70">{project.package_name}</p>
