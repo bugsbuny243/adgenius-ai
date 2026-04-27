@@ -4,6 +4,7 @@ import { createSupabaseReadonlyServerClient } from '@/lib/supabase-server';
 import { deleteGameProject } from '@/app/game-factory/actions';
 import { StartBuildButton } from '@/app/game-factory/[id]/StartBuildButton';
 import { BuildRowStatusAutoRefresh } from '@/app/game-factory/[id]/BuildRowStatusAutoRefresh';
+import { BuildListAutoRefresh } from '@/app/game-factory/[id]/BuildListAutoRefresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,6 +45,8 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
         <p className="text-sm text-white/70">{project.package_name}</p>
         <span className="mt-2 inline-flex rounded-full bg-white/10 px-3 py-1 text-xs">{project.status}</span>
       </header>
+
+      <BuildListAutoRefresh projectId={id} initialStatus={latestBuild?.status ?? null} />
 
       <section className="rounded-xl border border-white/10 bg-black/20 p-4 text-sm">
         <h2 className="mb-2 text-lg font-semibold">Brief</h2>
