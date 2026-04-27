@@ -55,7 +55,7 @@ export async function POST(_request: NextRequest, context: { params: Promise<{ j
     }
 
     const buildNumber = Number(buildJob.external_build_id);
-    if (!Number.isFinite(buildNumber)) {
+    if (!Number.isInteger(buildNumber) || buildNumber < 1) {
       return NextResponse.json({ ok: false, error: 'external_build_id geçerli bir sayı değil.' }, { status: 400 });
     }
 

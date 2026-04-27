@@ -194,6 +194,13 @@ export async function triggerBuild(buildTargetIdOrName: string): Promise<UnityBu
     }
   );
 
+  const buildNumber = data.build;
+  if (typeof buildNumber !== 'number' || !Number.isInteger(buildNumber) || buildNumber < 1) {
+    throw new UnityApiError('Unity build yanıtında geçerli build numarası yok.', {
+      endpointPath: `/orgs/${orgId}/projects/${projectId}/buildtargets/${targetId}/builds`,
+    });
+  }
+
   return mapBuild({ ...data, buildtargetid: data.buildtargetid ?? targetId });
 }
 
@@ -201,6 +208,10 @@ export async function getBuildStatus(
   buildTargetIdOrName: string,
   buildNumber: number
 ): Promise<UnityBuildResponse & { finished?: string }> {
+  if (!Number.isInteger(buildNumber) || buildNumber < 1) {
+    throw new UnityApiError(`Geçersiz build numarası: ${buildNumber}`);
+  }
+
   const { orgId, projectId } = getConfig();
   const targetId = await resolveBuildTargetId(buildTargetIdOrName);
 

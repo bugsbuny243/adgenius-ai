@@ -45,7 +45,13 @@ export async function GET(request: Request) {
   const buildNumber = typedJob.metadata?.unityBuildNumber;
   const unityBuildTargetId = typedJob.metadata?.unityBuildTargetId;
 
-  if (typeof buildNumber !== 'number' || typeof unityBuildTargetId !== 'string' || !unityBuildTargetId.trim()) {
+  if (
+    typeof buildNumber !== 'number' ||
+    !Number.isInteger(buildNumber) ||
+    buildNumber < 1 ||
+    typeof unityBuildTargetId !== 'string' ||
+    !unityBuildTargetId.trim()
+  ) {
     return json({ ok: false, error: 'Unity build bilgisi eksik.' }, 400);
   }
 
