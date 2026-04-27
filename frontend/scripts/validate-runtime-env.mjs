@@ -1,12 +1,5 @@
-const requiredPublicEnv = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY'];
-const requiredServerEnv = [
-  'SUPABASE_URL',
-  'SUPABASE_ANON_KEY',
-  'SUPABASE_SERVICE_ROLE_KEY',
-  'GOOGLE_CLIENT_ID',
-  'GOOGLE_CLIENT_SECRET',
-  'GOOGLE_REDIRECT_URI'
-];
+const requiredPublicEnv = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'NEXT_PUBLIC_SITE_URL'];
+const requiredServerEnv = ['BACKEND_API_URL'];
 
 function isPresent(value) {
   return typeof value === 'string' && value.trim().length > 0;
@@ -17,14 +10,7 @@ function missingKeys(keys) {
 }
 
 const missingPublic = missingKeys(requiredPublicEnv);
-const baseMissingServer = missingKeys(requiredServerEnv);
-const rawProvider = process.env.AI_PROVIDER;
-const provider = rawProvider && rawProvider.trim().toLowerCase() === 'openai' ? 'openai' : 'groq';
-const providerSpecificMissing =
-  provider === 'groq'
-    ? missingKeys(['GROQ_API_KEY'])
-    : missingKeys(['OPENAI_API_KEY']);
-const missingServer = [...baseMissingServer, ...providerSpecificMissing];
+const missingServer = missingKeys(requiredServerEnv);
 
 if (missingPublic.length || missingServer.length) {
   const details = [

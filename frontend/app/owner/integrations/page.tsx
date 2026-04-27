@@ -22,7 +22,7 @@ export default async function OwnerIntegrationsPage() {
     ['GITHUB_UNITY_REPO_OWNER', getMaskedStatus('GITHUB_UNITY_REPO_OWNER')],
     ['GITHUB_UNITY_REPO_NAME', getMaskedStatus('GITHUB_UNITY_REPO_NAME')],
     ['GITHUB_UNITY_REPO_BRANCH', getMaskedStatus('GITHUB_UNITY_REPO_BRANCH')],
-    ['GITHUB_UNITY_REPO_TOKEN', getMaskedStatus('GITHUB_UNITY_REPO_TOKEN')],
+    ['GITHUB_UNITY_REPO_AUTH_TOKEN', getMaskedStatus('GITHUB_UNITY_REPO_AUTH_TOKEN')],
     ['UNITY_ORG_ID', getMaskedStatus('UNITY_ORG_ID')],
     ['UNITY_PROJECT_ID', getMaskedStatus('UNITY_PROJECT_ID')],
     ['UNITY_BUILD_TARGET_ID', getMaskedStatus('UNITY_BUILD_TARGET_ID')],
@@ -30,7 +30,7 @@ export default async function OwnerIntegrationsPage() {
     ['UNITY_SERVICE_ACCOUNT_SECRET', getMaskedStatus('UNITY_SERVICE_ACCOUNT_SECRET')],
     ['SUPABASE_URL', getMaskedStatus('SUPABASE_URL')],
     ['SUPABASE_ANON_KEY', getMaskedStatus('SUPABASE_ANON_KEY')],
-    ['SUPABASE_SERVICE_ROLE_KEY', getMaskedStatus('SUPABASE_SERVICE_ROLE_KEY')],
+    ['SUPABASE_SERVER_KEY', getMaskedStatus('SUPABASE_SERVER_KEY')],
     ['GOOGLE_PLAY_DEFAULT_TRACK', getMaskedStatus('GOOGLE_PLAY_DEFAULT_TRACK')],
     ['OPENAI_API_KEY', getMaskedStatus('OPENAI_API_KEY')]
   ] as const;

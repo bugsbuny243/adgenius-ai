@@ -1,153 +1,59 @@
-const PUBLIC_ENV_KEYS = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY'] as const;
-const SERVER_ENV_KEYS = [
-  'SUPABASE_URL',
-  'SUPABASE_ANON_KEY',
-  'SUPABASE_SERVICE_ROLE_KEY',
-  'OPENAI_API_KEY',
-  'GROQ_API_KEY',
-  'AI_PROVIDER',
-  'GROQ_MODEL',
-  'OPENAI_MODEL_PRIMARY',
-  'OPENAI_MODEL_REASONING',
-  'OPENAI_MODEL_FAST',
-  'OPENAI_MODEL_LIGHT',
-  'OPENAI_REASONING_EFFORT',
-  'GOOGLE_CLIENT_ID',
-  'GOOGLE_CLIENT_SECRET',
-  'GOOGLE_REDIRECT_URI',
-  'APP_ORIGIN',
-  'GITHUB_UNITY_REPO_OWNER',
-  'GITHUB_UNITY_REPO_NAME',
-  'GITHUB_UNITY_REPO_BRANCH',
-  'GITHUB_UNITY_REPO_TOKEN',
-  'UNITY_ORG_ID',
-  'UNITY_PROJECT_ID',
-  'UNITY_BUILD_TARGET_ID',
-  'UNITY_SERVICE_ACCOUNT_KEY_ID',
-  'UNITY_SERVICE_ACCOUNT_SECRET',
-  'GOOGLE_PLAY_DEFAULT_TRACK',
-  'KOSCHEI_CREDENTIALS_ENCRYPTION_KEY'
-] as const;
+const PUBLIC_ENV_KEYS = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'NEXT_PUBLIC_SITE_URL'] as const;
+const SERVER_ENV_KEYS = ['BACKEND_API_URL', 'AI_PROVIDER', 'GROQ_API_KEY', 'OPENAI_API_KEY'] as const;
 
 type PublicEnvKey = (typeof PUBLIC_ENV_KEYS)[number];
 type ServerEnvKey = (typeof SERVER_ENV_KEYS)[number];
-
 type OwnerEnvKey = 'OWNER_USER_ID' | 'OWNER_EMAIL';
 
 function hasValue(value: string | undefined): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
-function resolveAiProvider(rawProvider: string | null): 'groq' | 'openai' {
-  const normalized = rawProvider?.trim().toLowerCase();
-  if (normalized === 'openai') return 'openai';
-  if (normalized === 'groq') return 'groq';
-  return 'groq';
-}
-
-function readServerEnv(name: ServerEnvKey): string | null {
+function read(name: string): string | null {
   const value = process.env[name];
   return hasValue(value) ? value : null;
 }
 
 export function getPublicEnv(): Record<PublicEnvKey, string | null> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
   return {
-    NEXT_PUBLIC_SUPABASE_URL: hasValue(supabaseUrl) ? supabaseUrl : null,
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: hasValue(supabaseAnonKey) ? supabaseAnonKey : null
+    NEXT_PUBLIC_SUPABASE_URL: read('NEXT_PUBLIC_SUPABASE_URL'),
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: read('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
+    NEXT_PUBLIC_SITE_URL: read('NEXT_PUBLIC_SITE_URL')
   };
 }
 
-export function getServerEnv(): Record<ServerEnvKey, string | null> {
+export function getServerEnv(): Record<string, string | null> {
   return {
-    SUPABASE_URL: readServerEnv('SUPABASE_URL'),
-    SUPABASE_ANON_KEY: readServerEnv('SUPABASE_ANON_KEY'),
-    SUPABASE_SERVICE_ROLE_KEY: readServerEnv('SUPABASE_SERVICE_ROLE_KEY'),
-    OPENAI_API_KEY: readServerEnv('OPENAI_API_KEY'),
-    GROQ_API_KEY: readServerEnv('GROQ_API_KEY'),
-    AI_PROVIDER: readServerEnv('AI_PROVIDER'),
-    GROQ_MODEL: readServerEnv('GROQ_MODEL'),
-    OPENAI_MODEL_PRIMARY: readServerEnv('OPENAI_MODEL_PRIMARY'),
-    OPENAI_MODEL_REASONING: readServerEnv('OPENAI_MODEL_REASONING'),
-    OPENAI_MODEL_FAST: readServerEnv('OPENAI_MODEL_FAST'),
-    OPENAI_MODEL_LIGHT: readServerEnv('OPENAI_MODEL_LIGHT'),
-    OPENAI_REASONING_EFFORT: readServerEnv('OPENAI_REASONING_EFFORT'),
-    GOOGLE_CLIENT_ID: readServerEnv('GOOGLE_CLIENT_ID'),
-    GOOGLE_CLIENT_SECRET: readServerEnv('GOOGLE_CLIENT_SECRET'),
-    GOOGLE_REDIRECT_URI: readServerEnv('GOOGLE_REDIRECT_URI'),
-    APP_ORIGIN: readServerEnv('APP_ORIGIN'),
-    GITHUB_UNITY_REPO_OWNER: readServerEnv('GITHUB_UNITY_REPO_OWNER'),
-    GITHUB_UNITY_REPO_NAME: readServerEnv('GITHUB_UNITY_REPO_NAME'),
-    GITHUB_UNITY_REPO_BRANCH: readServerEnv('GITHUB_UNITY_REPO_BRANCH'),
-    GITHUB_UNITY_REPO_TOKEN: readServerEnv('GITHUB_UNITY_REPO_TOKEN'),
-    UNITY_ORG_ID: readServerEnv('UNITY_ORG_ID'),
-    UNITY_PROJECT_ID: readServerEnv('UNITY_PROJECT_ID'),
-    UNITY_BUILD_TARGET_ID: readServerEnv('UNITY_BUILD_TARGET_ID'),
-    UNITY_SERVICE_ACCOUNT_KEY_ID: readServerEnv('UNITY_SERVICE_ACCOUNT_KEY_ID'),
-    UNITY_SERVICE_ACCOUNT_SECRET: readServerEnv('UNITY_SERVICE_ACCOUNT_SECRET'),
-    GOOGLE_PLAY_DEFAULT_TRACK: readServerEnv('GOOGLE_PLAY_DEFAULT_TRACK'),
-    KOSCHEI_CREDENTIALS_ENCRYPTION_KEY: readServerEnv('KOSCHEI_CREDENTIALS_ENCRYPTION_KEY')
+    BACKEND_API_URL: read('BACKEND_API_URL'),
+    AI_PROVIDER: read('AI_PROVIDER'),
+    GROQ_API_KEY: read('GROQ_API_KEY'),
+    OPENAI_API_KEY: read('OPENAI_API_KEY')
   };
 }
 
 export function getEnvDiagnostics() {
-  const isServerRuntime = typeof window === 'undefined';
   const publicEnv = getPublicEnv();
   const serverEnv = getServerEnv();
-  const provider = resolveAiProvider(serverEnv.AI_PROVIDER);
-
   const missingPublicEnv = PUBLIC_ENV_KEYS.filter((key) => !publicEnv[key]);
-  const missingServerEnv = isServerRuntime
-    ? SERVER_ENV_KEYS.filter((key) => {
-        if (key === 'AI_PROVIDER') return false;
-        if (key === 'GROQ_MODEL') return false;
-        if (provider === 'groq' && key.startsWith('OPENAI_MODEL_')) return false;
-        if (provider === 'groq' && key === 'OPENAI_REASONING_EFFORT') return false;
-        if (provider === 'groq' && key === 'OPENAI_API_KEY') return false;
-        if (provider !== 'groq' && key === 'GROQ_API_KEY') return false;
-        return !serverEnv[key];
-      })
-    : [];
-  const publicReady = missingPublicEnv.length === 0;
-
-  const groupReadiness = {
-    core: hasValue(serverEnv.APP_ORIGIN ?? undefined),
-    supabase: publicReady && Boolean(serverEnv.SUPABASE_URL && serverEnv.SUPABASE_ANON_KEY && serverEnv.SUPABASE_SERVICE_ROLE_KEY),
-    ai: (() => {
-      if (provider === 'groq') {
-        return Boolean(serverEnv.GROQ_API_KEY);
-      }
-      return Boolean(serverEnv.OPENAI_API_KEY);
-    })(),
-    githubUnity: Boolean(serverEnv.GITHUB_UNITY_REPO_OWNER && serverEnv.GITHUB_UNITY_REPO_NAME && serverEnv.GITHUB_UNITY_REPO_TOKEN),
-    unityBuild: Boolean(
-      serverEnv.UNITY_ORG_ID &&
-        serverEnv.UNITY_PROJECT_ID &&
-        serverEnv.UNITY_BUILD_TARGET_ID &&
-        serverEnv.UNITY_SERVICE_ACCOUNT_KEY_ID &&
-        serverEnv.UNITY_SERVICE_ACCOUNT_SECRET
-    ),
-    googleOAuth: Boolean(serverEnv.GOOGLE_CLIENT_ID && serverEnv.GOOGLE_CLIENT_SECRET && serverEnv.GOOGLE_REDIRECT_URI),
-    googlePlayEncryption: Boolean(serverEnv.KOSCHEI_CREDENTIALS_ENCRYPTION_KEY)
-  };
+  const missingServerEnv = typeof window === 'undefined' ? SERVER_ENV_KEYS.filter((key) => !serverEnv[key] && key === 'BACKEND_API_URL') : [];
 
   return {
     publicEnv,
     serverEnv,
     missingPublicEnv,
     missingServerEnv,
-    publicReady,
-    serverReady: isServerRuntime ? missingServerEnv.length === 0 : true,
-    groupReadiness
+    publicReady: missingPublicEnv.length === 0,
+    serverReady: missingServerEnv.length === 0,
+    groupReadiness: {
+      supabase: Boolean(publicEnv.NEXT_PUBLIC_SUPABASE_URL && publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+      backendApi: Boolean(serverEnv.BACKEND_API_URL)
+    }
   };
 }
 
-
 export function getOwnerEnv(): Record<OwnerEnvKey, string | null> {
   return {
-    OWNER_USER_ID: hasValue(process.env.OWNER_USER_ID) ? process.env.OWNER_USER_ID : null,
-    OWNER_EMAIL: hasValue(process.env.OWNER_EMAIL) ? process.env.OWNER_EMAIL : null
+    OWNER_USER_ID: read('OWNER_USER_ID'),
+    OWNER_EMAIL: read('OWNER_EMAIL')
   };
 }

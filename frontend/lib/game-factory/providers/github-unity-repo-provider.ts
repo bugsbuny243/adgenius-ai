@@ -98,11 +98,11 @@ export class GitHubUnityRepoProvider {
   private getConfig(gameProject: GameProjectRef) {
     const repoOwner = this.env.GITHUB_UNITY_REPO_OWNER;
     const repoName = this.env.GITHUB_UNITY_REPO_NAME;
-    const token = this.env.GITHUB_UNITY_REPO_TOKEN;
+    const token = this.env.GITHUB_UNITY_REPO_AUTH_TOKEN;
     const branch = gameProject.unity_branch || this.env.GITHUB_UNITY_REPO_BRANCH || 'main';
 
     if (!repoOwner || !repoName || !token) {
-      throw new Error('GitHub Unity repo ayarları eksik. GITHUB_UNITY_REPO_OWNER, GITHUB_UNITY_REPO_NAME ve GITHUB_UNITY_REPO_TOKEN zorunludur.');
+      throw new Error('GitHub Unity repo ayarları eksik. GITHUB_UNITY_REPO_OWNER, GITHUB_UNITY_REPO_NAME ve GITHUB_UNITY_REPO_AUTH_TOKEN zorunludur.');
     }
 
     return { owner: repoOwner, repo: repoName, token, branch };

@@ -1,10 +1,10 @@
 'use server';
 
+import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createSupabaseActionServerClient } from '@/lib/supabase-server';
-import { encryptCredentials, serializeEncryptedCredentials } from '@/lib/credentials-encryption';
-import { validateGooglePlayServiceAccount } from '@/lib/game-factory/providers/google-play-publisher-provider';
+import { getBackendApiUrl } from '@/lib/backend-api';
 
 function normalizeTrack(value: string): 'production' | 'closed' | 'internal' {
   if (value === 'closed' || value === 'internal') return value;
@@ -13,13 +13,9 @@ function normalizeTrack(value: string): 'production' | 'closed' | 'internal' {
 
 export async function saveGooglePlayIntegrationAction(formData: FormData) {
   const supabase = await createSupabaseActionServerClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect('/signin');
-  }
+  const [{ data: sessionData }, headerStore] = await Promise.all([supabase.auth.getSession(), headers()]);
+  const token = sessionData.session?.access_token;
+  if (!token) redirect('/signin');
 
   const displayName = String(formData.get('display_name') ?? '').trim();
   const defaultTrack = normalizeTrack(String(formData.get('default_track') ?? 'production').trim());
@@ -31,44 +27,28 @@ export async function saveGooglePlayIntegrationAction(formData: FormData) {
     rawJson = (await jsonUpload.text()).trim();
   }
 
-  if (!displayName || !rawJson) {
-    throw new Error('Bağlantı adı ve service account JSON zorunludur.');
-  }
+  const host = headerStore.get('x-forwarded-host') ?? headerStore.get('host');
+  const protocol = headerStore.get('x-forwarded-proto') ?? 'https';
+  if (!host) throw new Error('Host bilgisi bulunamadı.');
 
-  let parsedJson: Record<string, unknown>;
-  try {
-    parsedJson = JSON.parse(rawJson) as Record<string, unknown>;
-  } catch {
-    throw new Error('Service account JSON geçersiz.');
-  }
-
-  const clientEmail = typeof parsedJson.client_email === 'string' ? parsedJson.client_email.trim() : '';
-  const privateKey = typeof parsedJson.private_key === 'string' ? parsedJson.private_key.trim() : '';
-  if (!clientEmail || !privateKey) {
-    throw new Error('Service account JSON içinde client_email ve private_key alanları bulunmalıdır.');
-  }
-
-  const normalizedJson = JSON.stringify(parsedJson);
-  const encryptedCredentials = serializeEncryptedCredentials(encryptCredentials(normalizedJson));
-  const validation = await validateGooglePlayServiceAccount(normalizedJson);
-
-  const { error } = await supabase.from('user_integrations').insert({
-    user_id: user.id,
-    provider: 'google_play',
-    display_name: displayName,
-    encrypted_credentials: encryptedCredentials,
-    service_account_email: clientEmail,
-    default_track: defaultTrack,
-    status: validation.status,
-    last_validated_at: new Date().toISOString(),
-    error_message: validation.errorMessage
+  const backendResponse = await fetch(`${getBackendApiUrl()}/integrations/google-play`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'X-Forwarded-Host': host,
+      'X-Forwarded-Proto': protocol
+    },
+    body: JSON.stringify({ displayName, defaultTrack, serviceAccountJson: rawJson }),
+    cache: 'no-store'
   });
 
-  if (error) {
-    throw new Error(`Google Play bağlantısı kaydedilemedi: ${error.message}`);
+  const payload = (await backendResponse.json().catch(() => null)) as { ok?: boolean; error?: string; status?: string } | null;
+  if (!backendResponse.ok || !payload?.ok) {
+    throw new Error(payload?.error ?? 'Google Play bağlantısı kaydedilemedi.');
   }
 
   revalidatePath('/settings/integrations/google-play');
   revalidatePath('/game-factory');
-  redirect(`/settings/integrations/google-play?status=${validation.status}`);
+  redirect(`/settings/integrations/google-play?status=${payload.status ?? 'connected'}`);
 }
