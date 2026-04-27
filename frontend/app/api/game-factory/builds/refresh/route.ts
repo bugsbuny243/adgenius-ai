@@ -1,11 +1,12 @@
 import { getApiAuthContext, json } from '@/app/api/game-factory/_auth';
-import { getBuildStatus, type UnityBuildStatus } from '@/lib/unity-bridge';
+import { getBuildStatus, resolveBuildTargetId, type UnityBuildStatus } from '@/lib/unity-bridge';
 
 type RefreshRequest = { projectId: string; jobId?: string };
 
 type UnityBuildJobRow = {
   id: string;
   status: string | null;
+  build_target_id: string | null;
   started_at: string | null;
   artifact_url: string | null;
   error_message: string | null;
@@ -64,9 +65,10 @@ export async function POST(request: Request) {
 
   const { data: jobs, error: jobsError } = await context.supabase
     .from('unity_build_jobs')
-    .select('id, status, started_at, artifact_url, error_message, metadata')
+    .select('id, status, build_target_id, started_at, artifact_url, error_message, metadata')
     .eq('unity_game_project_id', projectId)
     .eq('workspace_id', context.workspaceId)
+    .in('status', ['queued', 'started'])
     .order('created_at', { ascending: false });
 
   if (jobsError) return json({ ok: false, error: jobsError.message }, 400);
@@ -75,7 +77,7 @@ export async function POST(request: Request) {
   let updatedJobs = 0;
   let attemptedJobs = 0;
   const errors: RefreshError[] = [];
-  let requestedJobStatus: string | null = null;
+  const refreshedBuilds: Array<{ jobId: string; previousStatus: string | null; newStatus: string }> = [];
 
   for (const rawJob of (jobs ?? []) as UnityBuildJobRow[]) {
     if (requestedJobId && rawJob.id !== requestedJobId) {
@@ -84,19 +86,31 @@ export async function POST(request: Request) {
 
     const metadata = (rawJob.metadata ?? {}) as Record<string, unknown>;
     const unityBuildNumber = metadata.unityBuildNumber;
-    const unityBuildTargetId = metadata.unityBuildTargetId;
+    const metadataBuildTargetId = metadata.unityBuildTargetId;
+    const dbBuildTargetId = rawJob.build_target_id;
 
     if (
       typeof unityBuildNumber !== 'number' ||
       !Number.isInteger(unityBuildNumber) ||
       unityBuildNumber < 1 ||
-      typeof unityBuildTargetId !== 'string' ||
-      !unityBuildTargetId.trim()
+      typeof metadataBuildTargetId !== 'string' ||
+      !metadataBuildTargetId.trim()
     ) {
       continue;
     }
 
     attemptedJobs += 1;
+
+    let unityBuildTargetId = metadataBuildTargetId.trim();
+    if (typeof dbBuildTargetId === 'string' && dbBuildTargetId.trim() === 'android-aab-release') {
+      try {
+        unityBuildTargetId = await resolveBuildTargetId(dbBuildTargetId.trim());
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Build target çözümlenemedi.';
+        errors.push({ jobId: rawJob.id, message });
+        continue;
+      }
+    }
 
     let unity;
     try {
@@ -162,9 +176,7 @@ export async function POST(request: Request) {
     }
 
     updatedJobs += 1;
-    if (requestedJobId && rawJob.id === requestedJobId) {
-      requestedJobStatus = mapUnityStatusToRowStatus(unity.status) ?? String(patch.status ?? '');
-    }
+    refreshedBuilds.push({ jobId: rawJob.id, previousStatus: rawJob.status, newStatus: unity.status });
   }
 
   if (projectStatus) {
@@ -177,8 +189,8 @@ export async function POST(request: Request) {
   }
 
   if (attemptedJobs > 0 && updatedJobs === 0 && errors.length > 0) {
-    return json({ ok: false, error: errors[0]?.message ?? 'Buildler yenilenemedi.', updatedJobs, projectStatus, errors }, 502);
+    return json({ ok: false, error: errors[0]?.message ?? 'Buildler yenilenemedi.', updatedJobs, projectStatus, refreshedBuilds, errors }, 502);
   }
 
-  return json({ ok: true, updatedJobs, projectStatus, errors, newStatus: requestedJobStatus });
+  return json({ ok: true, updatedJobs, projectStatus, refreshedBuilds, errors });
 }

@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { createSupabaseReadonlyServerClient } from '@/lib/supabase-server';
 import { deleteGameProject } from '@/app/game-factory/actions';
 import { StartBuildButton } from '@/app/game-factory/[id]/StartBuildButton';
+import { BuildRowStatusAutoRefresh } from '@/app/game-factory/[id]/BuildRowStatusAutoRefresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,7 +58,7 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
 
       <section className="rounded-xl border border-white/10 bg-black/20 p-4 text-sm">
         <h2 className="mb-2 text-lg font-semibold">Son Build</h2>
-        <p><b>Durum:</b> {latestBuild?.status ?? 'Henüz build yok'}</p>
+        <p><b>Durum:</b> {latestBuild ? <BuildRowStatusAutoRefresh buildId={latestBuild.id} projectId={id} initialStatus={latestBuild.status} /> : 'Henüz build yok'}</p>
         <p><b>Tarih:</b> {latestBuild?.created_at ? new Date(latestBuild.created_at).toLocaleString('tr-TR') : '—'}</p>
         {latestBuild?.artifact_url ? (
           <a href={latestBuild.artifact_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex rounded-lg border border-white/20 px-3 py-2">
