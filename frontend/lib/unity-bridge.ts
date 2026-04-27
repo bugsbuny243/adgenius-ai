@@ -142,8 +142,10 @@ function mapBuild(raw: UnityBuildRaw): UnityBuildResponse {
  * Hedef adı verilmişse gerçek build hedefi UUID'sini çözer.
  * Eğer zaten UUID formatında bir değer gönderilirse onu aynen kullanır.
  */
-async function resolveBuildTargetId(nameOrId: string): Promise<string> {
-  if (nameOrId.includes('-')) {
+const UUID_V4_OR_GENERIC_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function resolveBuildTargetId(nameOrId: string): Promise<string> {
+  if (UUID_V4_OR_GENERIC_PATTERN.test(nameOrId)) {
     return nameOrId;
   }
 

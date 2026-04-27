@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 
 type Props = {
   buildId: string;
+  projectId: string;
   initialStatus: string | null;
 };
 
@@ -15,24 +17,33 @@ function badge(status: string) {
   return 'bg-white/10 text-white';
 }
 
-export function BuildRowStatusAutoRefresh({ buildId, initialStatus }: Props) {
+export function BuildRowStatusAutoRefresh({ buildId, projectId, initialStatus }: Props) {
   const [status, setStatus] = useState(initialStatus ?? '-');
 
   useEffect(() => {
     const normalized = (status ?? '').toLowerCase();
-    if (!buildId || (normalized !== 'queued' && normalized !== 'started')) return;
+    if (!buildId || !projectId || (normalized !== 'queued' && normalized !== 'started')) return;
 
     const timer = setInterval(async () => {
       try {
-        const response = await fetch('/api/builds/refresh', {
+        const supabase = createSupabaseBrowserClient();
+        const token = (await supabase?.auth.getSession())?.data.session?.access_token;
+        if (!token) return;
+
+        const response = await fetch('/api/game-factory/builds/refresh', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ jobId: buildId })
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ projectId })
         });
         if (!response.ok) return;
 
-        const payload = (await response.json()) as { newStatus?: string | null; status?: string | null };
-        const nextStatus = payload.newStatus ?? payload.status;
+        const payload = (await response.json()) as {
+          refreshedBuilds?: Array<{ jobId?: string; newStatus?: string | null }>;
+        };
+        const nextStatus = payload.refreshedBuilds?.find((item) => item.jobId === buildId)?.newStatus ?? null;
         if (!nextStatus) return;
 
         setStatus(nextStatus);
@@ -46,7 +57,7 @@ export function BuildRowStatusAutoRefresh({ buildId, initialStatus }: Props) {
     }, 10000);
 
     return () => clearInterval(timer);
-  }, [buildId, status]);
+  }, [buildId, projectId, status]);
 
   return <span className={`rounded-full px-3 py-1 text-xs ${badge(status ?? '')}`}>{status}</span>;
 }
