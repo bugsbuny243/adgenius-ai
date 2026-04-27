@@ -4,8 +4,7 @@ import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createSupabaseActionServerClient } from '@/lib/supabase-server';
-import { decryptCredentials, tryParseEncryptedCredentials } from '@/lib/credentials-encryption';
-import { GooglePlayPublisherProvider } from '@/lib/game-factory/providers/google-play-publisher-provider';
+import { getBackendApiUrl } from '@/lib/backend-api';
 
 async function requireAuthenticatedUser() {
   const supabase = await createSupabaseActionServerClient();
@@ -147,98 +146,33 @@ export async function approveReleaseAction(projectId: string) {
 }
 
 export async function publishReleaseAction(projectId: string) {
-  const { supabase, project, user } = await requireOwnedProject(projectId);
-
-  if (!project.package_name) {
-    throw new Error('Google Play paket adı eksik.');
+  const { supabase } = await requireAuthenticatedUser();
+  const [{ data: sessionData }, headerStore] = await Promise.all([supabase.auth.getSession(), headers()]);
+  const token = sessionData.session?.access_token;
+  if (!token) {
+    throw new Error('Oturum bulunamadı.');
   }
 
-  const [{ data: artifact }, { data: latestReleaseJob }] = await Promise.all([
-    supabase
-      .from('game_artifacts')
-      .select('file_url')
-      .eq('unity_game_project_id', projectId)
-      .eq('artifact_type', 'aab')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from('game_release_jobs')
-      .select('id, status, release_notes, track')
-      .eq('unity_game_project_id', projectId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-  ]);
-
-  if (!artifact?.file_url) {
-    throw new Error('Yayın için AAB dosyası bulunamadı.');
-  }
-
-  if (latestReleaseJob?.status === 'awaiting_user_approval') {
-    throw new Error('Yayın başlamadan önce kullanıcı onayı verilmelidir.');
-  }
-
-  const integrationId = project.google_play_integration_id;
-  if (!integrationId) {
-    await upsertReleaseJob({
-      projectId,
-      status: 'failed',
-      track: latestReleaseJob?.track ?? project.release_track ?? 'production',
-      releaseNotes: latestReleaseJob?.release_notes ?? '',
-      errorMessage: 'Google Play bağlantısı gerekli.'
-    });
-    throw new Error('Google Play bağlantısı gerekli.');
-  }
-
-  const { data: integration, error: integrationError } = await supabase
-    .from('user_integrations')
-    .select('id, encrypted_credentials, default_track, status')
-    .eq('id', integrationId)
-    .eq('user_id', user.id)
-    .eq('provider', 'google_play')
-    .maybeSingle();
-
-  if (integrationError) {
-    throw new Error(`Google Play bağlantısı alınamadı: ${integrationError.message}`);
-  }
-
-  if (!integration) {
-    throw new Error('Projeye atanan Google Play bağlantısı bulunamadı.');
-  }
-
-  const encrypted = tryParseEncryptedCredentials(integration.encrypted_credentials);
-  if (!encrypted) {
-    throw new Error('Google Play kimlik bilgileri çözümlenemedi.');
-  }
-
-  const provider = new GooglePlayPublisherProvider();
-  const publishResult = await provider.publishRelease({
-    packageName: project.package_name,
-    track: latestReleaseJob?.track ?? integration.default_track ?? project.release_track ?? 'production',
-    releaseNotes: latestReleaseJob?.release_notes ?? 'Game Factory yayın güncellemesi',
-    aabFileUrl: artifact.file_url,
-    serviceAccountJson: decryptCredentials(encrypted),
-    versionCode: project.current_version_code,
-    versionName: project.current_version_name
+  const response = await fetch(`${getBackendApiUrl()}/game-factory/release/publish`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      ...(headerStore.get('x-forwarded-host') ? { 'X-Forwarded-Host': headerStore.get('x-forwarded-host') as string } : {}),
+      ...(headerStore.get('x-forwarded-proto') ? { 'X-Forwarded-Proto': headerStore.get('x-forwarded-proto') as string } : {})
+    },
+    body: JSON.stringify({ projectId }),
+    cache: 'no-store'
   });
 
-  const finalStatus = publishResult.status === 'published' ? 'published' : publishResult.status;
-
-  await upsertReleaseJob({
-    projectId,
-    status: finalStatus,
-    track: latestReleaseJob?.track ?? integration.default_track ?? project.release_track ?? 'production',
-    releaseNotes: latestReleaseJob?.release_notes ?? '',
-    errorMessage: publishResult.errorMessage ?? null
-  });
-
-  if (publishResult.status !== 'published') {
-    throw new Error(publishResult.errorMessage ?? 'Google Play yayını başarısız oldu.');
+  const payload = (await response.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+  if (!response.ok || !payload?.ok) {
+    throw new Error(payload?.error ?? 'Google Play yayını başarısız oldu.');
   }
 
   revalidatePath(`/game-factory/${projectId}/release`);
 }
+
 
 export async function setProjectGooglePlayIntegrationAction(projectId: string, formData: FormData) {
   const { supabase, user } = await requireAuthenticatedUser();

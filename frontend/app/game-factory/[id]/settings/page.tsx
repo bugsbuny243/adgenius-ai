@@ -32,14 +32,6 @@ export default async function GameFactorySettingsPage({ params }: { params: Prom
         .maybeSingle()
     : { data: null };
 
-  const hasGithubRepoEnv = Boolean(process.env.GITHUB_UNITY_REPO_OWNER && process.env.GITHUB_UNITY_REPO_NAME && process.env.GITHUB_UNITY_REPO_TOKEN);
-  const hasUnityBuildAutomation = Boolean(
-    process.env.UNITY_ORG_ID &&
-      process.env.UNITY_PROJECT_ID &&
-      process.env.UNITY_BUILD_TARGET_ID &&
-      process.env.UNITY_SERVICE_ACCOUNT_KEY_ID &&
-      (process.env.UNITY_SERVICE_ACCOUNT_SECRET || process.env.UNITY_SERVICE_ACCOUNT_SECRET_KEY)
-  );
 
   return (
     <main>
@@ -59,8 +51,8 @@ export default async function GameFactorySettingsPage({ params }: { params: Prom
 
         <div className="grid gap-2 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/85">
           <h2 className="text-lg font-semibold">Sistem durumu</h2>
-          <p>GitHub Unity repo: {statusLabel(hasGithubRepoEnv)}</p>
-          <p>Unity Build Automation: {statusLabel(hasUnityBuildAutomation)}</p>
+          <p>GitHub Unity repo: {statusLabel(Boolean(project.unity_repo_owner && project.unity_repo_name))}</p>
+          <p>Unity Build Automation: {statusLabel(Boolean(project.build_target))}</p>
           <p>Google Play: {statusLabel(Boolean(selectedIntegration && selectedIntegration.status === 'connected'))}</p>
         </div>
 

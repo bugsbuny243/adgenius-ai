@@ -6,7 +6,7 @@ type Json = string | number | boolean | null | { [key: string]: Json | undefined
 
 export function createSupabaseServiceRoleClient() {
   const url = process.env.SUPABASE_URL?.trim();
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  const serviceRoleKey = process.env.SUPABASE_SERVER_KEY?.trim();
 
   if (!url || !serviceRoleKey) {
     throw new Error('Supabase service role env eksik.');

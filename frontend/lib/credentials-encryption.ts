@@ -10,11 +10,11 @@ export type EncryptedCredentialsPayload = {
 };
 
 function resolveEncryptionKey(): Buffer {
-  const secret = process.env.KOSCHEI_CREDENTIALS_ENCRYPTION_KEY?.trim();
+  const secret = process.env.APP_CREDENTIALS_ENCRYPTION_KEY?.trim();
 
   if (!secret) {
     throw new Error(
-      'Missing required server configuration: KOSCHEI_CREDENTIALS_ENCRYPTION_KEY must be set for credentials encryption.'
+      'Missing required server configuration: APP_CREDENTIALS_ENCRYPTION_KEY must be set for credentials encryption.'
     );
   }
 
