@@ -24,7 +24,11 @@ export function BuildRowStatusAutoRefresh({ buildId, initialStatus }: Props) {
 
     const timer = setInterval(async () => {
       try {
-        const response = await fetch(`/api/builds/${buildId}/refresh`, { method: 'POST' });
+        const response = await fetch('/api/builds/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId: buildId })
+        });
         if (!response.ok) return;
 
         const payload = (await response.json()) as { newStatus?: string | null; status?: string | null };
@@ -32,6 +36,10 @@ export function BuildRowStatusAutoRefresh({ buildId, initialStatus }: Props) {
         if (!nextStatus) return;
 
         setStatus(nextStatus);
+
+        if (nextStatus === 'success' || nextStatus === 'failure') {
+          clearInterval(timer);
+        }
       } catch {
         // Sessizce geç: bir sonraki periyotta tekrar dene.
       }

@@ -17,20 +17,27 @@ export function BuildStatusAutoRefresh({ jobId, initialStatus }: Props) {
 
     const timer = setInterval(async () => {
       try {
-        const response = await fetch(`/api/builds/${jobId}/refresh`, {
-          method: 'POST'
+        const response = await fetch('/api/builds/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId })
         });
 
         if (!response.ok) return;
 
-        const payload = (await response.json()) as { status?: string | null };
-        if (payload.status) {
-          setStatus(payload.status);
+        const payload = (await response.json()) as { newStatus?: string | null; status?: string | null };
+        const nextStatus = payload.newStatus ?? payload.status;
+        if (!nextStatus) return;
+
+        setStatus(nextStatus);
+
+        if (nextStatus === 'success' || nextStatus === 'failure') {
+          clearInterval(timer);
         }
       } catch {
         // Sessizce geç: bir sonraki periyotta tekrar dene.
       }
-    }, 15000);
+    }, 10000);
 
     return () => clearInterval(timer);
   }, [jobId, status]);

@@ -17,11 +17,11 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
   if (!user) redirect('/signin');
 
   const [{ data: project }, { data: brief }, { data: buildJob }, { data: releaseJob }, { data: artifact }, { data: integrations }] = await Promise.all([
-    supabase.from('game_projects').select('*').eq('id', id).eq('user_id', user.id).maybeSingle(),
-    supabase.from('game_briefs').select('*').eq('game_project_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-    supabase.from('game_build_jobs').select('*').eq('game_project_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-    supabase.from('game_release_jobs').select('*').eq('game_project_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-    supabase.from('game_artifacts').select('*').eq('game_project_id', id).eq('artifact_type', 'aab').order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    supabase.from('unity_game_projects').select('*').eq('id', id).eq('user_id', user.id).maybeSingle(),
+    supabase.from('game_briefs').select('*').eq('unity_game_project_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    supabase.from('unity_build_jobs').select('*').eq('unity_game_project_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    supabase.from('game_release_jobs').select('*').eq('unity_game_project_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    supabase.from('game_artifacts').select('*').eq('unity_game_project_id', id).eq('artifact_type', 'aab').order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('user_integrations').select('id, display_name, service_account_email, default_track, status').eq('user_id', user.id).eq('provider', 'google_play').order('created_at', { ascending: false })
   ]);
 
@@ -35,12 +35,12 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
       <Nav />
       <section className="panel space-y-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">{project.name} · Yayın</h1>
+          <h1 className="text-2xl font-bold">{project.app_name ?? project.name} · Yayın</h1>
           <Link href={`/game-factory/${id}`} className="rounded-lg border border-white/20 px-3 py-2 text-sm">Projeye dön</Link>
         </div>
 
         <div className="grid gap-2 rounded-xl border border-white/10 bg-black/20 p-4 text-sm">
-          <p>Ürün adı: {project.product_name || project.name}</p>
+          <p>Ürün adı: {project.app_name || project.product_name || project.name}</p>
           <p>Paket adı: {project.package_name}</p>
           <p>Sürüm: {buildJob?.version_name ?? project.current_version_name} ({buildJob?.version_code ?? project.current_version_code})</p>
           <p>Build durumu: {buildJob?.id ? <BuildStatusAutoRefresh jobId={buildJob.id} initialStatus={buildJob.status} /> : '-'}</p>
