@@ -1,7 +1,7 @@
 import { getApiAuthContext, json } from '@/app/api/game-factory/_auth';
 import { getBuildStatus, type UnityBuildStatus } from '@/lib/unity-bridge';
 
-type RefreshRequest = { projectId: string };
+type RefreshRequest = { projectId: string; jobId?: string };
 
 type UnityBuildJobRow = {
   id: string;
@@ -33,12 +33,21 @@ function mapUnityStatusToProjectStatus(status: UnityBuildStatus): string | null 
   return null;
 }
 
+function mapUnityStatusToRowStatus(status: UnityBuildStatus): string | null {
+  if (status === 'queued') return 'queued';
+  if (status === 'sentToBuilder' || status === 'started' || status === 'restarted') return 'started';
+  if (status === 'success') return 'success';
+  if (status === 'failure') return 'failure';
+  return null;
+}
+
 export async function POST(request: Request) {
   const context = await getApiAuthContext(request);
   if (context instanceof Response) return context;
 
   const body = (await request.json()) as Partial<RefreshRequest>;
   const projectId = body.projectId?.trim();
+  const requestedJobId = body.jobId?.trim() || null;
   if (!projectId) return json({ ok: false, error: 'projectId zorunlu.' }, 400);
 
   const { data: project, error: projectError } = await context.supabase
@@ -66,8 +75,13 @@ export async function POST(request: Request) {
   let updatedJobs = 0;
   let attemptedJobs = 0;
   const errors: RefreshError[] = [];
+  let requestedJobStatus: string | null = null;
 
   for (const rawJob of (jobs ?? []) as UnityBuildJobRow[]) {
+    if (requestedJobId && rawJob.id !== requestedJobId) {
+      continue;
+    }
+
     const metadata = (rawJob.metadata ?? {}) as Record<string, unknown>;
     const unityBuildNumber = metadata.unityBuildNumber;
     const unityBuildTargetId = metadata.unityBuildTargetId;
@@ -148,6 +162,9 @@ export async function POST(request: Request) {
     }
 
     updatedJobs += 1;
+    if (requestedJobId && rawJob.id === requestedJobId) {
+      requestedJobStatus = mapUnityStatusToRowStatus(unity.status) ?? String(patch.status ?? '');
+    }
   }
 
   if (projectStatus) {
@@ -163,5 +180,5 @@ export async function POST(request: Request) {
     return json({ ok: false, error: errors[0]?.message ?? 'Buildler yenilenemedi.', updatedJobs, projectStatus, errors }, 502);
   }
 
-  return json({ ok: true, updatedJobs, projectStatus, errors });
+  return json({ ok: true, updatedJobs, projectStatus, errors, newStatus: requestedJobStatus });
 }
