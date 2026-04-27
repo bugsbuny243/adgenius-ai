@@ -72,7 +72,13 @@ export async function POST(request: Request) {
     const unityBuildNumber = metadata.unityBuildNumber;
     const unityBuildTargetId = metadata.unityBuildTargetId;
 
-    if (typeof unityBuildNumber !== 'number' || typeof unityBuildTargetId !== 'string' || !unityBuildTargetId.trim()) {
+    if (
+      typeof unityBuildNumber !== 'number' ||
+      !Number.isInteger(unityBuildNumber) ||
+      unityBuildNumber < 1 ||
+      typeof unityBuildTargetId !== 'string' ||
+      !unityBuildTargetId.trim()
+    ) {
       continue;
     }
 
