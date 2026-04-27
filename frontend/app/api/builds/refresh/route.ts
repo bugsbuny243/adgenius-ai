@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { getBuildStatus, type UnityBuildStatus } from '@/lib/unity-bridge';
+import { getBuildStatus } from '@/lib/unity-bridge';
 
-type BuildJobRow = {
+type RefreshBody = {
+  jobId?: string;
+};
+
+type UnityBuildJob = {
   id: string;
   status: string | null;
   artifact_url: string | null;
-  unity_game_project_id: string | null;
-  metadata: { unityBuildNumber?: number; unityBuildTargetId?: string } | null;
-};
-
-type RefreshRequest = {
-  jobId?: string;
+  metadata: Record<string, unknown> | null;
 };
 
 function createSupabaseClient() {
@@ -27,76 +26,79 @@ function createSupabaseClient() {
   });
 }
 
-function mapUnityStatusToDbStatus(status: UnityBuildStatus): string {
-  if (status === 'queued') return 'queued';
-  if (status === 'sentToBuilder' || status === 'started' || status === 'restarted') return 'running';
-  if (status === 'success') return 'succeeded';
-  if (status === 'failure') return 'failed';
-  if (status === 'canceled') return 'cancelled';
-  return 'running';
-}
-
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as RefreshRequest;
+    const body = (await request.json()) as RefreshBody;
     const jobId = body.jobId?.trim();
 
     if (!jobId) {
-      return NextResponse.json({ success: false, error: 'jobId zorunlu.' }, { status: 400 });
+      return NextResponse.json({ ok: false, error: 'jobId zorunlu.' }, { status: 400 });
     }
 
     const supabase = createSupabaseClient();
 
-    const { data: job, error: jobError } = await supabase
+    const { data: buildJob, error: buildJobError } = await supabase
       .from('unity_build_jobs')
-      .select('id, status, artifact_url, unity_game_project_id, metadata')
+      .select('id, status, artifact_url, metadata')
       .eq('id', jobId)
-      .maybeSingle<BuildJobRow>();
+      .maybeSingle<UnityBuildJob>();
 
-    if (jobError) {
-      return NextResponse.json({ success: false, error: jobError.message }, { status: 500 });
+    if (buildJobError) {
+      return NextResponse.json({ ok: false, error: buildJobError.message }, { status: 500 });
     }
 
-    if (!job) {
-      return NextResponse.json({ success: false, error: 'Build kaydı bulunamadı.' }, { status: 404 });
+    if (!buildJob) {
+      return NextResponse.json({ ok: false, error: 'Build kaydı bulunamadı.' }, { status: 404 });
     }
 
-    if (!job.unity_game_project_id) {
-      return NextResponse.json({ success: false, error: 'Kaydın unity_game_project_id alanı boş.' }, { status: 400 });
+    const metadata = (buildJob.metadata ?? {}) as Record<string, unknown>;
+    const unityBuildNumber = metadata.unityBuildNumber;
+    const unityBuildTargetId = metadata.unityBuildTargetId;
+
+    if (
+      typeof unityBuildNumber !== 'number' ||
+      !Number.isInteger(unityBuildNumber) ||
+      unityBuildNumber < 1 ||
+      typeof unityBuildTargetId !== 'string' ||
+      !unityBuildTargetId.trim()
+    ) {
+      return NextResponse.json(
+        { ok: false, error: 'Build metadata bilgisinde unityBuildNumber veya unityBuildTargetId eksik.' },
+        { status: 400 }
+      );
     }
 
-    const buildNumber = job.metadata?.unityBuildNumber;
-    const buildTargetId = job.metadata?.unityBuildTargetId?.trim();
+    const unityStatus = await getBuildStatus(unityBuildTargetId, unityBuildNumber);
+    const newStatus = unityStatus.status;
 
-    if (typeof buildNumber !== 'number' || !Number.isInteger(buildNumber) || buildNumber < 1 || !buildTargetId) {
-      return NextResponse.json({ success: false, error: 'Unity build bilgisi eksik.' }, { status: 400 });
-    }
+    const patch: Record<string, string | null> = { status: newStatus };
 
-    const unityStatus = await getBuildStatus(buildTargetId, buildNumber);
-    const nextStatus = mapUnityStatusToDbStatus(unityStatus.status);
-
-    const patch: Record<string, string | null> = {
-      status: nextStatus,
-      artifact_url: job.artifact_url,
-      finished_at: null
-    };
-
-    if (unityStatus.status === 'success') {
-      patch.artifact_url = unityStatus.links?.download_primary?.href ?? job.artifact_url ?? null;
+    if (newStatus === 'success') {
+      patch.artifact_url = unityStatus.links?.download_primary?.href ?? buildJob.artifact_url ?? null;
       patch.finished_at = unityStatus.finished ?? new Date().toISOString();
-    } else if (unityStatus.status === 'failure' || unityStatus.status === 'canceled') {
+      patch.error_message = null;
+    } else if (newStatus === 'failure') {
       patch.finished_at = unityStatus.finished ?? new Date().toISOString();
+      patch.error_message = 'Unity Build Automation build başarısız döndü.';
     }
 
     const { error: updateError } = await supabase.from('unity_build_jobs').update(patch).eq('id', jobId);
 
     if (updateError) {
-      return NextResponse.json({ success: false, error: updateError.message }, { status: 500 });
+      return NextResponse.json({ ok: false, error: updateError.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, newStatus: patch.status });
+    return NextResponse.json({
+      ok: true,
+      jobId,
+      status: patch.status,
+      newStatus: patch.status,
+      artifact_url: patch.artifact_url ?? buildJob.artifact_url ?? null,
+      finished_at: patch.finished_at ?? null,
+      error_message: patch.error_message ?? null
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Beklenmeyen bir hata oluştu.';
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
