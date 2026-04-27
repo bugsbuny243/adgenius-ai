@@ -47,7 +47,17 @@ export function BuildRowStatusAutoRefresh({ buildId, projectId, initialStatus }:
           results?: Array<{ jobId?: string; newStatus?: string | null; previousStatus?: string | null }>;
         };
         const matchedJob = payload.results?.find((item) => item.jobId === buildId);
-        const nextStatus = (matchedJob?.newStatus ?? payload.newStatus ?? payload.status)?.toLowerCase();
+        let nextStatus = (matchedJob?.newStatus ?? payload.newStatus ?? payload.status)?.toLowerCase() ?? null;
+
+        if (!nextStatus) {
+          const { data: latestRow } = await supabase
+            .from('unity_build_jobs')
+            .select('status')
+            .eq('id', buildId)
+            .maybeSingle();
+          nextStatus = (latestRow?.status ?? '').toLowerCase() || null;
+        }
+
         if (!nextStatus) return;
 
         setStatus(nextStatus);
