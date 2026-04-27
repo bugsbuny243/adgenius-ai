@@ -11,6 +11,25 @@ const app = express();
 app.use(express.json({ limit: '2mb' }));
 
 const REFRESHABLE_STATUSES = ['queued', 'claimed', 'running', 'succeeded', 'failed', 'cancelled', 'started', 'success', 'failure'];
+const VALID_PAYMENT_STATUSES = ['approved', 'rejected', 'cancelled'] as const;
+
+async function isPlatformOwner(userId: string, userEmail: string | null): Promise<boolean> {
+  const ownerUserId = process.env.OWNER_USER_ID?.trim();
+  const ownerEmail = process.env.OWNER_EMAIL?.trim().toLowerCase();
+  if (ownerUserId && ownerUserId === userId) return true;
+  if (ownerEmail && userEmail?.toLowerCase() === ownerEmail) return true;
+  return false;
+}
+
+async function requireOwner(req: express.Request, res: express.Response) {
+  const auth = await requireAuth(req, res);
+  if (!auth) return null;
+  if (!(await isPlatformOwner(auth.userId, auth.userEmail))) {
+    res.status(403).json({ ok: false, error: 'Owner yetkisi gerekiyor.' });
+    return null;
+  }
+  return auth;
+}
 
 async function hasActiveGameAgentPackage(userId: string, workspaceId: string): Promise<boolean> {
   const [{ data: subscription }, { data: approvedOrder }] = await Promise.all([
@@ -68,6 +87,34 @@ function isValidPositiveInt(value: unknown): value is number {
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
+app.post('/game-factory/generate', async (req, res) => {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+  if (!(await hasActiveGameAgentPackage(auth.userId, auth.workspaceId))) {
+    res.status(403).json({ ok: false, error: 'Bu işlem için aktif Game Agent paketi gerekir.' });
+    return;
+  }
+
+  const prompt = String(req.body?.prompt ?? '').trim();
+  if (!prompt) return void res.status(400).json({ ok: false, error: 'prompt zorunlu.' });
+
+  const { data: project, error } = await serviceRoleClient
+    .from('unity_game_projects')
+    .insert({
+      workspace_id: auth.workspaceId,
+      user_id: auth.userId,
+      app_name: prompt.slice(0, 80),
+      package_name: `com.koschei.${Date.now()}`,
+      status: 'draft',
+      metadata: { source: 'backend_generate', prompt }
+    })
+    .select('id, app_name, status, created_at')
+    .single();
+
+  if (error || !project) return void res.status(400).json({ ok: false, error: error?.message ?? 'Proje oluşturulamadı.' });
+  res.json({ ok: true, project });
+});
+
 app.post('/game-factory/build', async (req, res) => {
   const auth = await requireAuth(req, res);
   if (!auth) return;
@@ -99,7 +146,7 @@ app.post('/game-factory/build', async (req, res) => {
   } catch (error) {
     const unityError = error instanceof UnityApiError ? error : new UnityApiError('Unity build tetikleme hatası.');
     const queuedAt = new Date().toISOString();
-    await serviceRoleClient.from('unity_build_jobs').insert({ unity_game_project_id: projectId, workspace_id: auth.workspaceId, requested_by: auth.userId, build_target: 'android', build_type: 'release', status: 'failed', queued_at: queuedAt, error_message: unityError.message });
+    await serviceRoleClient.from('unity_build_jobs').insert({ unity_game_project_id: projectId, workspace_id: auth.workspaceId, user_id: auth.userId, requested_by: auth.userId, build_target: 'android', build_type: 'release', status: 'failed', queued_at: queuedAt, error_message: unityError.message });
     await serviceRoleClient.from('unity_game_projects').update({ status: 'failed' }).eq('id', projectId).eq('workspace_id', auth.workspaceId).eq('user_id', auth.userId);
     return void res.status(502).json({ ok: false, error: 'Unity build başlatılamadı.' });
   }
@@ -121,7 +168,7 @@ app.post('/game-factory/build', async (req, res) => {
 
   const { data: insertedJob, error: jobError } = await serviceRoleClient
     .from('unity_build_jobs')
-    .insert({ unity_game_project_id: projectId, workspace_id: auth.workspaceId, requested_by: auth.userId, build_target: 'android', build_type: 'release', status: initialJobStatus, queued_at: new Date().toISOString(), metadata: { ...(unityBuildNumber ? { unityBuildNumber } : {}), unityBuildTargetId: buildTargetId, unityReturnedBuildTargetId: unityResponse.buildTargetId, unityStatus: effectiveUnityStatus, unityDownloadUrl: effectiveDownloadUrl, needsUnityBuildNumberRecovery: !unityBuildNumber } })
+    .insert({ unity_game_project_id: projectId, workspace_id: auth.workspaceId, user_id: auth.userId, requested_by: auth.userId, build_target: 'android', build_type: 'release', status: initialJobStatus, queued_at: new Date().toISOString(), metadata: { ...(unityBuildNumber ? { unityBuildNumber } : {}), unityBuildTargetId: buildTargetId, unityReturnedBuildTargetId: unityResponse.buildTargetId, unityStatus: effectiveUnityStatus, unityDownloadUrl: effectiveDownloadUrl, needsUnityBuildNumberRecovery: !unityBuildNumber } })
     .select('id')
     .single();
 
@@ -148,7 +195,7 @@ app.post('/game-factory/builds/refresh', async (req, res) => {
 
   const { data: jobs, error: jobsError } = await serviceRoleClient
     .from('unity_build_jobs')
-    .select('id, unity_game_project_id, status, created_at, queued_at, started_at, build_target_id, metadata, artifact_url, error_message')
+    .select('id, unity_game_project_id, status, created_at, queued_at, started_at, build_target_id, metadata, artifact_url, error_message, requested_by')
     .eq('unity_game_project_id', projectId)
     .eq('workspace_id', auth.workspaceId)
     .in('status', REFRESHABLE_STATUSES)
@@ -213,7 +260,17 @@ app.post('/game-factory/builds/refresh', async (req, res) => {
       }
 
       if ((patch.status === 'succeeded' || unity.status === 'success') && unityDownloadUrl) {
-        await serviceRoleClient.from('game_artifacts').upsert({ unity_game_project_id: job.unity_game_project_id, build_job_id: job.id, artifact_type: 'aab', file_url: unityDownloadUrl, file_name: `${project.package_name || 'game'}.aab`, file_size_bytes: null }, { onConflict: 'build_job_id,artifact_type' });
+        await serviceRoleClient.from('game_artifacts').upsert({
+          unity_game_project_id: job.unity_game_project_id,
+          unity_build_job_id: job.id,
+          workspace_id: auth.workspaceId,
+          user_id: job.requested_by ?? auth.userId,
+          artifact_type: 'aab',
+          file_url: unityDownloadUrl,
+          file_name: `${project.package_name || 'game'}.aab`,
+          file_size_bytes: null,
+          status: 'ready'
+        }, { onConflict: 'unity_build_job_id,artifact_type' });
       }
 
       updated += 1;
@@ -240,7 +297,7 @@ app.get('/game-factory/build-status', async (req, res) => {
 
   const { data: job } = await serviceRoleClient
     .from('unity_build_jobs')
-    .select('id, unity_game_project_id, metadata')
+    .select('id, unity_game_project_id, metadata, workspace_id, requested_by')
     .eq('id', jobId)
     .eq('workspace_id', auth.workspaceId)
     .maybeSingle();
@@ -263,6 +320,18 @@ app.get('/game-factory/build-status', async (req, res) => {
     else if (unityStatus.status === 'canceled') { patch.status = 'cancelled'; patch.finished_at = unityStatus.finished ?? new Date().toISOString(); }
     else { patch.finished_at = null; }
     await serviceRoleClient.from('unity_build_jobs').update(patch).eq('id', jobId);
+  }
+
+  if ((mappedStatus === 'succeeded' || unityStatus.status === 'success') && artifactUrl) {
+    await serviceRoleClient.from('game_artifacts').upsert({
+      unity_game_project_id: job.unity_game_project_id,
+      unity_build_job_id: job.id,
+      workspace_id: job.workspace_id,
+      user_id: job.requested_by ?? auth.userId,
+      artifact_type: 'aab',
+      file_url: artifactUrl,
+      status: 'ready'
+    }, { onConflict: 'unity_build_job_id,artifact_type' });
   }
 
   if (projectStatus) await serviceRoleClient.from('unity_game_projects').update({ status: projectStatus }).eq('id', job.unity_game_project_id);
@@ -299,10 +368,16 @@ app.post('/unity-build-callback', express.text({ type: '*/*' }), async (req, res
   const downloadUrl = links.share_url?.href ?? links.artifacts?.[0]?.files?.[0]?.href ?? null;
 
   if (buildNumber > 0 && (status.includes('success') || status.includes('succeeded'))) {
+    const { data: jobs } = await serviceRoleClient.from('unity_build_jobs').select('id,unity_game_project_id,workspace_id,requested_by').contains('metadata', { unityBuildNumber: buildNumber });
     await serviceRoleClient
       .from('unity_build_jobs')
       .update({ status: 'succeeded', artifact_url: downloadUrl, finished_at: new Date().toISOString(), artifact_type: 'aab' })
       .contains('metadata', { unityBuildNumber: buildNumber });
+    for (const job of jobs ?? []) {
+      if (downloadUrl) {
+        await serviceRoleClient.from('game_artifacts').upsert({ unity_game_project_id: job.unity_game_project_id, unity_build_job_id: job.id, workspace_id: job.workspace_id, user_id: job.requested_by, artifact_type: 'aab', file_url: downloadUrl, status: 'ready' }, { onConflict: 'unity_build_job_id,artifact_type' });
+      }
+    }
   }
 
   res.status(200).json({ ok: true });
@@ -321,14 +396,36 @@ app.post('/integrations/google-play', async (req, res) => {
   if (!clientEmail) return void res.status(400).json({ ok: false, error: 'client_email eksik.' });
 
   const validation = await validateGooglePlayServiceAccount(serviceAccountJson);
-  const encryptedCredentials = serializeEncryptedCredentials(encryptCredentials(JSON.stringify(parsed)));
+  const encryptedPayload = serializeEncryptedCredentials(encryptCredentials(JSON.stringify(parsed)));
 
-  const { error } = await serviceRoleClient.from('user_integrations').insert({
-    user_id: auth.userId, provider: 'google_play', display_name: displayName, encrypted_credentials: encryptedCredentials,
-    service_account_email: clientEmail, default_track: defaultTrack, status: validation.status, last_validated_at: new Date().toISOString(), error_message: validation.errorMessage
+  const { data: integration, error: integrationError } = await serviceRoleClient.from('user_integrations').insert({
+    user_id: auth.userId,
+    workspace_id: auth.workspaceId,
+    provider: 'google_play',
+    display_name: displayName,
+    metadata: { connected_via: 'backend', has_service_account: true },
+    provider_account_id: clientEmail,
+    service_account_email: clientEmail,
+    default_track: defaultTrack,
+    status: validation.status,
+    last_validated_at: new Date().toISOString(),
+    error_message: validation.errorMessage
+  }).select('id').single();
+
+  if (integrationError || !integration) return void res.status(400).json({ ok: false, error: `Google Play bağlantısı kaydedilemedi: ${integrationError?.message}` });
+
+  const { error: credentialsError } = await serviceRoleClient.from('integration_credentials').insert({
+    workspace_id: auth.workspaceId,
+    user_id: auth.userId,
+    user_integration_id: integration.id,
+    provider: 'google_play',
+    credential_type: 'service_account_json',
+    encrypted_payload: encryptedPayload,
+    status: 'active',
+    metadata: { display_name: displayName }
   });
 
-  if (error) return void res.status(400).json({ ok: false, error: `Google Play bağlantısı kaydedilemedi: ${error.message}` });
+  if (credentialsError) return void res.status(400).json({ ok: false, error: `Credential kaydı eklenemedi: ${credentialsError.message}` });
   res.json({ ok: true, status: validation.status });
 });
 
@@ -338,14 +435,18 @@ app.post('/game-factory/release/publish', async (req, res) => {
   const projectId = String(req.body?.projectId ?? '').trim();
   if (!projectId) return void res.status(400).json({ ok: false, error: 'projectId zorunlu.' });
 
-  const { data: project } = await serviceRoleClient
+  const { data: unityProject } = await serviceRoleClient
     .from('unity_game_projects')
-    .select('id, user_id, package_name, release_track, google_play_integration_id, current_version_code, current_version_name')
+    .select('id, user_id, package_name, project_id')
     .eq('id', projectId)
     .eq('user_id', auth.userId)
     .maybeSingle();
 
-  if (!project?.package_name) return void res.status(400).json({ ok: false, error: 'Google Play paket adı eksik.' });
+  if (!unityProject?.package_name) return void res.status(400).json({ ok: false, error: 'Google Play paket adı eksik.' });
+
+  const { data: gameProject } = unityProject.project_id
+    ? await serviceRoleClient.from('game_projects').select('id, release_track, google_play_integration_id, current_version_code, current_version_name').eq('id', unityProject.project_id).maybeSingle()
+    : { data: null as any };
 
   const [{ data: artifact }, { data: latestReleaseJob }] = await Promise.all([
     serviceRoleClient.from('game_artifacts').select('file_url').eq('unity_game_project_id', projectId).eq('artifact_type', 'aab').order('created_at', { ascending: false }).limit(1).maybeSingle(),
@@ -355,24 +456,137 @@ app.post('/game-factory/release/publish', async (req, res) => {
 
   const { data: integration } = await serviceRoleClient
     .from('user_integrations')
-    .select('id, encrypted_credentials, default_track, status')
-    .eq('id', project.google_play_integration_id)
+    .select('id, default_track, status')
+    .eq('id', gameProject?.google_play_integration_id)
     .eq('user_id', auth.userId)
     .eq('provider', 'google_play')
     .maybeSingle();
 
   if (!integration) return void res.status(400).json({ ok: false, error: 'Google Play bağlantısı bulunamadı.' });
-  const encrypted = tryParseEncryptedCredentials(integration.encrypted_credentials);
+
+  const { data: credentialsRow } = await serviceRoleClient
+    .from('integration_credentials')
+    .select('encrypted_payload')
+    .eq('user_integration_id', integration.id)
+    .eq('provider', 'google_play')
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const encrypted = tryParseEncryptedCredentials(credentialsRow?.encrypted_payload ?? null);
   if (!encrypted) return void res.status(400).json({ ok: false, error: 'Google Play kimlik bilgileri çözümlenemedi.' });
 
   const provider = new GooglePlayPublisherProvider();
-  const publishResult = await provider.publishRelease({ packageName: project.package_name, track: latestReleaseJob?.track ?? integration.default_track ?? project.release_track ?? 'production', releaseNotes: latestReleaseJob?.release_notes ?? 'Game Factory yayın güncellemesi', aabFileUrl: artifact.file_url, serviceAccountJson: decryptCredentials(encrypted), versionCode: project.current_version_code, versionName: project.current_version_name });
+  const publishResult = await provider.publishRelease({ packageName: unityProject.package_name, track: latestReleaseJob?.track ?? integration.default_track ?? gameProject?.release_track ?? 'production', releaseNotes: latestReleaseJob?.release_notes ?? 'Game Factory yayın güncellemesi', aabFileUrl: artifact.file_url, serviceAccountJson: decryptCredentials(encrypted), versionCode: gameProject?.current_version_code ?? undefined, versionName: gameProject?.current_version_name ?? undefined });
 
   const status = publishResult.status === 'published' ? 'published' : publishResult.status;
-  await serviceRoleClient.from('game_release_jobs').insert({ unity_game_project_id: projectId, status, track: latestReleaseJob?.track ?? integration.default_track ?? project.release_track ?? 'production', release_notes: latestReleaseJob?.release_notes ?? '', error_message: publishResult.errorMessage ?? null });
+  await serviceRoleClient.from('game_release_jobs').insert({ unity_game_project_id: projectId, status, track: latestReleaseJob?.track ?? integration.default_track ?? gameProject?.release_track ?? 'production', release_notes: latestReleaseJob?.release_notes ?? '', error_message: publishResult.errorMessage ?? null, workspace_id: auth.workspaceId, user_id: auth.userId });
 
   if (publishResult.status !== 'published') return void res.status(400).json({ ok: false, error: publishResult.errorMessage ?? 'Google Play yayını başarısız oldu.' });
   res.json({ ok: true });
+});
+
+app.get('/owner/summary', async (req, res) => {
+  const owner = await requireOwner(req, res);
+  if (!owner) return;
+  const [usersRes, activeSubRes, pendingOrdersRes, approvedOrdersRes, failedBuildsRes, projectsRes, errorsRes] = await Promise.all([
+    serviceRoleClient.from('profiles').select('id', { count: 'exact', head: true }),
+    serviceRoleClient.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+    serviceRoleClient.from('payment_orders').select('id', { count: 'exact', head: true }).eq('status', 'pending').eq('provider', 'shopier'),
+    serviceRoleClient.from('payment_orders').select('id', { count: 'exact', head: true }).eq('status', 'approved').eq('provider', 'shopier'),
+    serviceRoleClient.from('unity_build_jobs').select('id', { count: 'exact', head: true }).eq('status', 'failed'),
+    serviceRoleClient.from('unity_game_projects').select('id, app_name, status, created_at').order('created_at', { ascending: false }).limit(5),
+    serviceRoleClient.from('billing_events').select('id, event_type, payload, created_at').order('created_at', { ascending: false }).limit(5)
+  ]);
+
+  res.json({ ok: true, summary: { users: usersRes.count ?? 0, activeSubscriptions: activeSubRes.count ?? 0, pendingOrders: pendingOrdersRes.count ?? 0, approvedOrders: approvedOrdersRes.count ?? 0, failedBuilds: failedBuildsRes.count ?? 0 }, projects: projectsRes.data ?? [], events: errorsRes.data ?? [] });
+});
+
+app.get('/owner/users', async (req, res) => {
+  const owner = await requireOwner(req, res);
+  if (!owner) return;
+  const { data, error } = await serviceRoleClient.from('profiles').select('id, email, created_at').order('created_at', { ascending: false }).limit(50);
+  if (error) return void res.status(400).json({ ok: false, error: error.message });
+  res.json({ ok: true, users: data ?? [] });
+});
+
+app.get('/owner/payments', async (req, res) => {
+  const owner = await requireOwner(req, res);
+  if (!owner) return;
+  const { data: paymentOrders, error } = await serviceRoleClient.from('payment_orders').select('id, user_id, plan_key, amount, currency, status, created_at, approved_at, metadata').eq('provider', 'shopier').order('created_at', { ascending: false }).limit(50);
+  if (error) return void res.status(400).json({ ok: false, error: error.message });
+
+  const userIds = [...new Set((paymentOrders ?? []).map((order) => order.user_id).filter(Boolean))] as string[];
+  const { data: profiles } = userIds.length ? await serviceRoleClient.from('profiles').select('id, email').in('id', userIds) : { data: [] as { id: string; email: string | null }[] };
+  const emailMap = Object.fromEntries((profiles ?? []).map((profile) => [profile.id, profile.email]));
+  res.json({ ok: true, paymentOrders: paymentOrders ?? [], emailMap });
+});
+
+app.patch('/owner/payments', async (req, res) => {
+  const owner = await requireOwner(req, res);
+  if (!owner) return;
+
+  const payload = (req.body ?? {}) as { orderId?: string; status?: string; note?: string };
+  const orderId = payload.orderId?.trim();
+  if (!orderId || !VALID_PAYMENT_STATUSES.includes((payload.status ?? '') as (typeof VALID_PAYMENT_STATUSES)[number])) {
+    return void res.status(400).json({ ok: false, error: 'order_id_and_valid_status_required' });
+  }
+
+  const { data: order, error: orderError } = await serviceRoleClient
+    .from('payment_orders')
+    .select('id, user_id, plan_key, amount, currency, status, metadata')
+    .eq('id', orderId)
+    .eq('provider', 'shopier')
+    .maybeSingle();
+
+  if (orderError || !order) return void res.status(404).json({ ok: false, error: orderError?.message ?? 'payment_order_not_found' });
+
+  const nowIso = new Date().toISOString();
+  const note = payload.note?.trim() || null;
+  const nextMetadata = { ...(typeof order.metadata === 'object' && order.metadata ? order.metadata : {}), owner_note: note, owner_status_updated_at: nowIso };
+
+  const { error: updateError } = await serviceRoleClient
+    .from('payment_orders')
+    .update({ status: payload.status, approved_at: payload.status === 'approved' ? nowIso : null, approved_by: payload.status === 'approved' ? owner.userId : null, metadata: nextMetadata })
+    .eq('id', orderId);
+
+  if (updateError) return void res.status(400).json({ ok: false, error: updateError.message });
+  res.json({ ok: true });
+});
+
+app.get('/owner/build-jobs', async (req, res) => {
+  const owner = await requireOwner(req, res);
+  if (!owner) return;
+  const { data, error } = await serviceRoleClient.from('unity_build_jobs').select('id, unity_game_project_id, status, created_at, error_message').order('created_at', { ascending: false }).limit(50);
+  if (error) return void res.status(400).json({ ok: false, error: error.message });
+  res.json({ ok: true, jobs: data ?? [] });
+});
+
+app.get('/owner/release-jobs', async (req, res) => {
+  const owner = await requireOwner(req, res);
+  if (!owner) return;
+  const { data, error } = await serviceRoleClient.from('billing_events').select('id, event_type, created_at, payload').ilike('event_type', '%release%').order('created_at', { ascending: false }).limit(30);
+  if (error) return void res.status(400).json({ ok: false, error: error.message });
+  res.json({ ok: true, jobs: data ?? [] });
+});
+
+app.get('/owner/integrations', async (req, res) => {
+  const owner = await requireOwner(req, res);
+  if (!owner) return;
+  const [{ count: integrationCount }, { count: modelConfigCount }] = await Promise.all([
+    serviceRoleClient.from('user_integrations_public').select('id', { count: 'exact', head: true }),
+    serviceRoleClient.from('billing_events').select('id', { count: 'exact', head: true }).ilike('event_type', '%model%')
+  ]);
+  res.json({ ok: true, integrationCount: integrationCount ?? 0, modelConfigCount: modelConfigCount ?? 0 });
+});
+
+app.get('/owner/logs', async (req, res) => {
+  const owner = await requireOwner(req, res);
+  if (!owner) return;
+  const { data, error } = await serviceRoleClient.from('billing_events').select('id, event_type, actor_user_id, created_at').order('created_at', { ascending: false }).limit(100);
+  if (error) return void res.status(400).json({ ok: false, error: error.message });
+  res.json({ ok: true, events: data ?? [] });
 });
 
 const port = Number(process.env.PORT ?? 4000);
