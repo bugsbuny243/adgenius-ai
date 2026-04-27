@@ -22,7 +22,8 @@ export function BuildRowStatusAutoRefresh({ buildId, projectId, initialStatus }:
 
   useEffect(() => {
     const normalized = (status ?? '').toLowerCase();
-    if (!buildId || !projectId || normalized === 'success' || normalized === 'failure') return;
+    const shouldPoll = normalized === 'queued' || normalized === 'started';
+    if (!buildId || !projectId || !shouldPoll) return;
 
     const timer = setInterval(async () => {
       try {
