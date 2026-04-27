@@ -1,90 +1,36 @@
 # Koschei AI Command Center
 
-Workspace tabanlı bir **AI command center foundation**:
-- Next.js App Router + TypeScript + Tailwind
-- Supabase Auth + Postgres + RLS
-- 
+## Service split
 
-## Tech stack
+- `frontend/` is browser-safe only.
+- `backend/` owns all secret-backed operations.
+- `supabase/migrations/` contains compatibility patches for existing production schema.
 
-- `frontend`: Next.js 16, React 19, TypeScript, Tailwind
-- `backend/supabase/migrations/*`: workspace-centric SQL foundation + RLS
+## Frontend env (safe only)
 
-## Project structure
+Use these in `frontend/.env` and frontend Railway service:
 
-```
-project-root/
-├── backend/
-│   └── supabase/
-│       ├── functions/
-│       └── migrations/
-├── frontend/
-│   ├── app/
-│   ├── components/
-│   ├── lib/
-│   ├── public/
-│   └── scripts/
-└── README.md
-```
-
-## Environment variables
-
-Railway (Production) için aşağıdaki değişkenleri **service level** olarak tanımlayın:
-
-### Public (build-time + client)
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_SITE_URL`
+- `BACKEND_API_URL`
 
-### Server (runtime)
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- 
+Do **not** put service role, Unity, GitHub, Google secrets, or encryption keys in frontend.
 
-> Not: `NEXT_PUBLIC_*` değişkenleri build-time’da bundle’a gömülür. Bu değerler değişirse **rebuild + redeploy** zorunludur.
+## Backend env
 
-## Railway deployment (normal Next.js)
+Backend service receives:
 
-- Root Directory: `/frontend`
-- Build Command: `npm install && npm run build`
-- Start Command: `npx next start -H 0.0.0.0 -p $PORT`
+- Supabase service role credentials
+- Unity credentials and webhook secret
+- GitHub Unity repo token/config
+- Google credentials
+- AI provider keys
+- credentials encryption key
 
-Docker / standalone / static export kullanılmaz.
+## Schema notes
 
-## Railway setup steps
-
-1. Railway service root’unu `/frontend` olarak ayarlayın.
-2. Build Command’i `npm install && npm run build` yapın.
-3. Start Command’i `npx next start -H 0.0.0.0 -p $PORT` yapın.
-4. Tüm env değişkenlerini girin (yukarıdaki liste).
-5. Deploy edin.
-6. Health endpoint kontrol edin:
-   - `GET /api/health`
-
-## Cache / stale build notu
-
-Aşağıdaki durumlarda clean rebuild yapın:
-- `NEXT_PUBLIC_*` değerleri değiştiyse
-- önceki yanlış root/build config ile artifact cache oluştuysa
-
-Railway’de yeni deploy sırasında cache’i temizleyip yeniden build alın.
-
-## Local run
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Open: `http://localhost:3000`
-
-## Healthcheck response (safe)
-
-`/api/health` sadece status/boolean döner:
-- app up/down
-- public env ready/missingCount
-- server env ready/missingCount
-- supabase ready/not ready
-
-Secret değerler response içinde asla dönülmez.
+- `user_integrations.encrypted_credentials` is **deprecated compatibility**.
+- `integration_credentials` is backend-only credential storage.
+- `game_artifacts.build_job_id` is legacy.
+- `game_artifacts.unity_build_job_id` is canonical for Unity builds.

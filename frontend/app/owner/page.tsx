@@ -1,42 +1,36 @@
 import Link from 'next/link';
 import { requirePlatformOwner } from '@/lib/owner-auth';
-import { createSupabaseServiceRoleClient } from '@/lib/supabase-service-role';
+import { fetchBackendForOwner } from '@/lib/backend-server';
+
+type SummaryResponse = {
+  ok: boolean;
+  summary?: { users: number; activeSubscriptions: number; pendingOrders: number; approvedOrders: number; failedBuilds: number };
+  projects?: Array<{ id: string; app_name: string; status: string; created_at: string | null }>;
+  events?: Array<{ id: string; event_type: string; created_at: string | null }>;
+};
 
 export default async function OwnerOverviewPage() {
   await requirePlatformOwner();
-  const supabase = createSupabaseServiceRoleClient();
-
-  const [usersRes, activeSubRes, pendingOrdersRes, approvedOrdersRes, failedBuildsRes, projectsRes, errorsRes, healthRes] = await Promise.all([
-    supabase.from('profiles').select('id', { count: 'exact', head: true }),
-    supabase.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-    supabase.from('payment_orders').select('id', { count: 'exact', head: true }).eq('status', 'pending').eq('provider', 'shopier'),
-    supabase.from('payment_orders').select('id', { count: 'exact', head: true }).eq('status', 'approved').eq('provider', 'shopier'),
-    supabase.from('unity_build_jobs').select('id', { count: 'exact', head: true }).eq('status', 'failed'),
-    supabase.from('unity_game_projects').select('id, app_name, status, created_at').order('created_at', { ascending: false }).limit(5),
-    supabase.from('billing_events').select('id, event_type, payload, created_at').order('created_at', { ascending: false }).limit(5),
-    fetch(`${process.env.APP_ORIGIN ?? 'http://localhost:3000'}/api/health`, { cache: 'no-store' }).then((r) => r.json()).catch(() => null)
-  ]);
-
-  const healthSummary = healthRes?.ok ? 'Sistem sağlıklı görünüyor' : 'Sistem durumu kontrol edilmeli';
+  const response = await fetchBackendForOwner('/owner/summary');
+  const data = (await response.json().catch(() => ({}))) as SummaryResponse;
 
   return (
     <section className="grid gap-4 lg:grid-cols-2">
       <article className="panel lg:col-span-2">
         <h2 className="text-lg font-semibold">Genel Bakış</h2>
         <div className="mt-3 grid gap-2 text-sm md:grid-cols-4">
-          <p className="rounded-lg border border-white/15 px-3 py-2">Toplam kullanıcı: {usersRes.count ?? 0}</p>
-          <p className="rounded-lg border border-white/15 px-3 py-2">Aktif abonelik: {activeSubRes.count ?? 0}</p>
-          <p className="rounded-lg border border-white/15 px-3 py-2">Bekleyen Shopier ödeme: {pendingOrdersRes.count ?? 0}</p>
-          <p className="rounded-lg border border-white/15 px-3 py-2">Onaylanmış manuel ödeme: {approvedOrdersRes.count ?? 0}</p>
-          <p className="rounded-lg border border-white/15 px-3 py-2">Başarısız Unity build: {failedBuildsRes.count ?? 0}</p>
-          <p className="rounded-lg border border-white/15 px-3 py-2 md:col-span-3">Sistem sağlık özeti: {healthSummary}</p>
+          <p className="rounded-lg border border-white/15 px-3 py-2">Toplam kullanıcı: {data.summary?.users ?? 0}</p>
+          <p className="rounded-lg border border-white/15 px-3 py-2">Aktif abonelik: {data.summary?.activeSubscriptions ?? 0}</p>
+          <p className="rounded-lg border border-white/15 px-3 py-2">Bekleyen Shopier ödeme: {data.summary?.pendingOrders ?? 0}</p>
+          <p className="rounded-lg border border-white/15 px-3 py-2">Onaylanmış manuel ödeme: {data.summary?.approvedOrders ?? 0}</p>
+          <p className="rounded-lg border border-white/15 px-3 py-2">Başarısız Unity build: {data.summary?.failedBuilds ?? 0}</p>
         </div>
       </article>
 
       <article className="panel">
         <h3 className="text-lg font-semibold">Son Game Factory Projeleri</h3>
         <div className="mt-3 space-y-2 text-sm">
-          {(projectsRes.data ?? []).map((project) => (
+          {(data.projects ?? []).map((project) => (
             <p key={project.id} className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
               {project.app_name} • {project.status} • {new Date(project.created_at ?? '').toLocaleString('tr-TR')}
             </p>
@@ -47,7 +41,7 @@ export default async function OwnerOverviewPage() {
       <article className="panel">
         <h3 className="text-lg font-semibold">Son Hata / Olay Kayıtları</h3>
         <div className="mt-3 space-y-2 text-xs">
-          {(errorsRes.data ?? []).map((event) => (
+          {(data.events ?? []).map((event) => (
             <p key={event.id} className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
               {event.event_type} • {new Date(event.created_at ?? '').toLocaleString('tr-TR')}
             </p>
