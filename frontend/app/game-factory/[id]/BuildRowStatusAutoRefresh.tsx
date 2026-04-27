@@ -28,6 +28,7 @@ export function BuildRowStatusAutoRefresh({ buildId, projectId, initialStatus }:
     const timer = setInterval(async () => {
       try {
         const supabase = createSupabaseBrowserClient();
+        if (!supabase) return;
         const token = (await supabase?.auth.getSession())?.data.session?.access_token;
         if (!token) return;
 
