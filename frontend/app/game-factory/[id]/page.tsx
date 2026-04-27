@@ -4,7 +4,6 @@ import { createSupabaseReadonlyServerClient } from '@/lib/supabase-server';
 import { deleteGameProject } from '@/app/game-factory/actions';
 import { StartBuildButton } from '@/app/game-factory/[id]/StartBuildButton';
 import { BuildRowStatusAutoRefresh } from '@/app/game-factory/[id]/BuildRowStatusAutoRefresh';
-import { BuildListAutoRefresh } from '@/app/game-factory/[id]/BuildListAutoRefresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +16,7 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
 
   if (!user) redirect('/signin');
 
-  const [{ data: project }, { data: latestBuild }] = await Promise.all([
+  const [{ data: project }, { data: builds }] = await Promise.all([
     supabase
       .from('unity_game_projects')
       .select('id, app_name, package_name, status, game_brief, approval_status')
@@ -29,14 +28,15 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
       .select('id, status, created_at, artifact_url')
       .eq('unity_game_project_id', id)
       .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+      .limit(10)
   ]);
 
   if (!project) notFound();
 
   const brief = (project.game_brief ?? {}) as Record<string, unknown>;
   const features = Array.isArray(brief.keyFeatures) ? brief.keyFeatures.map((item) => String(item)) : [];
+
+  const latestBuild = builds?.[0] ?? null;
 
   return (
     <main className="panel space-y-4">
@@ -45,8 +45,6 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
         <p className="text-sm text-white/70">{project.package_name}</p>
         <span className="mt-2 inline-flex rounded-full bg-white/10 px-3 py-1 text-xs">{project.status}</span>
       </header>
-
-      <BuildListAutoRefresh projectId={id} initialStatus={latestBuild?.status ?? null} />
 
       <section className="rounded-xl border border-white/10 bg-black/20 p-4 text-sm">
         <h2 className="mb-2 text-lg font-semibold">Brief</h2>
@@ -68,6 +66,30 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
             İndir
           </a>
         ) : null}
+      </section>
+
+      <section className="overflow-x-auto rounded-xl border border-white/10 bg-black/20 p-4">
+        <h2 className="mb-3 text-lg font-semibold">Build Listesi</h2>
+        <table className="min-w-full text-sm">
+          <thead className="bg-black/30 text-left">
+            <tr>
+              <th className="px-3 py-2">Build</th>
+              <th className="px-3 py-2">Durum</th>
+              <th className="px-3 py-2">Tarih</th>
+              <th className="px-3 py-2">İndir</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(builds ?? []).map((build, index) => (
+              <tr key={build.id} className="border-t border-white/10">
+                <td className="px-3 py-2">#{(builds?.length ?? 0) - index}</td>
+                <td className="px-3 py-2"><BuildRowStatusAutoRefresh buildId={build.id} projectId={id} initialStatus={build.status} /></td>
+                <td className="px-3 py-2">{build.created_at ? new Date(build.created_at).toLocaleString('tr-TR') : '—'}</td>
+                <td className="px-3 py-2">{build.artifact_url ? <a href={build.artifact_url} target="_blank" rel="noreferrer" className="underline">İndir</a> : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </section>
 
       <section className="rounded-xl border border-white/10 bg-black/20 p-4">
