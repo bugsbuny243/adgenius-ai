@@ -82,6 +82,6 @@ Fresh bir Supabase projesine uygulanacaksa önce aşağıdakiler mevcut olmalıd
 
 - `public.touch_updated_at()` fonksiyonu
 - `public.owns_game_project(game_project_id uuid)` fonksiyonu
-- Temel tablolar: `game_projects`, `game_briefs`, `game_build_jobs`, `game_artifacts`, `game_release_jobs`
+- Temel tablolar: `game_projects`, `game_briefs`, `unity_build_jobs`, `game_artifacts`, `game_release_jobs`
 
 Production'da bu temel şema zaten varsa mevcut migration doğrudan uygulanabilir.

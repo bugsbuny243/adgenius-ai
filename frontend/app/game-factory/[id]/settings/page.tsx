@@ -18,7 +18,7 @@ export default async function GameFactorySettingsPage({ params }: { params: Prom
 
   if (!user) redirect('/signin');
 
-  const { data: project } = await supabase.from('game_projects').select('*').eq('id', id).eq('user_id', user.id).maybeSingle();
+  const { data: project } = await supabase.from('unity_game_projects').select('*').eq('id', id).eq('user_id', user.id).maybeSingle();
 
   if (!project) notFound();
 
