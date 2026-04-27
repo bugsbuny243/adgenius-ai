@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getBuildStatus } from '@/lib/unity-bridge';
 
-type GameBuildJob = {
+type UnityBuildJob = {
   id: string;
   status: string | null;
-  external_build_id: string | null;
-  build_target_id: string | null;
   artifact_url: string | null;
+  metadata: Record<string, unknown> | null;
 };
 
 function createSupabaseClient() {
@@ -34,10 +33,10 @@ export async function POST(_request: NextRequest, context: { params: Promise<{ j
     const supabase = createSupabaseClient();
 
     const { data: buildJob, error: buildJobError } = await supabase
-      .from('game_build_jobs')
-      .select('id, status, external_build_id, build_target_id, artifact_url')
+      .from('unity_build_jobs')
+      .select('id, status, artifact_url, metadata')
       .eq('id', jobId)
-      .maybeSingle<GameBuildJob>();
+      .maybeSingle<UnityBuildJob>();
 
     if (buildJobError) {
       return NextResponse.json({ ok: false, error: buildJobError.message }, { status: 500 });
@@ -47,19 +46,24 @@ export async function POST(_request: NextRequest, context: { params: Promise<{ j
       return NextResponse.json({ ok: false, error: 'Build kaydı bulunamadı.' }, { status: 404 });
     }
 
-    if (!buildJob.external_build_id?.trim() || !buildJob.build_target_id?.trim()) {
+    const metadata = (buildJob.metadata ?? {}) as Record<string, unknown>;
+    const unityBuildNumber = metadata.unityBuildNumber;
+    const unityBuildTargetId = metadata.unityBuildTargetId;
+
+    if (
+      typeof unityBuildNumber !== 'number' ||
+      !Number.isInteger(unityBuildNumber) ||
+      unityBuildNumber < 1 ||
+      typeof unityBuildTargetId !== 'string' ||
+      !unityBuildTargetId.trim()
+    ) {
       return NextResponse.json(
-        { ok: false, error: 'Build kaydında external_build_id veya build_target_id eksik.' },
+        { ok: false, error: 'Build metadata bilgisinde unityBuildNumber veya unityBuildTargetId eksik.' },
         { status: 400 }
       );
     }
 
-    const buildNumber = Number(buildJob.external_build_id);
-    if (!Number.isInteger(buildNumber) || buildNumber < 1) {
-      return NextResponse.json({ ok: false, error: 'external_build_id geçerli bir sayı değil.' }, { status: 400 });
-    }
-
-    const unityStatus = await getBuildStatus(buildJob.build_target_id, buildNumber);
+    const unityStatus = await getBuildStatus(unityBuildTargetId, unityBuildNumber);
 
     const patch: Record<string, string | null> = { status: unityStatus.status };
 
@@ -73,7 +77,7 @@ export async function POST(_request: NextRequest, context: { params: Promise<{ j
     }
 
     const { error: updateError } = await supabase
-      .from('game_build_jobs')
+      .from('unity_build_jobs')
       .update(patch)
       .eq('id', jobId);
 
