@@ -1,16 +1,16 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
-import { revalidatePath } from 'next/cache';
 import { createSupabaseReadonlyServerClient } from '@/lib/supabase-server';
 import { StartBuildButton } from '@/app/game-factory/[id]/StartBuildButton';
 import { BuildStatusPoller } from '@/app/game-factory/[id]/BuildStatusPoller';
+import { RefreshBuildsButton } from '@/app/game-factory/[id]/RefreshBuildsButton';
 
 export const dynamic = 'force-dynamic';
 
 function badge(status: string) {
   if (status === 'queued') return 'bg-amber-500/20 text-amber-200';
-  if (status === 'running') return 'bg-blue-500/20 text-blue-200';
-  if (status === 'success') return 'bg-emerald-500/20 text-emerald-200';
+  if (status === 'running' || status === 'building' || status === 'triggered') return 'bg-blue-500/20 text-blue-200';
+  if (status === 'success' || status === 'succeeded') return 'bg-emerald-500/20 text-emerald-200';
   if (status === 'failed') return 'bg-red-500/20 text-red-200';
   return 'bg-white/10 text-white';
 }
@@ -23,11 +23,6 @@ function durationLabel(start: string | null, end: string | null) {
   const minutes = Math.floor(seconds / 60);
   const rem = seconds % 60;
   return `${minutes}dk ${rem}sn`;
-}
-
-async function refreshBuilds(path: string) {
-  'use server';
-  revalidatePath(path);
 }
 
 export default async function GameFactoryBuildsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -50,11 +45,11 @@ export default async function GameFactoryBuildsPage({ params }: { params: Promis
 
   if (!project) notFound();
 
-  const activeJob = (builds ?? []).find((job) => job.status === 'queued' || job.status === 'running');
+  const activeJob = (builds ?? []).find((job) => job.status === 'queued' || job.status === 'running' || job.status === 'building' || job.status === 'triggered');
 
   return (
     <main className="panel space-y-4">
-      <BuildStatusPoller activeJobId={activeJob?.id ?? null} />
+      <BuildStatusPoller activeJobId={activeJob?.id ?? null} projectId={id} />
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">{project.app_name}</h1>
@@ -62,9 +57,7 @@ export default async function GameFactoryBuildsPage({ params }: { params: Promis
         </div>
         <div className="flex gap-2">
           <Link href={`/game-factory/${id}`} className="rounded-lg border border-white/20 px-3 py-2 text-sm">Projeye dön</Link>
-          <form action={refreshBuilds.bind(null, `/game-factory/${id}/builds`)}>
-            <button className="rounded-lg border border-white/20 px-3 py-2 text-sm">Yenile</button>
-          </form>
+          <RefreshBuildsButton projectId={id} />
         </div>
       </header>
 
@@ -86,11 +79,11 @@ export default async function GameFactoryBuildsPage({ params }: { params: Promis
             {(builds ?? []).map((build, index) => (
               <tr key={build.id} className="border-t border-white/10">
                 <td className="px-3 py-2">#{(builds?.length ?? 0) - index}</td>
-                <td className="px-3 py-2"><span className={`rounded-full px-3 py-1 text-xs ${badge(build.status ?? '')}`}>{build.status}</span></td>
+                <td className="px-3 py-2"><span className={`rounded-full px-3 py-1 text-xs ${badge(build.status ?? '')}`}>{build.status === 'succeeded' ? 'successful' : build.status}</span></td>
                 <td className="px-3 py-2">{build.started_at ? new Date(build.started_at).toLocaleString('tr-TR') : '-'}</td>
                 <td className="px-3 py-2">{durationLabel(build.started_at, build.finished_at)}</td>
                 <td className="px-3 py-2">{build.artifact_url ? <a href={build.artifact_url} className="underline" target="_blank" rel="noreferrer">İndir</a> : '-'}</td>
-                <td className="px-3 py-2">{build.build_logs ? <a href={build.build_logs} className="underline" target="_blank" rel="noreferrer">Logs</a> : '-'}</td>
+                <td className="px-3 py-2">{(build.logs_url ?? build.build_logs) ? <a href={build.logs_url ?? build.build_logs} className="underline" target="_blank" rel="noreferrer">Logs</a> : '-'}</td>
               </tr>
             ))}
           </tbody>
