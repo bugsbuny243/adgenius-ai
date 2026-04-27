@@ -85,6 +85,7 @@ export async function POST(_request: NextRequest, context: { params: Promise<{ j
       ok: true,
       jobId,
       status: patch.status,
+      newStatus: patch.status,
       artifact_url: patch.artifact_url ?? buildJob.artifact_url,
       finished_at: patch.finished_at ?? null,
       error_message: patch.error_message ?? null

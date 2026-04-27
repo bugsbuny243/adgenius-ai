@@ -4,22 +4,10 @@ import { createSupabaseReadonlyServerClient } from '@/lib/supabase-server';
 import { StartBuildButton } from '@/app/game-factory/[id]/StartBuildButton';
 import { BuildStatusPoller } from '@/app/game-factory/[id]/BuildStatusPoller';
 import { RefreshBuildsButton } from '@/app/game-factory/[id]/RefreshBuildsButton';
+import { BuildRowStatusAutoRefresh } from '@/app/game-factory/[id]/BuildRowStatusAutoRefresh';
 
 export const dynamic = 'force-dynamic';
 
-function badge(status: string) {
-  if (status === 'queued') return 'bg-amber-500/20 text-amber-200';
-  if (status === 'running' || status === 'claimed') return 'bg-blue-500/20 text-blue-200';
-  if (status === 'success' || status === 'succeeded') return 'bg-emerald-500/20 text-emerald-200';
-  if (status === 'failed' || status === 'cancelled') return 'bg-red-500/20 text-red-200';
-  return 'bg-white/10 text-white';
-}
-
-function labelStatus(status: string | null) {
-  if (status === 'succeeded') return 'successful';
-  if (status === 'cancelled') return 'cancelled';
-  return status ?? '-';
-}
 
 function durationLabel(start: string | null, end: string | null) {
   if (!start) return '-';
@@ -87,7 +75,7 @@ export default async function GameFactoryBuildsPage({ params }: { params: Promis
               return (
                 <tr key={build.id} className="border-t border-white/10">
                   <td className="px-3 py-2">{typeof unityBuildNumber === 'number' ? `#${unityBuildNumber}` : `#${(builds?.length ?? 0) - index}`}</td>
-                  <td className="px-3 py-2"><span className={`rounded-full px-3 py-1 text-xs ${badge(build.status ?? '')}`}>{labelStatus(build.status)}</span></td>
+                  <td className="px-3 py-2"><BuildRowStatusAutoRefresh buildId={build.id} initialStatus={build.status} /></td>
                   <td className="px-3 py-2">{build.started_at ? new Date(build.started_at).toLocaleString('tr-TR') : '-'}</td>
                   <td className="px-3 py-2">{durationLabel(build.started_at, build.finished_at)}</td>
                   <td className="px-3 py-2">{build.artifact_url ? <a href={build.artifact_url} className="underline" target="_blank" rel="noreferrer">İndir</a> : '-'}</td>
