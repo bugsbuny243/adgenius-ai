@@ -43,7 +43,7 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
           <p>Ürün adı: {project.app_name || project.product_name || project.name}</p>
           <p>Paket adı: {project.package_name}</p>
           <p>Sürüm: {buildJob?.version_name ?? project.current_version_name} ({buildJob?.version_code ?? project.current_version_code})</p>
-          <p>Build durumu: {buildJob?.id ? <BuildStatusAutoRefresh jobId={buildJob.id} initialStatus={buildJob.status} /> : '-'}</p>
+          <p>Build durumu: {buildJob?.id ? <BuildStatusAutoRefresh jobId={buildJob.id} initialStatus={buildJob.status} withLabel /> : '-'}</p>
           <p>Yayın kanalı: {releaseJob?.track ?? project.release_track}</p>
           <p>Google Play bağlantısı: {selectedIntegration?.display_name ?? 'Seçilmedi'}</p>
           <p>Kısa açıklama: {brief?.store_short_description ?? '-'}</p>

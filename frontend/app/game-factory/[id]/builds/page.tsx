@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { createSupabaseReadonlyServerClient } from '@/lib/supabase-server';
 import { StartBuildButton } from '@/app/game-factory/[id]/StartBuildButton';
-import { BuildStatusPoller } from '@/app/game-factory/[id]/BuildStatusPoller';
+import { BuildStatusAutoRefresh } from '@/app/game-factory/[id]/BuildStatusAutoRefresh';
 import { RefreshBuildsButton } from '@/app/game-factory/[id]/RefreshBuildsButton';
 import { BuildRowStatusAutoRefresh } from '@/app/game-factory/[id]/BuildRowStatusAutoRefresh';
 
@@ -43,7 +43,7 @@ export default async function GameFactoryBuildsPage({ params }: { params: Promis
 
   return (
     <main className="panel space-y-4">
-      <BuildStatusPoller activeJobId={activeJob?.id ?? null} projectId={id} />
+      <BuildStatusAutoRefresh projectId={activeJob ? id : null} />
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">{project.app_name}</h1>
