@@ -75,7 +75,7 @@ export default async function GameFactoryBuildsPage({ params }: { params: Promis
               return (
                 <tr key={build.id} className="border-t border-white/10">
                   <td className="px-3 py-2">{typeof unityBuildNumber === 'number' ? `#${unityBuildNumber}` : `#${(builds?.length ?? 0) - index}`}</td>
-                  <td className="px-3 py-2"><BuildRowStatusAutoRefresh buildId={build.id} initialStatus={build.status} /></td>
+                  <td className="px-3 py-2"><BuildRowStatusAutoRefresh buildId={build.id} projectId={id} initialStatus={build.status} /></td>
                   <td className="px-3 py-2">{build.started_at ? new Date(build.started_at).toLocaleString('tr-TR') : '-'}</td>
                   <td className="px-3 py-2">{durationLabel(build.started_at, build.finished_at)}</td>
                   <td className="px-3 py-2">{build.artifact_url ? <a href={build.artifact_url} className="underline" target="_blank" rel="noreferrer">İndir</a> : '-'}</td>
