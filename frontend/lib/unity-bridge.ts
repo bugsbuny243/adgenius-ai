@@ -13,10 +13,11 @@ export type UnityBuildStatus =
   | 'unknown';
 
 export interface UnityBuildResponse {
-  build: number;
+  build: number | null;
   buildTargetId: string;
   status: UnityBuildStatus;
   created: string;
+  finished?: string;
   links?: { download_primary?: { href: string } };
 }
 
@@ -127,11 +128,17 @@ async function unityRequest<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 function mapBuild(raw: UnityBuildRaw): UnityBuildResponse {
+  const parsedBuild =
+    typeof raw.build === 'number' && Number.isInteger(raw.build) && raw.build > 0
+      ? raw.build
+      : null;
+
   return {
-    build: typeof raw.build === 'number' ? raw.build : 0,
+    build: parsedBuild,
     buildTargetId: raw.buildtargetid ?? '',
     status: normalizeStatus(raw.status),
     created: raw.created ?? new Date(0).toISOString(),
+    finished: raw.finished,
     links: raw.links?.download_primary?.href
       ? { download_primary: { href: raw.links.download_primary.href } }
       : undefined,
@@ -195,7 +202,7 @@ export async function triggerBuild(buildTargetIdOrName: string): Promise<UnityBu
 export async function getBuildStatus(
   buildTargetIdOrName: string,
   buildNumber: number
-): Promise<UnityBuildResponse & { finished?: string }> {
+): Promise<UnityBuildResponse> {
   const { orgId, projectId } = getConfig();
   const targetId = await resolveBuildTargetId(buildTargetIdOrName); // <-- DÜZELTİLDİ
 
@@ -203,8 +210,7 @@ export async function getBuildStatus(
     `/orgs/${orgId}/projects/${projectId}/buildtargets/${targetId}/builds/${buildNumber}`
   );
 
-  const mapped = mapBuild({ ...data, buildtargetid: data.buildtargetid ?? targetId });
-  return { ...mapped, finished: data.finished };
+  return mapBuild({ ...data, buildtargetid: data.buildtargetid ?? targetId });
 }
 
 export async function cancelBuild(
@@ -223,7 +229,7 @@ export async function cancelBuild(
 export async function getBuilds(
   buildTargetIdOrName: string,
   limit = 10
-): Promise<(UnityBuildResponse & { finished?: string })[]> {
+): Promise<UnityBuildResponse[]> {
   const { orgId, projectId } = getConfig();
   const targetId = await resolveBuildTargetId(buildTargetIdOrName); // <-- DÜZELTİLDİ
 
@@ -231,10 +237,13 @@ export async function getBuilds(
     `/orgs/${orgId}/projects/${projectId}/buildtargets/${targetId}/builds?per_page=${limit}`
   );
 
-  return (Array.isArray(data) ? data : []).map((item) => ({
-    ...mapBuild({ ...item, buildtargetid: item.buildtargetid ?? targetId }),
-    finished: item.finished,
-  }));
+  return (Array.isArray(data) ? data : [])
+    .map((item) => mapBuild({ ...item, buildtargetid: item.buildtargetid ?? targetId }))
+    .sort((a, b) => {
+      const aTime = new Date(a.created).getTime();
+      const bTime = new Date(b.created).getTime();
+      return bTime - aTime;
+    });
 }
 
 export async function getBuildTargets(): Promise<UnityBuildTarget[]> {

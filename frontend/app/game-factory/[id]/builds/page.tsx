@@ -8,6 +8,20 @@ import { BuildRowStatusAutoRefresh } from '@/app/game-factory/[id]/BuildRowStatu
 
 export const dynamic = 'force-dynamic';
 
+function normalizeBuildStatus(status: string | null): string {
+  if (status === 'started') return 'running';
+  if (status === 'success') return 'succeeded';
+  if (status === 'failure') return 'failed';
+  return status ?? '-';
+}
+
+function displayBuildNumber(unityBuildNumber: unknown, fallback: number): string {
+  if (typeof unityBuildNumber === 'number' && Number.isInteger(unityBuildNumber) && unityBuildNumber > 0) {
+    return `#${unityBuildNumber}`;
+  }
+  if (fallback > 0) return `local #${fallback}`;
+  return '-';
+}
 
 function durationLabel(start: string | null, end: string | null) {
   if (!start) return '-';
@@ -72,14 +86,15 @@ export default async function GameFactoryBuildsPage({ params }: { params: Promis
           <tbody>
             {(builds ?? []).map((build, index) => {
               const unityBuildNumber = (build.metadata as { unityBuildNumber?: number } | null)?.unityBuildNumber;
+              const normalizedStatus = normalizeBuildStatus(build.status);
               return (
                 <tr key={build.id} className="border-t border-white/10">
-                  <td className="px-3 py-2">{typeof unityBuildNumber === 'number' ? `#${unityBuildNumber}` : `#${(builds?.length ?? 0) - index}`}</td>
-                  <td className="px-3 py-2"><BuildRowStatusAutoRefresh buildId={build.id} projectId={id} initialStatus={build.status} /></td>
+                  <td className="px-3 py-2">{displayBuildNumber(unityBuildNumber, (builds?.length ?? 0) - index)}</td>
+                  <td className="px-3 py-2"><BuildRowStatusAutoRefresh buildId={build.id} projectId={id} initialStatus={normalizedStatus} /></td>
                   <td className="px-3 py-2">{build.started_at ? new Date(build.started_at).toLocaleString('tr-TR') : '-'}</td>
                   <td className="px-3 py-2">{durationLabel(build.started_at, build.finished_at)}</td>
                   <td className="px-3 py-2">{build.artifact_url ? <a href={build.artifact_url} className="underline" target="_blank" rel="noreferrer">İndir</a> : '-'}</td>
-                  <td className="px-3 py-2">{(build.logs_url ?? build.build_logs) ? <a href={build.logs_url ?? build.build_logs} className="underline" target="_blank" rel="noreferrer">Logs</a> : '-'}</td>
+                  <td className="px-3 py-2">{build.logs_url ? <a href={build.logs_url} className="underline" target="_blank" rel="noreferrer">Logs</a> : '-'}</td>
                 </tr>
               );
             })}

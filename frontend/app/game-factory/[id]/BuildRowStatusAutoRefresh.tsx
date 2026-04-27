@@ -12,17 +12,26 @@ type Props = {
 function badge(status: string) {
   if (status === 'queued') return 'bg-amber-500/20 text-amber-200';
   if (status === 'claimed' || status === 'running' || status === 'started') return 'bg-blue-500/20 text-blue-200';
-  if (status === 'success') return 'bg-emerald-500/20 text-emerald-200';
-  if (status === 'failure') return 'bg-red-500/20 text-red-200';
+  if (status === 'succeeded' || status === 'success') return 'bg-emerald-500/20 text-emerald-200';
+  if (status === 'failed' || status === 'failure') return 'bg-red-500/20 text-red-200';
+  if (status === 'cancelled') return 'bg-slate-500/20 text-slate-200';
   return 'bg-white/10 text-white';
 }
 
+function normalizeStatus(status: string | null | undefined): string {
+  const normalized = (status ?? '').toLowerCase();
+  if (normalized === 'started') return 'running';
+  if (normalized === 'success') return 'succeeded';
+  if (normalized === 'failure') return 'failed';
+  return normalized;
+}
+
 export function BuildRowStatusAutoRefresh({ buildId, projectId, initialStatus }: Props) {
-  const [status, setStatus] = useState(initialStatus ?? '-');
+  const [status, setStatus] = useState(normalizeStatus(initialStatus) || '-');
 
   useEffect(() => {
-    const normalized = (status ?? '').toLowerCase();
-    const shouldPoll = normalized === 'queued' || normalized === 'started';
+    const normalized = normalizeStatus(status);
+    const shouldPoll = normalized === 'queued' || normalized === 'claimed' || normalized === 'running' || normalized === 'started';
     if (!buildId || !projectId || !shouldPoll) return;
 
     const timer = setInterval(async () => {
@@ -48,7 +57,7 @@ export function BuildRowStatusAutoRefresh({ buildId, projectId, initialStatus }:
           results?: Array<{ jobId?: string; newStatus?: string | null; previousStatus?: string | null }>;
         };
         const matchedJob = payload.results?.find((item) => item.jobId === buildId);
-        let nextStatus = (matchedJob?.newStatus ?? payload.newStatus ?? payload.status)?.toLowerCase() ?? null;
+        let nextStatus = normalizeStatus(matchedJob?.newStatus ?? payload.newStatus ?? payload.status ?? null) || null;
 
         if (!nextStatus) {
           const { data: latestRow } = await supabase
@@ -56,14 +65,14 @@ export function BuildRowStatusAutoRefresh({ buildId, projectId, initialStatus }:
             .select('status')
             .eq('id', buildId)
             .maybeSingle();
-          nextStatus = (latestRow?.status ?? '').toLowerCase() || null;
+          nextStatus = normalizeStatus(latestRow?.status ?? null) || null;
         }
 
         if (!nextStatus) return;
 
         setStatus(nextStatus);
 
-        if (nextStatus === 'success' || nextStatus === 'failure') {
+        if (nextStatus === 'succeeded' || nextStatus === 'failed' || nextStatus === 'cancelled') {
           clearInterval(timer);
         }
       } catch {
@@ -74,5 +83,5 @@ export function BuildRowStatusAutoRefresh({ buildId, projectId, initialStatus }:
     return () => clearInterval(timer);
   }, [buildId, projectId, status]);
 
-  return <span className={`rounded-full px-3 py-1 text-xs ${badge((status ?? '').toLowerCase())}`}>{status}</span>;
+  return <span className={`rounded-full px-3 py-1 text-xs ${badge(normalizeStatus(status))}`}>{normalizeStatus(status)}</span>;
 }
