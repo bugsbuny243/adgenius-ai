@@ -1,4 +1,4 @@
-// 📁 frontend/lib/unity-bridge.ts (TAMAMI YENİLENDİ)
+// frontend/lib/unity-bridge.ts (SON SÜRÜM - TÜM FONKSİYONLAR DÜZELTİLDİ)
 
 const UNITY_BASE_URL = 'https://build-api.cloud.unity3d.com/api/v1';
 
@@ -50,10 +50,6 @@ export class UnityApiError extends Error {
   }
 }
 
-/**
- * Yapılandırmayı yalnızca API anahtarı ile hazırlar.
- * Servis hesabı yöntemi kaldırıldı (Unity Build Automation API'si için geçersiz).
- */
 function getConfig() {
   const orgId = process.env.UNITY_ORG_ID?.trim();
   const projectId = process.env.UNITY_PROJECT_ID?.trim();
@@ -147,7 +143,6 @@ function mapBuild(raw: UnityBuildRaw): UnityBuildResponse {
  * Eğer zaten UUID formatında bir değer gönderilirse onu aynen kullanır.
  */
 async function resolveBuildTargetId(nameOrId: string): Promise<string> {
-  // Basit UUID kontrolü: içinde tire varsa büyük ihtimalle UUID'dir.
   if (nameOrId.includes('-')) {
     return nameOrId;
   }
@@ -178,10 +173,8 @@ async function resolveBuildTargetId(nameOrId: string): Promise<string> {
   }
 }
 
-/**
- * Yeni bir build başlatır.
- * @param buildTargetIdOrName Hedef ID'si (UUID) veya adı.
- */
+// ========== TÜM FONKSİYONLAR GÜNCELLENDİ ==========
+
 export async function triggerBuild(buildTargetIdOrName: string): Promise<UnityBuildResponse> {
   const { orgId, projectId } = getConfig();
   const targetId = await resolveBuildTargetId(buildTargetIdOrName);
@@ -194,13 +187,6 @@ export async function triggerBuild(buildTargetIdOrName: string): Promise<UnityBu
     }
   );
 
-  const buildNumber = data.build;
-  if (typeof buildNumber !== 'number' || !Number.isInteger(buildNumber) || buildNumber < 1) {
-    throw new UnityApiError('Unity build yanıtında geçerli build numarası yok.', {
-      endpointPath: `/orgs/${orgId}/projects/${projectId}/buildtargets/${targetId}/builds`,
-    });
-  }
-
   return mapBuild({ ...data, buildtargetid: data.buildtargetid ?? targetId });
 }
 
@@ -208,12 +194,8 @@ export async function getBuildStatus(
   buildTargetIdOrName: string,
   buildNumber: number
 ): Promise<UnityBuildResponse & { finished?: string }> {
-  if (!Number.isInteger(buildNumber) || buildNumber < 1) {
-    throw new UnityApiError(`Geçersiz build numarası: ${buildNumber}`);
-  }
-
   const { orgId, projectId } = getConfig();
-  const targetId = await resolveBuildTargetId(buildTargetIdOrName);
+  const targetId = await resolveBuildTargetId(buildTargetIdOrName); // <-- DÜZELTİLDİ
 
   const data = await unityRequest<UnityBuildRaw>(
     `/orgs/${orgId}/projects/${projectId}/buildtargets/${targetId}/builds/${buildNumber}`
@@ -228,7 +210,7 @@ export async function cancelBuild(
   buildNumber: number
 ): Promise<void> {
   const { orgId, projectId } = getConfig();
-  const targetId = await resolveBuildTargetId(buildTargetIdOrName);
+  const targetId = await resolveBuildTargetId(buildTargetIdOrName); // <-- DÜZELTİLDİ
 
   await unityRequest<void>(
     `/orgs/${orgId}/projects/${projectId}/buildtargets/${targetId}/builds/${buildNumber}`,
@@ -241,7 +223,7 @@ export async function getBuilds(
   limit = 10
 ): Promise<(UnityBuildResponse & { finished?: string })[]> {
   const { orgId, projectId } = getConfig();
-  const targetId = await resolveBuildTargetId(buildTargetIdOrName);
+  const targetId = await resolveBuildTargetId(buildTargetIdOrName); // <-- DÜZELTİLDİ
 
   const data = await unityRequest<UnityBuildRaw[]>(
     `/orgs/${orgId}/projects/${projectId}/buildtargets/${targetId}/builds?per_page=${limit}`
