@@ -15,7 +15,7 @@ export function RefreshBuildsButton({ projectId }: { projectId: string }) {
       const token = (await supabase?.auth.getSession())?.data.session?.access_token;
       if (!token) return;
 
-      await fetch('/api/game-factory/builds/refresh', {
+      const response = await fetch('/api/game-factory/builds/refresh', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -23,6 +23,11 @@ export function RefreshBuildsButton({ projectId }: { projectId: string }) {
         },
         body: JSON.stringify({ projectId })
       });
+
+      const payload = (await response.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!response.ok || payload?.ok === false) {
+        alert(payload?.error ?? 'Build yenileme sırasında bir hata oluştu.');
+      }
     } finally {
       router.refresh();
       setLoading(false);

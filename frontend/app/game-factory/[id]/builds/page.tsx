@@ -9,10 +9,16 @@ export const dynamic = 'force-dynamic';
 
 function badge(status: string) {
   if (status === 'queued') return 'bg-amber-500/20 text-amber-200';
-  if (status === 'running' || status === 'building' || status === 'triggered') return 'bg-blue-500/20 text-blue-200';
+  if (status === 'running' || status === 'claimed') return 'bg-blue-500/20 text-blue-200';
   if (status === 'success' || status === 'succeeded') return 'bg-emerald-500/20 text-emerald-200';
-  if (status === 'failed') return 'bg-red-500/20 text-red-200';
+  if (status === 'failed' || status === 'cancelled') return 'bg-red-500/20 text-red-200';
   return 'bg-white/10 text-white';
+}
+
+function labelStatus(status: string | null) {
+  if (status === 'succeeded') return 'successful';
+  if (status === 'cancelled') return 'cancelled';
+  return status ?? '-';
 }
 
 function durationLabel(start: string | null, end: string | null) {
@@ -45,7 +51,7 @@ export default async function GameFactoryBuildsPage({ params }: { params: Promis
 
   if (!project) notFound();
 
-  const activeJob = (builds ?? []).find((job) => job.status === 'queued' || job.status === 'running' || job.status === 'building' || job.status === 'triggered');
+  const activeJob = (builds ?? []).find((job) => job.status === 'queued' || job.status === 'claimed' || job.status === 'running');
 
   return (
     <main className="panel space-y-4">
@@ -76,16 +82,19 @@ export default async function GameFactoryBuildsPage({ params }: { params: Promis
             </tr>
           </thead>
           <tbody>
-            {(builds ?? []).map((build, index) => (
-              <tr key={build.id} className="border-t border-white/10">
-                <td className="px-3 py-2">#{(builds?.length ?? 0) - index}</td>
-                <td className="px-3 py-2"><span className={`rounded-full px-3 py-1 text-xs ${badge(build.status ?? '')}`}>{build.status === 'succeeded' ? 'successful' : build.status}</span></td>
-                <td className="px-3 py-2">{build.started_at ? new Date(build.started_at).toLocaleString('tr-TR') : '-'}</td>
-                <td className="px-3 py-2">{durationLabel(build.started_at, build.finished_at)}</td>
-                <td className="px-3 py-2">{build.artifact_url ? <a href={build.artifact_url} className="underline" target="_blank" rel="noreferrer">İndir</a> : '-'}</td>
-                <td className="px-3 py-2">{(build.logs_url ?? build.build_logs) ? <a href={build.logs_url ?? build.build_logs} className="underline" target="_blank" rel="noreferrer">Logs</a> : '-'}</td>
-              </tr>
-            ))}
+            {(builds ?? []).map((build, index) => {
+              const unityBuildNumber = (build.metadata as { unityBuildNumber?: number } | null)?.unityBuildNumber;
+              return (
+                <tr key={build.id} className="border-t border-white/10">
+                  <td className="px-3 py-2">{typeof unityBuildNumber === 'number' ? `#${unityBuildNumber}` : `#${(builds?.length ?? 0) - index}`}</td>
+                  <td className="px-3 py-2"><span className={`rounded-full px-3 py-1 text-xs ${badge(build.status ?? '')}`}>{labelStatus(build.status)}</span></td>
+                  <td className="px-3 py-2">{build.started_at ? new Date(build.started_at).toLocaleString('tr-TR') : '-'}</td>
+                  <td className="px-3 py-2">{durationLabel(build.started_at, build.finished_at)}</td>
+                  <td className="px-3 py-2">{build.artifact_url ? <a href={build.artifact_url} className="underline" target="_blank" rel="noreferrer">İndir</a> : '-'}</td>
+                  <td className="px-3 py-2">{(build.logs_url ?? build.build_logs) ? <a href={build.logs_url ?? build.build_logs} className="underline" target="_blank" rel="noreferrer">Logs</a> : '-'}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </section>
