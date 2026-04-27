@@ -1,6 +1,6 @@
 import { getApiAuthContext, json } from '@/app/api/game-factory/_auth';
 import { requireActiveGameAgentPackage } from '@/lib/game-agent-access';
-import { UnityApiError, triggerBuild } from '@/lib/unity-bridge';
+import { getBuilds, UnityApiError, triggerBuild } from '@/lib/unity-bridge';
 
 type BuildRequest = { projectId: string };
 
@@ -35,6 +35,7 @@ export async function POST(request: Request) {
   if (!buildTargetId) return json({ ok: false, error: 'UNITY_BUILD_TARGET_ID eksik.' }, 500);
 
   let unityResponse: Awaited<ReturnType<typeof triggerBuild>>;
+  let recoveredBuild: Awaited<ReturnType<typeof getBuilds>>[number] | null = null;
   try {
     unityResponse = await triggerBuild(buildTargetId);
   } catch (error) {
@@ -74,6 +75,35 @@ export async function POST(request: Request) {
     );
   }
 
+  const hasValidUnityBuildNumber =
+    typeof unityResponse.build === 'number' &&
+    Number.isInteger(unityResponse.build) &&
+    unityResponse.build > 0;
+
+  if (!hasValidUnityBuildNumber) {
+    try {
+      const latestBuilds = await getBuilds(buildTargetId, 10);
+      recoveredBuild = latestBuilds.find((build) => build.buildTargetId === buildTargetId) ?? latestBuilds[0] ?? null;
+    } catch (error) {
+      console.warn('[game-factory/build] Unable to recover unityBuildNumber from getBuilds', {
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  const unityBuildNumber =
+    hasValidUnityBuildNumber
+      ? unityResponse.build
+      : typeof recoveredBuild?.build === 'number' && recoveredBuild.build > 0
+        ? recoveredBuild.build
+        : null;
+
+  const effectiveUnityStatus = recoveredBuild?.status ?? unityResponse.status;
+  const initialJobStatus =
+    effectiveUnityStatus === 'sentToBuilder' || effectiveUnityStatus === 'started' || effectiveUnityStatus === 'restarted'
+      ? 'running'
+      : 'queued';
+  const effectiveDownloadUrl = recoveredBuild?.links?.download_primary?.href ?? unityResponse.links?.download_primary?.href ?? null;
   const queuedAt = new Date().toISOString();
   const { data: insertedJob, error: jobError } = await context.supabase
     .from('unity_build_jobs')
@@ -83,12 +113,15 @@ export async function POST(request: Request) {
       requested_by: context.userId,
       build_target: 'android',
       build_type: 'release',
-      status: 'queued',
+      status: initialJobStatus,
       queued_at: queuedAt,
       metadata: {
-        unityBuildNumber: unityResponse.build,
+        ...(unityBuildNumber ? { unityBuildNumber } : {}),
         unityBuildTargetId: buildTargetId,
-        unityReturnedBuildTargetId: unityResponse.buildTargetId
+        unityReturnedBuildTargetId: unityResponse.buildTargetId,
+        unityStatus: effectiveUnityStatus,
+        unityDownloadUrl: effectiveDownloadUrl,
+        needsUnityBuildNumberRecovery: !unityBuildNumber
       }
     })
     .select('id')
@@ -100,5 +133,5 @@ export async function POST(request: Request) {
 
   await context.supabase.from('unity_game_projects').update({ status: 'building' }).eq('id', projectId);
 
-  return json({ ok: true, jobId: insertedJob.id, unityBuildNumber: unityResponse.build });
+  return json({ ok: true, jobId: insertedJob.id, unityBuildNumber: unityBuildNumber ?? null });
 }

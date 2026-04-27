@@ -13,7 +13,10 @@ export function RefreshBuildsButton({ projectId }: { projectId: string }) {
     try {
       const supabase = createSupabaseBrowserClient();
       const token = (await supabase?.auth.getSession())?.data.session?.access_token;
-      if (!token) return;
+      if (!token) {
+        alert('Oturum bulunamadı.');
+        return;
+      }
 
       const response = await fetch('/api/game-factory/builds/refresh', {
         method: 'POST',
@@ -24,12 +27,17 @@ export function RefreshBuildsButton({ projectId }: { projectId: string }) {
         body: JSON.stringify({ projectId })
       });
 
-      const payload = (await response.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      const payload = (await response.json().catch(() => null)) as { ok?: boolean; error?: string; errors?: string[] } | null;
       if (!response.ok || payload?.ok === false) {
-        alert(payload?.error ?? 'Build yenileme sırasında bir hata oluştu.');
+        alert(payload?.errors?.[0] ?? payload?.error ?? 'Build yenileme sırasında bir hata oluştu.');
+        return;
       }
-    } finally {
+
+      if (payload?.errors?.length) {
+        alert(payload.errors[0]);
+      }
       router.refresh();
+    } finally {
       setLoading(false);
     }
   }
