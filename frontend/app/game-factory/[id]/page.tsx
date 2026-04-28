@@ -14,12 +14,14 @@ type BuildRow = {
   created_at: string | null;
   updated_at: string | null;
   artifact_url: string | null;
+  logs_url?: string | null;
   metadata: Record<string, unknown> | null;
 };
 
 function normalizeBuildStatus(status: string | null): string {
   if (status === 'started') return 'running';
   if (status === 'success') return 'succeeded';
+  if (status === 'completed') return 'succeeded';
   if (status === 'failure') return 'failed';
   if (status === 'canceled') return 'cancelled';
   return status ?? '-';
@@ -69,6 +71,19 @@ function displayBuildNumber(build: BuildRow, fallback: number): string {
   return `local #${fallback}`;
 }
 
+function renderBuildAction(status: string, downloadUrl: string | null, logsUrl: string | null) {
+  if (status === 'queued') return 'Bekliyor';
+  if (status === 'building' || status === 'claimed' || status === 'running' || status === 'started') return 'Build devam ediyor';
+  if (status === 'failed') {
+    if (logsUrl) return <a href={logsUrl} target="_blank" rel="noreferrer" className="underline">Logs / Hata</a>;
+    return 'Hata';
+  }
+  if (status === 'succeeded' && downloadUrl) {
+    return <a href={downloadUrl} target="_blank" rel="noreferrer" className="underline">İndir</a>;
+  }
+  return '—';
+}
+
 export default async function GameFactoryProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createSupabaseReadonlyServerClient();
@@ -87,7 +102,7 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
       .maybeSingle(),
     supabase
       .from('unity_build_jobs')
-      .select('id, status, created_at, updated_at, artifact_url, metadata')
+      .select('id, status, created_at, updated_at, artifact_url, logs_url, metadata')
       .eq('unity_game_project_id', id)
       .order('created_at', { ascending: false })
       .limit(10)
@@ -100,6 +115,26 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
 
   const dedupedBuilds = pickLatestBuildPerNumber((builds ?? []) as BuildRow[]);
   const latestBuild = dedupedBuilds[0] ?? null;
+  const buildIds = dedupedBuilds.map((build) => build.id);
+  const artifactMap = new Map<string, string>();
+
+  if (buildIds.length > 0) {
+    const { data: artifacts } = await supabase
+      .from('game_artifacts')
+      .select('unity_build_job_id, file_url, created_at')
+      .in('unity_build_job_id', buildIds)
+      .order('created_at', { ascending: false });
+
+    for (const artifact of artifacts ?? []) {
+      if (!artifact.unity_build_job_id || !artifact.file_url) continue;
+      if (!artifactMap.has(artifact.unity_build_job_id)) {
+        artifactMap.set(artifact.unity_build_job_id, artifact.file_url);
+      }
+    }
+  }
+
+  const latestBuildStatus = latestBuild ? normalizeBuildStatus(latestBuild.status) : null;
+  const latestDownloadUrl = latestBuild ? (latestBuild.artifact_url ?? artifactMap.get(latestBuild.id) ?? null) : null;
 
   return (
     <main className="panel space-y-4">
@@ -123,13 +158,10 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
 
       <section className="rounded-xl border border-white/10 bg-black/20 p-4 text-sm">
         <h2 className="mb-2 text-lg font-semibold">Son Build</h2>
-        <p><b>Durum:</b> {latestBuild ? <span className={`rounded-full px-3 py-1 text-xs ${statusBadge(normalizeBuildStatus(latestBuild.status))}`}>{normalizeBuildStatus(latestBuild.status)}</span> : 'Henüz build yok'}</p>
+        <p><b>Durum:</b> {latestBuild ? <span className={`rounded-full px-3 py-1 text-xs ${statusBadge(latestBuildStatus ?? '-')}`}>{latestBuildStatus}</span> : 'Henüz build yok'}</p>
         <p><b>Tarih:</b> {latestBuild?.created_at ? new Date(latestBuild.created_at).toLocaleString('tr-TR') : '—'}</p>
-        {latestBuild?.artifact_url ? (
-          <a href={latestBuild.artifact_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex rounded-lg border border-white/20 px-3 py-2">
-            İndir
-          </a>
-        ) : null}
+        {latestBuildStatus ? <p><b>Aksiyon:</b> {renderBuildAction(latestBuildStatus, latestDownloadUrl, latestBuild?.logs_url ?? null)}</p> : null}
+        {latestBuild?.logs_url ? <p className="mt-2"><a href={latestBuild.logs_url} target="_blank" rel="noreferrer" className="underline">Logs</a></p> : null}
       </section>
 
       <section className="overflow-x-auto rounded-xl border border-white/10 bg-black/20 p-4">
@@ -141,17 +173,23 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
               <th className="px-3 py-2">Durum</th>
               <th className="px-3 py-2">Tarih</th>
               <th className="px-3 py-2">İndir</th>
+              <th className="px-3 py-2">Logs</th>
             </tr>
           </thead>
           <tbody>
-            {dedupedBuilds.map((build, index) => (
-              <tr key={build.id} className="border-t border-white/10">
-                <td className="px-3 py-2">{displayBuildNumber(build, dedupedBuilds.length - index)}</td>
-                <td className="px-3 py-2"><span className={`rounded-full px-3 py-1 text-xs ${statusBadge(normalizeBuildStatus(build.status))}`}>{normalizeBuildStatus(build.status)}</span></td>
-                <td className="px-3 py-2">{build.created_at ? new Date(build.created_at).toLocaleString('tr-TR') : '—'}</td>
-                <td className="px-3 py-2">{build.artifact_url ? <a href={build.artifact_url} target="_blank" rel="noreferrer" className="underline">İndir</a> : '—'}</td>
-              </tr>
-            ))}
+            {dedupedBuilds.map((build, index) => {
+              const normalizedStatus = normalizeBuildStatus(build.status);
+              const downloadUrl = build.artifact_url ?? artifactMap.get(build.id) ?? null;
+              return (
+                <tr key={build.id} className="border-t border-white/10">
+                  <td className="px-3 py-2">{displayBuildNumber(build, dedupedBuilds.length - index)}</td>
+                  <td className="px-3 py-2"><span className={`rounded-full px-3 py-1 text-xs ${statusBadge(normalizedStatus)}`}>{normalizedStatus}</span></td>
+                  <td className="px-3 py-2">{build.created_at ? new Date(build.created_at).toLocaleString('tr-TR') : '—'}</td>
+                  <td className="px-3 py-2">{renderBuildAction(normalizedStatus, downloadUrl, build.logs_url ?? null)}</td>
+                  <td className="px-3 py-2">{build.logs_url ? <a href={build.logs_url} target="_blank" rel="noreferrer" className="underline">Logs</a> : '—'}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </section>
