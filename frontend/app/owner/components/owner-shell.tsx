@@ -7,16 +7,7 @@ type OwnerShellProps = {
 };
 
 export const OWNER_LINKS = [
-  { href: '/owner', label: 'Genel Bakış' },
-  { href: '/owner/users', label: 'Kullanıcılar' },
-  { href: '/owner/payments', label: 'Ödemeler' },
-  { href: '/owner/subscriptions', label: 'Abonelikler' },
-  { href: '/owner/game-factory', label: 'Game Factory' },
-  { href: '/owner/build-jobs', label: 'Build İşleri' },
-  { href: '/owner/release-jobs', label: 'Yayın İşleri' },
-  { href: '/owner/integrations', label: 'Sistem Entegrasyonları' },
-  { href: '/owner/settings', label: 'Ayarlar' },
-  { href: '/owner/logs', label: 'Loglar / Hata Kayıtları' }
+  { href: '/owner', label: 'Owner Panel' }
 ] as const;
 
 export function OwnerShell({ ownerLabel, children }: OwnerShellProps) {
