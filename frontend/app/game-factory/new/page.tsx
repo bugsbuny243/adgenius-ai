@@ -178,10 +178,23 @@ export default function NewGameFactoryPage() {
           }
         })
       });
-      const data = (await response.json()) as { ok: boolean; error?: string };
+      const data = (await response.json()) as {
+        ok: boolean;
+        error?: string;
+        unity_game_project?: {
+          id?: string;
+          title?: string | null;
+          package_name?: string | null;
+        };
+      };
       if (!response.ok || !data.ok) {
         throw new Error(data.error ?? 'Onay işlemi başarısız.');
       }
+      const approvedProjectId = data.unity_game_project?.id?.trim();
+      if (!approvedProjectId) {
+        throw new Error('Proje bulunamadı.');
+      }
+      setProjectId(approvedProjectId);
       setStep(3);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Bir hata oluştu.');

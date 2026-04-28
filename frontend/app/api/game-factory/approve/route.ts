@@ -81,7 +81,7 @@ export async function POST(request: Request) {
     ? project.game_brief as Record<string, unknown>
     : {};
 
-  const { error } = await context.supabase
+  const { data: approvedProject, error } = await context.supabase
     .from('unity_game_projects')
     .update({
       approval_status: 'approved',
@@ -96,9 +96,19 @@ export async function POST(request: Request) {
     })
     .eq('id', projectId)
     .eq('workspace_id', context.workspaceId)
-    .eq('user_id', context.userId);
+    .eq('user_id', context.userId)
+    .select('id, app_name, package_name')
+    .maybeSingle();
 
   if (error) return json({ ok: false, error: error.message }, 400);
+  if (!approvedProject?.id) return json({ ok: false, error: 'Proje bulunamadı.' }, 404);
 
-  return json({ ok: true });
+  return json({
+    ok: true,
+    unity_game_project: {
+      id: approvedProject.id,
+      title: approvedProject.app_name,
+      package_name: approvedProject.package_name
+    }
+  });
 }
