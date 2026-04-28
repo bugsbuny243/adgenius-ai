@@ -24,6 +24,7 @@ export type WriteBuildConfigResult = {
   branch: string;
   commitSha: string | null;
   path: string;
+  verified: boolean;
 };
 
 class GitHubApiError extends Error {
@@ -83,6 +84,20 @@ async function getExistingFileSha(owner: string, repo: string, branch: string): 
   }
 }
 
+async function verifyBuildConfigExists(owner: string, repo: string, branch: string): Promise<boolean> {
+  try {
+    await githubRequest<{ sha?: string }>(
+      `/repos/${owner}/${repo}/contents/${BUILD_CONFIG_PATH_ENCODED}?ref=${encodeURIComponent(branch)}`
+    );
+    return true;
+  } catch (error) {
+    if (error instanceof GitHubApiError && error.status === 404) {
+      return false;
+    }
+    throw error;
+  }
+}
+
 /**
  * Unity template repository must include an Editor pre-build script that reads
  * Assets/Koschei/Generated/koschei-build-config.json and applies:
@@ -108,9 +123,15 @@ export async function writeUnityBuildConfigToRepo(input: WriteBuildConfigInput):
     }
   );
 
+  const verified = await verifyBuildConfigExists(input.owner, input.repo, input.branch);
+  if (!verified) {
+    throw new Error('Unity build config yazılamadı; build başlatılmadı.');
+  }
+
   return {
     branch: input.branch,
     commitSha: result.commit?.sha ?? null,
-    path: BUILD_CONFIG_PATH
+    path: BUILD_CONFIG_PATH,
+    verified
   };
 }

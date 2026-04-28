@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   const packageName = String(project.package_name ?? '').trim();
   const versionCodeRaw = Number(project.current_version_code ?? 0);
   const versionCode = Number.isInteger(versionCodeRaw) && versionCodeRaw > 0 ? versionCodeRaw : 1;
-  const versionName = String(project.current_version_name ?? '').trim() || '1.0.0';
+  const versionName = `1.0.${versionCode}`;
   const unityRepoOwner = String(process.env.GITHUB_UNITY_REPO_OWNER ?? '').trim() || String(project.unity_repo_owner ?? '').trim();
   const unityRepoName = String(process.env.GITHUB_UNITY_REPO_NAME ?? '').trim() || String(project.unity_repo_name ?? '').trim();
   const unityBranch = String(process.env.GITHUB_UNITY_REPO_BRANCH ?? '').trim() || String(project.unity_branch ?? '').trim() || 'main';
@@ -48,6 +48,9 @@ export async function POST(request: Request) {
   if (!packageName) return json({ ok: false, error: 'package_name eksik.' }, 400);
   if (!unityRepoOwner || !unityRepoName) {
     return json({ ok: false, error: 'Unity GitHub repo bilgileri eksik.' }, 400);
+  }
+  if (unityRepoOwner !== 'bugsbuny243' || unityRepoName !== 'koschei-unity-templates') {
+    return json({ ok: false, error: 'Unity repo yanlış yapılandırılmış.' }, 400);
   }
 
   const brief = (project.game_brief ?? {}) as {
@@ -121,9 +124,11 @@ export async function POST(request: Request) {
     });
 
     configWrite = writtenConfig;
-    console.info('Koschei Unity build config written', {
+    console.info('Koschei Unity build config written and verified', {
       package_name: packageName,
-      build_job_id: insertedJob.id
+      build_job_id: insertedJob.id,
+      branch: writtenConfig.branch,
+      commit_sha: writtenConfig.commitSha
     });
 
     await serviceRole
@@ -139,7 +144,7 @@ export async function POST(request: Request) {
       })
       .eq('id', insertedJob.id);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unity build config yazma hatası.';
+    const message = error instanceof Error ? error.message : 'Unity build config yazılamadı; build başlatılmadı.';
     console.error('Koschei Unity build config write failed', {
       package_name: packageName,
       build_job_id: insertedJob.id,
@@ -150,7 +155,7 @@ export async function POST(request: Request) {
       .from('unity_build_jobs')
       .update({
         status: 'failed',
-        error_message: `Unity build config yazılamadı: ${message}`,
+        error_message: 'Unity build config yazılamadı; build başlatılmadı.',
         metadata: {
           buildConfigWritten: false
         }
@@ -164,7 +169,7 @@ export async function POST(request: Request) {
       .eq('workspace_id', context.workspaceId)
       .eq('user_id', context.userId);
 
-    return json({ ok: false, error: `Unity build config yazılamadı: ${message}` }, 500);
+    return json({ ok: false, error: 'Unity build config yazılamadı; build başlatılmadı.' }, 500);
   }
 
   let unityResponse: Awaited<ReturnType<typeof triggerBuild>>;
