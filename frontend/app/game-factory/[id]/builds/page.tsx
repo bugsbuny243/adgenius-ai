@@ -11,6 +11,7 @@ export const dynamic = 'force-dynamic';
 function normalizeBuildStatus(status: string | null): string {
   if (status === 'started') return 'running';
   if (status === 'success') return 'succeeded';
+  if (status === 'completed') return 'succeeded';
   if (status === 'failure') return 'failed';
   return status ?? '-';
 }
@@ -31,6 +32,19 @@ function durationLabel(start: string | null, end: string | null) {
   const minutes = Math.floor(seconds / 60);
   const rem = seconds % 60;
   return `${minutes}dk ${rem}sn`;
+}
+
+function renderDownloadCell(status: string, downloadUrl: string | null, logsUrl: string | null) {
+  if (status === 'queued') return 'Bekliyor';
+  if (status === 'building' || status === 'claimed' || status === 'running' || status === 'started') return 'Build devam ediyor';
+  if (status === 'failed') {
+    if (logsUrl) return <a href={logsUrl} className="underline" target="_blank" rel="noreferrer">Logs / Hata</a>;
+    return 'Hata';
+  }
+  if (status === 'succeeded' && downloadUrl) {
+    return <a href={downloadUrl} className="underline" target="_blank" rel="noreferrer">İndir</a>;
+  }
+  return '-';
 }
 
 export default async function GameFactoryBuildsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -71,7 +85,10 @@ export default async function GameFactoryBuildsPage({ params }: { params: Promis
     }
   }
 
-  const activeJob = (builds ?? []).find((job) => job.status === 'queued' || job.status === 'claimed' || job.status === 'running');
+  const activeJob = (builds ?? []).find((job) => {
+    const normalized = normalizeBuildStatus(job.status).toLowerCase();
+    return normalized === 'queued' || normalized === 'building' || normalized === 'claimed' || normalized === 'running' || normalized === 'started';
+  });
 
   return (
     <main className="panel space-y-4">
@@ -112,7 +129,7 @@ export default async function GameFactoryBuildsPage({ params }: { params: Promis
                   <td className="px-3 py-2"><BuildRowStatusAutoRefresh buildId={build.id} projectId={id} initialStatus={normalizedStatus} /></td>
                   <td className="px-3 py-2">{build.started_at ? new Date(build.started_at).toLocaleString('tr-TR') : '-'}</td>
                   <td className="px-3 py-2">{durationLabel(build.started_at, build.finished_at)}</td>
-                  <td className="px-3 py-2">{downloadUrl ? <a href={downloadUrl} className="underline" target="_blank" rel="noreferrer">İndir</a> : '-'}</td>
+                  <td className="px-3 py-2">{renderDownloadCell(normalizedStatus, downloadUrl, build.logs_url ?? null)}</td>
                   <td className="px-3 py-2">{build.logs_url ? <a href={build.logs_url} className="underline" target="_blank" rel="noreferrer">Logs</a> : '-'}</td>
                 </tr>
               );
