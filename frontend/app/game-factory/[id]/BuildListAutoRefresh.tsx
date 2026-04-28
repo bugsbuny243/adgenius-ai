@@ -15,17 +15,17 @@ export function BuildListAutoRefresh({ builds }: Props) {
   useEffect(() => {
     const hasActive = builds.some((b) => {
       const status = (b.status ?? '').toLowerCase();
-      return status === 'queued' || status === 'building' || status === 'claimed' || status === 'running' || status === 'started';
+      return status === 'queued' || status === 'started';
     });
+
     if (!hasActive) return;
 
     const interval = setInterval(async () => {
       const res = await fetch('/api/game-factory/builds/refresh', { method: 'POST' });
-      const data = await res.json();
-      if (data.results?.some((r: { newStatus?: string }) => r.newStatus === 'succeeded' || r.newStatus === 'success')) {
+      if (res.ok) {
         window.location.reload();
       }
-    }, 10000);
+    }, 15000);
 
     return () => clearInterval(interval);
   }, [builds]);

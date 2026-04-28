@@ -1,39 +1,17 @@
 import { getApiAuthContext, json } from '@/app/api/game-factory/_auth';
+import { getBuildStatus } from '@/lib/server/unity-cloud-build';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase-service-role';
-
-const UNITY_BASE_URL = 'https://build-api.cloud.unity3d.com/api/v1';
 
 type JsonObject = Record<string, unknown>;
 
 type UnityBuildApiResponse = {
   status?: string;
-  build?: number;
-  buildNumber?: number;
   links?: {
     download_primary?: { href?: string };
-    download?: { href?: string };
-    artifacts?: { href?: string };
-    artifact?: { href?: string };
     log?: { href?: string };
+    artifacts?: Array<{ files?: Array<{ href?: string }> }>;
   };
-  artifacts?: Array<{
-    url?: string;
-    href?: string;
-    download_url?: string;
-    files?: Array<{ url?: string; href?: string }>;
-  }>;
-  download_url?: string;
-  artifact_url?: string;
 };
-
-function getUnityAuthHeader(): string {
-  const apiKey = process.env.UNITY_BUILD_API_KEY?.trim();
-  if (!apiKey) {
-    throw new Error('UNITY_BUILD_API_KEY eksik.');
-  }
-
-  return `Basic ${Buffer.from(`${apiKey}:`, 'utf8').toString('base64')}`;
-}
 
 function normalizeJobStatus(status: string): string {
   const value = status.toLowerCase();
@@ -49,82 +27,22 @@ function pickString(value: unknown): string | null {
 }
 
 function extractArtifactUrl(payload: UnityBuildApiResponse): string | null {
-  return (
-    pickString(payload.links?.download_primary?.href) ??
-    pickString(payload.links?.download?.href) ??
-    pickString(payload.links?.artifacts?.href) ??
-    pickString(payload.links?.artifact?.href) ??
-    pickString(payload.artifacts?.[0]?.url) ??
-    pickString(payload.artifacts?.[0]?.href) ??
-    pickString(payload.artifacts?.[0]?.download_url) ??
-    pickString(payload.artifacts?.[0]?.files?.[0]?.url) ??
-    pickString(payload.artifacts?.[0]?.files?.[0]?.href) ??
-    pickString(payload.download_url) ??
-    pickString(payload.artifact_url) ??
-    null
-  );
+  return pickString(payload.links?.download_primary?.href) ?? pickString(payload.links?.artifacts?.[0]?.files?.[0]?.href) ?? null;
 }
 
 function extractLogsUrl(payload: UnityBuildApiResponse): string | null {
   return pickString(payload.links?.log?.href);
 }
 
-async function unityRequest(path: string): Promise<unknown> {
-  const authHeader = getUnityAuthHeader();
-  const response = await fetch(`${UNITY_BASE_URL}${path}`, {
-    headers: {
-      Authorization: authHeader,
-      'Content-Type': 'application/json'
-    },
-    cache: 'no-store'
-  });
-
-  const contentType = response.headers.get('content-type') ?? '';
-  const body = contentType.toLowerCase().includes('application/json') ? await response.json() : await response.text();
-
-  if (!response.ok) {
-    const message =
-      typeof body === 'string'
-        ? body.slice(0, 300)
-        : typeof (body as { message?: unknown })?.message === 'string'
-          ? String((body as { message?: unknown }).message)
-          : `Unity API hatası: ${response.status}`;
-    throw new Error(message);
-  }
-
-  return body;
-}
-
-async function getUnityBuildData(orgId: string, projectId: string, buildTargetId: string, buildNumber: number) {
-  const detailsPath = `/orgs/${orgId}/projects/${projectId}/buildtargets/${buildTargetId}/builds/${buildNumber}`;
-  const detailsRaw = (await unityRequest(detailsPath)) as UnityBuildApiResponse;
-
-  let artifactUrl = extractArtifactUrl(detailsRaw);
-  let logsUrl = extractLogsUrl(detailsRaw);
-  let unityResponseKeys = Object.keys(detailsRaw ?? {});
-
-  if (!artifactUrl) {
-    const historyPath = `/orgs/${orgId}/projects/${projectId}/buildtargets/${buildTargetId}/builds?per_page=25`;
-    const historyRaw = await unityRequest(historyPath);
-    const historyList = Array.isArray(historyRaw) ? (historyRaw as UnityBuildApiResponse[]) : [];
-    const matched = historyList.find((item) => {
-      const candidate = Number(item.build ?? item.buildNumber ?? 0);
-      return Number.isInteger(candidate) && candidate === buildNumber;
-    });
-
-    if (matched) {
-      artifactUrl = extractArtifactUrl(matched) ?? artifactUrl;
-      logsUrl = extractLogsUrl(matched) ?? logsUrl;
-      unityResponseKeys = Array.from(new Set([...unityResponseKeys, ...Object.keys(matched ?? {})]));
-    }
-  }
+async function getUnityBuildData(buildTargetId: string, buildNumber: number) {
+  const detailsRaw = (await getBuildStatus(buildTargetId, buildNumber)) as UnityBuildApiResponse & { build?: number | null };
 
   return {
     unityStatus: pickString(detailsRaw.status) ?? 'unknown',
-    unityBuildNumber: Number(detailsRaw.build ?? detailsRaw.buildNumber ?? buildNumber) || buildNumber,
-    artifactUrl,
-    logsUrl,
-    unityResponseKeys
+    unityBuildNumber: Number(detailsRaw.build ?? buildNumber) || buildNumber,
+    artifactUrl: extractArtifactUrl(detailsRaw),
+    logsUrl: extractLogsUrl(detailsRaw),
+    unityResponseKeys: Object.keys(detailsRaw ?? {})
   };
 }
 
@@ -148,12 +66,6 @@ export async function POST(request: Request) {
   if (jobsError) return json({ ok: false, error: jobsError.message }, 400);
   if (!jobs?.length) return json({ ok: true, message: 'Aktif build yok', results: [] });
 
-  const orgId = process.env.UNITY_ORG_ID?.trim();
-  const unityProjectId = process.env.UNITY_PROJECT_ID?.trim();
-  if (!orgId || !unityProjectId) {
-    return json({ ok: false, error: 'UNITY_ORG_ID veya UNITY_PROJECT_ID eksik.' }, 500);
-  }
-
   const results: Array<Record<string, unknown>> = [];
   const errors: string[] = [];
 
@@ -168,7 +80,7 @@ export async function POST(request: Request) {
     }
 
     try {
-      const unity = await getUnityBuildData(orgId, unityProjectId, buildTargetId, buildNumber);
+      const unity = await getUnityBuildData(buildTargetId, buildNumber);
       const mappedStatus = normalizeJobStatus(unity.unityStatus);
       const terminal = ['succeeded', 'failed', 'cancelled'].includes(mappedStatus);
       const nowIso = new Date().toISOString();
