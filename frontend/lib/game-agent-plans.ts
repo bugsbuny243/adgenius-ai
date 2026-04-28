@@ -31,7 +31,11 @@ export const GAME_AGENT_PLANS: GameAgentPlan[] = [
     ],
     excludes: [
       'Google Play yayınının garanti edilmesi',
-      'Karmaşık multiplayer/MMO oyunlar',
+      'Multiplayer server (Yakında)',
+      'Realtime gameplay server (Yakında)',
+      'MMO/live-service infrastructure (Yakında)',
+      'Matchmaking/lobby/chat server (Yakında)',
+      'Dedicated game server hosting (Yakında)',
       'İleri seviye özel sanat üretimi',
       'Sınırsız revizyon',
       'Gelir garantisi',
@@ -61,8 +65,11 @@ export const GAME_AGENT_PLANS: GameAgentPlan[] = [
     ],
     excludes: [
       'Google Play onay garantisi',
-      'İleri seviye online multiplayer',
-      'Özel backend sunucuları',
+      'Multiplayer server (Yakında)',
+      'Realtime gameplay server (Yakında)',
+      'MMO/live-service infrastructure (Yakında)',
+      'Matchmaking/lobby/chat server (Yakında)',
+      'Dedicated game server hosting (Yakında)',
       'Lisanslı üçüncü taraf asset maliyetleri',
       'Sınırsız revizyon',
       'Gelir garantisi'
@@ -93,9 +100,12 @@ export const GAME_AGENT_PLANS: GameAgentPlan[] = [
     excludes: [
       'Google Play onay garantisi',
       'Gelir garantisi',
-      'PUBG/DarkOrbit seviyesinde MMO üretimi',
+      'Multiplayer server (Yakında)',
+      'Realtime gameplay server (Yakında)',
+      'MMO/live-service infrastructure (Yakında)',
+      'Matchmaking/lobby/chat server (Yakında)',
+      'Dedicated game server hosting (Yakında)',
       'Ayrı anlaşma olmadan özel 3D asset',
-      'Ayrı anlaşma olmadan uzun dönem live ops/backend',
       'Kullanıcı adına hukuki/hesap sorumluluğu'
     ],
     warnings: [
@@ -114,6 +124,7 @@ export const GAME_AGENT_PUBLIC_NOTICES = [
   'Ödeme sonrası paket erişimi owner tarafından manuel onaylanır.',
   'Google Play yayın onayı Google’ın inceleme sürecine bağlıdır.',
   'Koschei oyun üretim ve build hazırlık sürecini otomatikleştirir; mağaza kabulü veya gelir garantisi vermez.',
-  'Karmaşık online/multiplayer oyunlar bu paketlere dahil değildir.',
+  'Multiplayer/server/MMO altyapıları Yakında etiketli ayrı profesyonel paket olarak sunulacaktır.',
+  'Koschei şu anda Android oyun ve Android mobil uygulama üretimi, APK/AAB build ve Google Play yayın akışına odaklanır. Multiplayer ve sunucu altyapısı yakında ayrı profesyonel paket olarak sunulacaktır.',
   'Her paket Game Agent içindir; diğer ajanlar ileride farklı fiyatlandırılacaktır.'
 ] as const;

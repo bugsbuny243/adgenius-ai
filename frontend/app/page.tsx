@@ -7,12 +7,20 @@ const features = [
     description: 'Oyun fikrine göre otomatik brief oluşturur.'
   },
   {
-    title: '🔨 Unity Build',
-    description: 'GitHub’daki Unity projesini otomatik build eder.'
+    title: '📱 Android App/Game Factory',
+    description: 'Android oyun ve mobil uygulama üretim akışına odaklanır.'
+  },
+  {
+    title: '📦 APK/AAB Build',
+    description: 'Unity proje çıktısını APK/AAB olarak hazırlar.'
   },
   {
     title: '🚀 Play Store Yayın',
     description: 'Build’i doğrudan Google Play’e gönderir.'
+  },
+  {
+    title: '🌐 Multiplayer/Sunucu Altyapısı',
+    description: 'Multiplayer server, realtime gameplay server ve MMO/live-service altyapısı yakında.'
   }
 ] as const;
 
@@ -37,7 +45,7 @@ export default function HomePage() {
 
       <section className="space-y-4">
         <h2 className="text-2xl font-semibold">Özellikler</h2>
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {features.map((item) => (
             <article key={item.title} className="rounded-2xl border border-white/10 bg-black/20 p-5">
               <h3 className="text-lg font-semibold">{item.title}</h3>
@@ -45,6 +53,12 @@ export default function HomePage() {
             </article>
           ))}
         </div>
+      </section>
+
+      <section className="rounded-2xl border border-amber-300/30 bg-amber-500/10 p-6">
+        <p className="text-sm text-amber-50/90">
+          Koschei şu anda Android oyun ve Android mobil uygulama üretimi, APK/AAB build ve Google Play yayın akışına odaklanır. Multiplayer ve sunucu altyapısı yakında ayrı profesyonel paket olarak sunulacaktır.
+        </p>
       </section>
 
       <section className="rounded-2xl border border-white/10 bg-black/20 p-6 text-center">
