@@ -62,6 +62,7 @@ function resolveDownloadState(params: {
 function normalizeBuildStatus(status: string | null): string {
   if (status === 'started') return 'running';
   if (status === 'success') return 'succeeded';
+  if (status === 'completed') return 'succeeded';
   if (status === 'failure') return 'failed';
   return status ?? '-';
 }
@@ -74,6 +75,12 @@ function displayBuildNumber(unityBuildNumber: unknown, fallback: number): string
   return '-';
 }
 
+
+function pickExternalUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  return url.startsWith('http://') || url.startsWith('https://') ? url : null;
+}
+
 function durationLabel(start: string | null, end: string | null) {
   if (!start) return '-';
   const startTime = new Date(start).getTime();
@@ -82,6 +89,19 @@ function durationLabel(start: string | null, end: string | null) {
   const minutes = Math.floor(seconds / 60);
   const rem = seconds % 60;
   return `${minutes}dk ${rem}sn`;
+}
+
+function renderDownloadCell(status: string, downloadUrl: string | null, logsUrl: string | null) {
+  if (status === 'queued') return 'Bekliyor';
+  if (status === 'building' || status === 'claimed' || status === 'running' || status === 'started') return 'Build devam ediyor';
+  if (status === 'failed') {
+    if (logsUrl) return <a href={logsUrl} className="underline" target="_blank" rel="noreferrer">Logs / Hata</a>;
+    return 'Hata';
+  }
+  if (status === 'succeeded' && downloadUrl) {
+    return <a href={downloadUrl} className="underline" target="_blank" rel="noreferrer">İndir</a>;
+  }
+  return '-';
 }
 
 export default async function GameFactoryBuildsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -122,7 +142,10 @@ export default async function GameFactoryBuildsPage({ params }: { params: Promis
     }
   }
 
-  const activeJob = (builds ?? []).find((job) => job.status === 'queued' || job.status === 'claimed' || job.status === 'running');
+  const activeJob = (builds ?? []).find((job) => {
+    const normalized = normalizeBuildStatus(job.status).toLowerCase();
+    return normalized === 'queued' || normalized === 'building' || normalized === 'claimed' || normalized === 'running' || normalized === 'started';
+  });
 
   return (
     <main className="panel space-y-4">

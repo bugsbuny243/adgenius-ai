@@ -13,7 +13,10 @@ type Props = {
 
 export function BuildListAutoRefresh({ builds }: Props) {
   useEffect(() => {
-    const hasActive = builds.some((b) => b.status === 'queued' || b.status === 'started');
+    const hasActive = builds.some((b) => {
+      const status = (b.status ?? '').toLowerCase();
+      return status === 'queued' || status === 'building' || status === 'claimed' || status === 'running' || status === 'started';
+    });
     if (!hasActive) return;
 
     const interval = setInterval(async () => {
