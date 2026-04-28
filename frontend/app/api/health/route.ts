@@ -10,6 +10,6 @@ export async function GET() {
     app: 'up',
     environment: groups,
     supabase: groups.supabase,
-    backendApiConfigured: groups.backendApi
+    backendApiConfigured: false
   });
 }

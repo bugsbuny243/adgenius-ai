@@ -1,5 +1,5 @@
 const PUBLIC_ENV_KEYS = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'NEXT_PUBLIC_SITE_URL'] as const;
-const SERVER_ENV_KEYS = ['BACKEND_API_URL', 'SUPABASE_URL', 'SUPABASE_ANON_KEY', 'AI_PROVIDER', 'OPENAI_API_KEY', 'GROQ_API_KEY'] as const;
+const SERVER_ENV_KEYS = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'AI_PROVIDER', 'OPENAI_API_KEY', 'GROQ_API_KEY'] as const;
 
 type PublicEnvKey = (typeof PUBLIC_ENV_KEYS)[number];
 type ServerEnvKey = (typeof SERVER_ENV_KEYS)[number];
@@ -24,7 +24,6 @@ export function getPublicEnv(): Record<PublicEnvKey, string | null> {
 
 export function getServerEnv(): Record<ServerEnvKey, string | null> {
   return {
-    BACKEND_API_URL: read('BACKEND_API_URL'),
     SUPABASE_URL: read('SUPABASE_URL') ?? read('NEXT_PUBLIC_SUPABASE_URL'),
     SUPABASE_ANON_KEY: read('SUPABASE_ANON_KEY') ?? read('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
     AI_PROVIDER: read('AI_PROVIDER'),
@@ -37,7 +36,7 @@ export function getEnvDiagnostics() {
   const publicEnv = getPublicEnv();
   const serverEnv = getServerEnv();
   const missingPublicEnv = PUBLIC_ENV_KEYS.filter((key) => !publicEnv[key]);
-  const missingServerEnv = typeof window === 'undefined' ? SERVER_ENV_KEYS.filter((key) => key === 'BACKEND_API_URL' && !serverEnv[key]) : [];
+  const missingServerEnv: ServerEnvKey[] = [];
 
   return {
     publicEnv,
@@ -47,8 +46,7 @@ export function getEnvDiagnostics() {
     publicReady: missingPublicEnv.length === 0,
     serverReady: missingServerEnv.length === 0,
     groupReadiness: {
-      supabase: Boolean(publicEnv.NEXT_PUBLIC_SUPABASE_URL && publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY),
-      backendApi: Boolean(serverEnv.BACKEND_API_URL)
+      supabase: Boolean(publicEnv.NEXT_PUBLIC_SUPABASE_URL && publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY)
     }
   };
 }

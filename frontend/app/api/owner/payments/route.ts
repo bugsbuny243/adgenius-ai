@@ -1,24 +1,8 @@
-import { createSupabaseActionServerClient } from '@/lib/supabase-server';
-import { getBackendApiUrl } from '@/lib/backend-api';
+import { NextResponse } from 'next/server';
 
-export async function PATCH(request: Request) {
-  const supabase = await createSupabaseActionServerClient();
-  const {
-    data: { session }
-  } = await supabase.auth.getSession();
-
-  const response = await fetch(`${getBackendApiUrl()}/owner/payments`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': request.headers.get('content-type') ?? 'application/json',
-      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {})
-    },
-    body: await request.text(),
-    cache: 'no-store'
-  });
-
-  return new Response(await response.text(), {
-    status: response.status,
-    headers: { 'Content-Type': response.headers.get('content-type') ?? 'application/json' }
-  });
+export async function PATCH() {
+  return NextResponse.json(
+    { ok: false, error: 'Owner payments local route not implemented yet' },
+    { status: 501 }
+  );
 }

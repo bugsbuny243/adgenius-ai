@@ -1,5 +1,5 @@
 const requiredPublicEnv = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'NEXT_PUBLIC_SITE_URL'];
-const requiredServerEnv = ['BACKEND_API_URL'];
+const requiredServerEnv = [];
 
 function isPresent(value) {
   return typeof value === 'string' && value.trim().length > 0;
