@@ -6,7 +6,8 @@ import { redirect } from 'next/navigation';
 import { createSupabaseActionServerClient } from '@/lib/supabase-server';
 import { decryptCredentials, tryParseEncryptedCredentials } from '@/lib/credentials-encryption';
 import { GooglePlayPublisherProvider } from '@/lib/google-play-server';
-import { runReleasePreflight } from '@/lib/game-factory/release-preflight';
+import { evaluateGooglePlayReadiness } from '@/lib/google-play-readiness';
+import { getSupabaseServiceRoleClient } from '@/lib/supabase-service-role';
 
 async function requireAuthenticatedUser() {
   const supabase = await createSupabaseActionServerClient();
@@ -190,51 +191,27 @@ export async function publishReleaseAction(projectId: string) {
     throw new Error('AAB artifact bulunamadı.');
   }
 
-  if (!integration || integration.status !== 'connected') {
-    await upsertReleaseJob({
-      projectId,
-      status: 'blocked',
-      track: latestReleaseJob?.track ?? project.release_track ?? 'internal',
-      releaseNotes: latestReleaseJob?.release_notes ?? '',
-      errorMessage: 'Google Play bağlantısı doğrulanmış değil.',
-      blockerReasons: ['Google Play bağlantısı bulunamadı veya doğrulanmamış.']
-    });
-    throw new Error('Google Play bağlantısı doğrulanmış değil.');
-  }
-
-  if (!project.workspace_id) {
-    await upsertReleaseJob({
-      projectId,
-      status: 'blocked',
-      track: latestReleaseJob?.track ?? project.release_track ?? 'internal',
-      releaseNotes: latestReleaseJob?.release_notes ?? '',
-      errorMessage: 'Workspace bilgisi eksik.',
-      blockerReasons: ['Workspace bilgisi eksik.']
-    });
-    throw new Error('Workspace bilgisi eksik.');
-  }
-
-  const preflight = await runReleasePreflight({
-    supabase,
-    projectId,
+  const readiness = await evaluateGooglePlayReadiness({
     userId: user.id,
-    workspaceId: project.workspace_id
+    projectId,
+    packageName: project.package_name,
+    integrationId: integration?.id ?? project.google_play_integration_id
   });
 
-  if (!preflight.ok) {
+  if (!integration || integration.status !== 'connected' || readiness.status !== 'ready') {
     await upsertReleaseJob({
       projectId,
       status: 'blocked',
-      track: preflight.selectedTrack,
+      track: latestReleaseJob?.track ?? project.release_track ?? 'internal',
       releaseNotes: latestReleaseJob?.release_notes ?? '',
-      errorMessage: preflight.blockers.join(' | '),
-      blockerReasons: preflight.blockers
+      errorMessage: readiness.blockers[0] ?? 'Google Play bağlantısı doğrulanmış değil.',
+      blockerReasons: readiness.blockers
     });
-
-    throw new Error(preflight.blockers.join(' | '));
+    throw new Error(readiness.blockers[0] ?? 'Google Play bağlantısı doğrulanmış değil.');
   }
 
-  const { data: credentialsRow } = await supabase
+  const serviceRole = getSupabaseServiceRoleClient();
+  const { data: credentialsRow } = await serviceRole
     .from('integration_credentials')
     .select('encrypted_payload')
     .eq('user_integration_id', integration.id)
@@ -277,7 +254,7 @@ export async function publishReleaseAction(projectId: string) {
     track: preflight.selectedTrack,
     releaseNotes: latestReleaseJob?.release_notes ?? '',
     errorMessage: publishResult.errorMessage ?? null,
-    blockerReasons: publishResult.status === 'blocked_by_platform_requirement' && publishResult.errorMessage ? [publishResult.errorMessage] : []
+    blockerReasons: publishResult.status === 'published' ? [] : [publishResult.errorMessage ?? 'Google Play yayını başarısız oldu.']
   });
 
   if (publishResult.status !== 'published') {
