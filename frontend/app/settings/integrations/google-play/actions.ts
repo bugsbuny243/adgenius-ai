@@ -1,10 +1,10 @@
 'use server';
 
-import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createSupabaseActionServerClient } from '@/lib/supabase-server';
-import { getBackendApiUrl } from '@/lib/backend-api';
+import { encryptCredentials, serializeEncryptedCredentials } from '@/lib/credentials-encryption';
+import { validateGooglePlayServiceAccount } from '@/lib/google-play-server';
 
 function normalizeTrack(value: string): 'production' | 'closed' | 'internal' {
   if (value === 'closed' || value === 'internal') return value;
@@ -13,9 +13,9 @@ function normalizeTrack(value: string): 'production' | 'closed' | 'internal' {
 
 export async function saveGooglePlayIntegrationAction(formData: FormData) {
   const supabase = await createSupabaseActionServerClient();
-  const [{ data: sessionData }, headerStore] = await Promise.all([supabase.auth.getSession(), headers()]);
-  const token = sessionData.session?.access_token;
-  if (!token) redirect('/signin');
+  const { data: sessionData } = await supabase.auth.getSession();
+  const session = sessionData.session;
+  if (!session?.access_token || !session?.user?.id) redirect('/signin');
 
   const displayName = String(formData.get('display_name') ?? '').trim();
   const defaultTrack = normalizeTrack(String(formData.get('default_track') ?? 'production').trim());
@@ -27,28 +27,54 @@ export async function saveGooglePlayIntegrationAction(formData: FormData) {
     rawJson = (await jsonUpload.text()).trim();
   }
 
-  const host = headerStore.get('x-forwarded-host') ?? headerStore.get('host');
-  const protocol = headerStore.get('x-forwarded-proto') ?? 'https';
-  if (!host) throw new Error('Host bilgisi bulunamadı.');
+  if (!displayName || !rawJson) {
+    throw new Error('Bağlantı adı ve service account JSON zorunludur.');
+  }
 
-  const backendResponse = await fetch(`${getBackendApiUrl()}/integrations/google-play`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'X-Forwarded-Host': host,
-      'X-Forwarded-Proto': protocol
-    },
-    body: JSON.stringify({ displayName, defaultTrack, serviceAccountJson: rawJson }),
-    cache: 'no-store'
+  const parsed = JSON.parse(rawJson) as Record<string, unknown>;
+  const clientEmail = typeof parsed.client_email === 'string' ? parsed.client_email.trim() : '';
+  if (!clientEmail) {
+    throw new Error('client_email eksik.');
+  }
+
+  const validation = await validateGooglePlayServiceAccount(rawJson);
+  const encryptedPayload = serializeEncryptedCredentials(encryptCredentials(JSON.stringify(parsed)));
+
+  const { data: integration, error: integrationError } = await supabase
+    .from('user_integrations')
+    .insert({
+      user_id: session.user.id,
+      provider: 'google_play',
+      display_name: displayName,
+      metadata: { connected_via: 'nextjs', has_service_account: true, google_client_secret_present: Boolean(process.env.GOOGLE_CLIENT_SECRET?.trim()) },
+      provider_account_id: clientEmail,
+      service_account_email: clientEmail,
+      default_track: defaultTrack,
+      status: validation.status,
+      last_validated_at: new Date().toISOString(),
+      error_message: validation.errorMessage
+    })
+    .select('id')
+    .single();
+
+  if (integrationError || !integration) {
+    throw new Error(`Google Play bağlantısı kaydedilemedi: ${integrationError?.message ?? 'unknown_error'}`);
+  }
+
+  const { error: credentialsError } = await supabase.from('integration_credentials').insert({
+    user_integration_id: integration.id,
+    provider: 'google_play',
+    credential_type: 'service_account_json',
+    encrypted_payload: encryptedPayload,
+    status: 'active',
+    metadata: { display_name: displayName }
   });
 
-  const payload = (await backendResponse.json().catch(() => null)) as { ok?: boolean; error?: string; status?: string } | null;
-  if (!backendResponse.ok || !payload?.ok) {
-    throw new Error(payload?.error ?? 'Google Play bağlantısı kaydedilemedi.');
+  if (credentialsError) {
+    throw new Error(`Credential kaydı eklenemedi: ${credentialsError.message}`);
   }
 
   revalidatePath('/settings/integrations/google-play');
   revalidatePath('/game-factory');
-  redirect(`/settings/integrations/google-play?status=${payload.status ?? 'connected'}`);
+  redirect(`/settings/integrations/google-play?status=${validation.status}`);
 }
