@@ -21,6 +21,17 @@ export default function PricingPage() {
         </div>
       </section>
 
+      <section className="rounded-xl border border-white/15 bg-black/20 p-4">
+        <h2 className="text-lg font-semibold text-white">Yakında (Profesyonel Altyapı Paketi)</h2>
+        <ul className="mt-2 space-y-1 text-sm text-white/80">
+          <li>• Multiplayer server — <span className="font-semibold text-amber-300">Yakında</span></li>
+          <li>• Realtime gameplay server — <span className="font-semibold text-amber-300">Yakında</span></li>
+          <li>• MMO/live-service infrastructure — <span className="font-semibold text-amber-300">Yakında</span></li>
+          <li>• Matchmaking/lobby/chat server — <span className="font-semibold text-amber-300">Yakında</span></li>
+          <li>• Dedicated game server hosting — <span className="font-semibold text-amber-300">Yakında</span></li>
+        </ul>
+      </section>
+
       <section className="rounded-xl border border-amber-300/30 bg-amber-500/10 p-4">
         <h2 className="text-lg font-semibold text-amber-100">Önemli Bilgilendirme</h2>
         <ul className="mt-2 space-y-1 text-sm text-amber-50/90">

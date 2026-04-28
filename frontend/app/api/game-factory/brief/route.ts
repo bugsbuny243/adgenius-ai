@@ -88,6 +88,9 @@ type GameBrief = {
   required_budget_to_include_deferred_features: number;
   infrastructure_gap_analysis: string[];
   recommended_next_step: string;
+  infrastructure_required?: boolean;
+  feature_status?: 'coming_soon';
+  warning?: string;
 };
 
 type NormalizedAdvancedIntake = {
@@ -402,6 +405,18 @@ function inferTechnicalRequirements(prompt: string, monetizationNotes: string) {
   };
 }
 
+const COMING_SOON_WARNING = 'Bu özellikler yakında desteklenecek profesyonel altyapı paketine dahildir.';
+
+function inferComingSoonInfrastructureRequirement(prompt: string, intake: NormalizedAdvancedIntake): boolean {
+  const featureHaystack = intake.requiredFeatures.join(' ');
+  const haystack = `${prompt} ${featureHaystack} ${intake.projectType}`.toLowerCase();
+  return /(multiplayer|çok oyunculu|mmo|live[-\s]?service|realtime|real-time|matchmaking|lobby|chat server|dedicated server|game server|socket|sunucu|server)/i.test(haystack)
+    || intake.projectType === 'multiplayer'
+    || intake.projectType === 'mmo'
+    || intake.projectType === 'realtime'
+    || intake.projectType === 'server_required';
+}
+
 function getProjectComplexitySignal(prompt: string, intake: NormalizedAdvancedIntake) {
   const haystack = `${prompt} ${intake.projectType} ${intake.requiredFeatures.join(' ')}`.toLowerCase();
   const isAdvanced =
@@ -528,6 +543,7 @@ function normalizeBrief(raw: Record<string, unknown>, prompt: string, platform: 
   const packageName = isNonEmptyString(raw.packageName) ? raw.packageName.trim() : `com.koschei.generated.${finalSlug.replace(/-/g, '') || 'game'}`;
   const inferred = inferTechnicalRequirements(prompt, monetizationNotes);
   const budgetScope = generateBudgetScope(prompt, advancedIntake);
+  const infrastructureRequiredSoon = inferComingSoonInfrastructureRequirement(prompt, advancedIntake);
 
   return {
     title,
@@ -593,7 +609,14 @@ function normalizeBrief(raw: Record<string, unknown>, prompt: string, platform: 
     deferred_features: toStringArray(raw.deferred_features).length ? toStringArray(raw.deferred_features) : budgetScope.deferred_features,
     required_budget_to_include_deferred_features: clampInt(toNumber(raw.required_budget_to_include_deferred_features), budgetScope.required_budget_to_include_deferred_features),
     infrastructure_gap_analysis: toStringArray(raw.infrastructure_gap_analysis).length ? toStringArray(raw.infrastructure_gap_analysis) : budgetScope.infrastructure_gap_analysis,
-    recommended_next_step: isNonEmptyString(raw.recommended_next_step) ? raw.recommended_next_step.trim() : budgetScope.recommended_next_step
+    recommended_next_step: isNonEmptyString(raw.recommended_next_step) ? raw.recommended_next_step.trim() : budgetScope.recommended_next_step,
+    ...(infrastructureRequiredSoon
+      ? {
+          infrastructure_required: true,
+          feature_status: 'coming_soon' as const,
+          warning: COMING_SOON_WARNING
+        }
+      : {})
   };
 }
 
