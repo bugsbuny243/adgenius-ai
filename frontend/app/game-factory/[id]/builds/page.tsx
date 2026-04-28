@@ -24,6 +24,12 @@ function displayBuildNumber(unityBuildNumber: unknown, fallback: number): string
   return '-';
 }
 
+
+function pickExternalUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  return url.startsWith('http://') || url.startsWith('https://') ? url : null;
+}
+
 function durationLabel(start: string | null, end: string | null) {
   if (!start) return '-';
   const startTime = new Date(start).getTime();
@@ -123,14 +129,15 @@ export default async function GameFactoryBuildsPage({ params }: { params: Promis
               const unityBuildNumber = (build.metadata as { unityBuildNumber?: number } | null)?.unityBuildNumber;
               const normalizedStatus = normalizeBuildStatus(build.status);
               const downloadUrl = build.artifact_url ?? artifactMap.get(build.id) ?? null;
+              const logsUrl = pickExternalUrl(build.logs_url);
               return (
                 <tr key={build.id} className="border-t border-white/10">
                   <td className="px-3 py-2">{displayBuildNumber(unityBuildNumber, (builds?.length ?? 0) - index)}</td>
                   <td className="px-3 py-2"><BuildRowStatusAutoRefresh buildId={build.id} projectId={id} initialStatus={normalizedStatus} /></td>
                   <td className="px-3 py-2">{build.started_at ? new Date(build.started_at).toLocaleString('tr-TR') : '-'}</td>
                   <td className="px-3 py-2">{durationLabel(build.started_at, build.finished_at)}</td>
-                  <td className="px-3 py-2">{renderDownloadCell(normalizedStatus, downloadUrl, build.logs_url ?? null)}</td>
-                  <td className="px-3 py-2">{build.logs_url ? <a href={build.logs_url} className="underline" target="_blank" rel="noreferrer">Logs</a> : '-'}</td>
+                  <td className="px-3 py-2">{downloadUrl ? <a href={downloadUrl} className="underline" target="_blank" rel="noopener noreferrer">İndir</a> : '-'}</td>
+                  <td className="px-3 py-2">{logsUrl ? <a href={logsUrl} className="underline" target="_blank" rel="noopener noreferrer">Logs</a> : <span className="text-white/50">Log yok</span>}</td>
                 </tr>
               );
             })}
