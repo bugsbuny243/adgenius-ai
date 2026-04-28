@@ -107,6 +107,14 @@ export default function NewGameFactoryPage() {
     setLoading(true);
     setError('');
     try {
+      const googlePlayAccountChoice: GooglePlayAccountChoice =
+        brief?.google_play_account_status === 'artifact_only'
+          ? 'artifact_only'
+          : brief?.google_play_account_status === 'user_has_account'
+            ? 'user_has_account'
+            : 'user_needs_setup';
+      const ackAccountRequired = technicalChecks.google_play_ack;
+      const ackUserResponsibilities = technicalChecks.publish_blocker_ack;
       const token = await getAccessToken();
       const confirmationKeys = Object.entries(technicalChecks)
         .filter(([, checked]) => checked)

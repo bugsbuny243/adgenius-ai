@@ -36,6 +36,26 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
   const selectedIntegration = (integrations ?? []).find((integration) => integration.id === project.google_play_integration_id) ?? null;
   const shouldShowConnectionWarning = Boolean(releaseJob?.error_message && /google play bağlantısı gerekli/i.test(releaseJob.error_message));
   const blockerReasons = Array.isArray(releaseJob?.blocker_reasons) ? (releaseJob?.blocker_reasons as string[]) : [];
+  const deliveryMode = readiness?.delivery_mode ?? 'play_publish';
+  const deliveryModeLabel =
+    deliveryMode === 'apk_aab_only'
+      ? 'APK/AAB teslimi'
+      : deliveryMode === 'setup_assisted'
+        ? 'Setup assisted'
+        : 'Google Play publish';
+  const readinessStatus =
+    readiness?.google_play_account_status === 'user_has_account'
+      ? 'Hesap bağlı'
+      : readiness?.google_play_account_status === 'user_needs_setup'
+        ? 'Kurulum gerekli'
+        : readiness?.google_play_account_status === 'artifact_only'
+          ? 'Sadece artifact teslimi'
+          : 'Bilinmiyor';
+  const publishBlockedReason = !artifact?.file_url
+    ? 'Yayın başlatmak için önce başarılı bir AAB build çıktısı gerekli.'
+    : !selectedIntegration && deliveryMode !== 'apk_aab_only'
+      ? 'Google Play’e göndermek için bir Google Play bağlantısı seçin.'
+      : null;
 
   return (
     <main>
@@ -53,7 +73,7 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
           <p>Build durumu: {buildJob?.id ? <BuildStatusAutoRefresh jobId={buildJob.id} initialStatus={buildJob.status} withLabel /> : '-'}</p>
           <p>Yayın kanalı: {releaseJob?.track ?? project.release_track}</p>
           <p>Google Play bağlantısı: {selectedIntegration?.display_name ?? 'Seçilmedi'}</p>
-          <p>Teslim modu: {deliveryMode}</p>
+          <p>Teslim modu: {deliveryModeLabel}</p>
           <p>Google Play hesap durumu: {readinessStatus}</p>
           <p>Checklist onayı: {readiness?.confirmed_at ? new Date(readiness.confirmed_at).toLocaleString('tr-TR') : 'Bekleniyor'}</p>
           <p>Kısa açıklama: {brief?.store_short_description ?? '-'}</p>
