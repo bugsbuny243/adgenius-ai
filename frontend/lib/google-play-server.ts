@@ -154,11 +154,11 @@ export class GooglePlayPublisherProvider {
       const bundle = (await uploadResp.json()) as { versionCode?: number };
       const versionCode = String(bundle.versionCode ?? input.versionCode ?? '');
 
-      await this.playRequest(sa, `applications/${input.packageName}/edits/${editId}/tracks/${input.track ?? 'production'}`, {
+      await this.playRequest(sa, `applications/${input.packageName}/edits/${editId}/tracks/${input.track ?? 'internal'}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          track: input.track ?? 'production',
+          track: input.track ?? 'internal',
           releases: [
             {
               name: input.versionName || `Game Factory ${versionCode}`,
