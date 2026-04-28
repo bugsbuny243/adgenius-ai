@@ -140,11 +140,20 @@ export async function POST(request: Request) {
       .eq('id', insertedJob.id);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unity build config yazma hatası.';
+    console.error('Koschei Unity build config write failed', {
+      package_name: packageName,
+      build_job_id: insertedJob.id,
+      error: message
+    });
+
     await serviceRole
       .from('unity_build_jobs')
       .update({
         status: 'failed',
-        error_message: `Unity build config yazılamadı: ${message}`
+        error_message: `Unity build config yazılamadı: ${message}`,
+        metadata: {
+          buildConfigWritten: false
+        }
       })
       .eq('id', insertedJob.id);
 
