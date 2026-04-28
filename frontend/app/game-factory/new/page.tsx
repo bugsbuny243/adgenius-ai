@@ -33,6 +33,10 @@ type GameBrief = {
   publishingRequirements: string[];
   blockersBeforeBuild: string[];
   blockersBeforePublish: string[];
+  google_play_required: boolean;
+  google_play_account_status: 'unknown' | 'user_has_account' | 'user_needs_setup' | 'artifact_only';
+  publishing_blockers: string[];
+  delivery_mode: 'apk_aab_only' | 'play_publish' | 'setup_assisted';
 };
 
 type GooglePlayAccountChoice = 'user_has_account' | 'artifact_only' | 'user_needs_setup';

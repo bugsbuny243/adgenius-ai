@@ -40,6 +40,10 @@ type GameBrief = {
   publishingRequirements: string[];
   blockersBeforeBuild: string[];
   blockersBeforePublish: string[];
+  google_play_required: boolean;
+  google_play_account_status: 'unknown' | 'user_has_account' | 'user_needs_setup' | 'artifact_only';
+  publishing_blockers: string[];
+  delivery_mode: 'apk_aab_only' | 'play_publish' | 'setup_assisted';
 };
 
 function logRouteError(stage: 'request_parse' | 'ai_call' | 'ai_parse' | 'db_write', error: unknown, extras?: Record<string, unknown>) {
@@ -285,7 +289,31 @@ function normalizeBrief(raw: Record<string, unknown>, prompt: string, platform: 
     multiplayerRequired: toBool(raw.multiplayerRequired) || inferred.multiplayerRequired,
     publishingRequirements: toStringArray(raw.publishingRequirements).length ? toStringArray(raw.publishingRequirements) : inferred.publishingRequirements,
     blockersBeforeBuild: toStringArray(raw.blockersBeforeBuild).length ? toStringArray(raw.blockersBeforeBuild) : inferred.blockersBeforeBuild,
-    blockersBeforePublish: toStringArray(raw.blockersBeforePublish).length ? toStringArray(raw.blockersBeforePublish) : inferred.blockersBeforePublish
+    blockersBeforePublish: toStringArray(raw.blockersBeforePublish).length ? toStringArray(raw.blockersBeforePublish) : inferred.blockersBeforePublish,
+    google_play_required: toBool(raw.google_play_required) || toBool(raw.googlePlayRequired) || true,
+    google_play_account_status:
+      raw.google_play_account_status === 'unknown' ||
+      raw.google_play_account_status === 'user_has_account' ||
+      raw.google_play_account_status === 'user_needs_setup' ||
+      raw.google_play_account_status === 'artifact_only'
+        ? raw.google_play_account_status
+        : raw.googlePlayAccountStatus === 'unknown' ||
+            raw.googlePlayAccountStatus === 'user_has_account' ||
+            raw.googlePlayAccountStatus === 'user_needs_setup' ||
+            raw.googlePlayAccountStatus === 'artifact_only'
+          ? raw.googlePlayAccountStatus
+          : 'unknown',
+    publishing_blockers: toStringArray(raw.publishing_blockers).length
+      ? toStringArray(raw.publishing_blockers)
+      : toStringArray(raw.blockersBeforePublish).length
+        ? toStringArray(raw.blockersBeforePublish)
+        : inferred.blockersBeforePublish,
+    delivery_mode:
+      raw.delivery_mode === 'apk_aab_only' || raw.delivery_mode === 'play_publish' || raw.delivery_mode === 'setup_assisted'
+        ? raw.delivery_mode
+        : raw.deliveryMode === 'apk_aab_only' || raw.deliveryMode === 'play_publish' || raw.deliveryMode === 'setup_assisted'
+          ? raw.deliveryMode
+          : 'play_publish'
   };
 }
 
