@@ -56,10 +56,10 @@ export default async function GooglePlayIntegrationsPage({ searchParams }: PageP
 
           <label className="space-y-1">
             <span className="text-sm">Varsayılan yayın kanalı</span>
-            <select name="default_track" defaultValue="production" className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2">
-              <option value="production">production</option>
-              <option value="closed">closed</option>
+            <select name="default_track" defaultValue="internal" className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2">
               <option value="internal">internal</option>
+              <option value="closed">closed</option>
+              <option value="production">production</option>
             </select>
           </label>
 

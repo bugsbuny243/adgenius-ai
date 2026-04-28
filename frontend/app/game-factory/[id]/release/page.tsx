@@ -16,13 +16,15 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
   } = await supabase.auth.getUser();
   if (!user) redirect('/signin');
 
-  const [{ data: project }, { data: brief }, { data: buildJob }, { data: releaseJob }, { data: artifact }, { data: integrations }] = await Promise.all([
+  const [{ data: project }, { data: brief }, { data: buildJob }, { data: releaseJob }, { data: artifact }, { data: integrations }, { data: consoleReadiness }, { data: latestPreflight }] = await Promise.all([
     supabase.from('unity_game_projects').select('*').eq('id', id).eq('user_id', user.id).maybeSingle(),
     supabase.from('game_briefs').select('*').eq('unity_game_project_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('unity_build_jobs').select('*').eq('unity_game_project_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('game_release_jobs').select('*').eq('unity_game_project_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('game_artifacts').select('*').eq('unity_game_project_id', id).eq('artifact_type', 'aab').order('created_at', { ascending: false }).limit(1).maybeSingle(),
-    supabase.from('user_integrations').select('id, display_name, service_account_email, default_track, status').eq('user_id', user.id).eq('provider', 'google_play').order('created_at', { ascending: false })
+    supabase.from('user_integrations').select('id, display_name, service_account_email, default_track, status').eq('user_id', user.id).eq('provider', 'google_play').order('created_at', { ascending: false }),
+    supabase.from('play_console_readiness').select('*').eq('project_id', id).eq('user_id', user.id).maybeSingle(),
+    supabase.from('play_release_preflight_checks').select('status, blockers, warnings, details').eq('project_id', id).eq('user_id', user.id).order('created_at', { ascending: false }).limit(1).maybeSingle()
   ]);
   const { data: readiness } = await supabase
     .from('google_play_readiness')
@@ -56,6 +58,23 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
     : !selectedIntegration && deliveryMode !== 'apk_aab_only'
       ? 'Google Play’e göndermek için bir Google Play bağlantısı seçin.'
       : null;
+  const preflightDetails = latestPreflight?.details && typeof latestPreflight.details === 'object' && !Array.isArray(latestPreflight.details)
+    ? (latestPreflight.details as Record<string, boolean>)
+    : {};
+  const checklistItems = [
+    { label: 'AAB hazır', ok: Boolean(preflightDetails.latest_aab_exists && preflightDetails.artifact_file_url_exists) },
+    { label: 'Google Play bağlantısı', ok: Boolean(preflightDetails.google_play_integration_valid) },
+    { label: 'Package name', ok: Boolean(preflightDetails.package_name_exists) },
+    { label: 'Store listing', ok: Boolean(preflightDetails.store_title_exists && preflightDetails.store_short_description_exists && preflightDetails.store_full_description_exists) },
+    { label: 'Privacy policy', ok: Boolean(preflightDetails.privacy_policy_ready) },
+    { label: 'Data Safety', ok: Boolean(preflightDetails.data_safety_ready) },
+    { label: 'Target audience', ok: Boolean(preflightDetails.target_audience_ready) },
+    { label: 'Ads declaration', ok: Boolean(preflightDetails.ads_declaration_ready) },
+    { label: 'IAP products', ok: Boolean(preflightDetails.iap_products_ready) },
+    { label: 'Release track', ok: Boolean(preflightDetails.release_track_exists && preflightDetails.production_track_gate) }
+  ];
+  const latestPreflightBlockers = Array.isArray(latestPreflight?.blockers) ? (latestPreflight.blockers as string[]) : [];
+  const latestPreflightWarnings = Array.isArray(latestPreflight?.warnings) ? (latestPreflight.warnings as string[]) : [];
 
   return (
     <main>
@@ -75,6 +94,7 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
           <p>Google Play bağlantısı: {selectedIntegration?.display_name ?? 'Seçilmedi'}</p>
           <p>Teslim modu: {deliveryModeLabel}</p>
           <p>Google Play hesap durumu: {readinessStatus}</p>
+          <p>Play Console readiness: {consoleReadiness?.status ?? '-'}</p>
           <p>Checklist onayı: {readiness?.confirmed_at ? new Date(readiness.confirmed_at).toLocaleString('tr-TR') : 'Bekleniyor'}</p>
           <p>Kısa açıklama: {brief?.store_short_description ?? '-'}</p>
           <p>Detaylı açıklama: {brief?.store_full_description ?? '-'}</p>
@@ -91,6 +111,38 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
               'Yok'
             )}
           </p>
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-black/20 p-4 text-sm space-y-3">
+          <h3 className="text-base font-semibold">Google Play Yayın Hazırlığı</h3>
+          <ul className="grid gap-1 sm:grid-cols-2">
+            {checklistItems.map((item) => (
+              <li key={item.label} className="flex items-center gap-2">
+                <span className={item.ok ? 'text-emerald-300' : 'text-amber-300'}>{item.ok ? '✓' : '•'}</span>
+                <span>{item.label}</span>
+              </li>
+            ))}
+          </ul>
+          {latestPreflightBlockers.length > 0 ? (
+            <div className="rounded-lg border border-red-400/30 bg-red-950/20 p-3 text-red-100">
+              <p className="font-medium">Preflight blockers</p>
+              <ul className="list-disc pl-5">
+                {latestPreflightBlockers.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {latestPreflightWarnings.length > 0 ? (
+            <div className="rounded-lg border border-amber-400/30 bg-amber-950/20 p-3 text-amber-100">
+              <p className="font-medium">Preflight uyarıları</p>
+              <ul className="list-disc pl-5">
+                {latestPreflightWarnings.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
 
         {blockerReasons.length > 0 ? (
@@ -145,6 +197,12 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
             <PublishButton label="Google Play’e gönder" />
           </form>
         )}
+
+        {!selectedIntegration ? (
+          <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+            Play Store yayını için kullanıcıya ait Google Play Console hesabı gerekir.
+          </div>
+        ) : null}
 
         {deliveryMode === 'setup_assisted' ? (
           <div className="rounded-xl border border-blue-400/30 bg-blue-500/10 p-4 text-sm text-blue-100">

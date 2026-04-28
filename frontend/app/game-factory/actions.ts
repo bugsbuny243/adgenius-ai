@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation';
 import { createSupabaseActionServerClient } from '@/lib/supabase-server';
 import { decryptCredentials, tryParseEncryptedCredentials } from '@/lib/credentials-encryption';
 import { GooglePlayPublisherProvider } from '@/lib/google-play-server';
+import { runReleasePreflight } from '@/lib/game-factory/release-preflight';
 
 async function requireAuthenticatedUser() {
   const supabase = await createSupabaseActionServerClient();
@@ -24,7 +25,7 @@ async function requireOwnedProject(projectId: string) {
   const { supabase, user } = await requireAuthenticatedUser();
   const { data: project, error } = await supabase
     .from('unity_game_projects')
-    .select('id, user_id, package_name, release_track, google_play_integration_id, current_version_code, current_version_name')
+    .select('id, user_id, workspace_id, package_name, release_track, google_play_integration_id, current_version_code, current_version_name')
     .eq('id', projectId)
     .eq('user_id', user.id)
     .maybeSingle();
@@ -46,6 +47,7 @@ async function upsertReleaseJob(params: {
   track: string;
   releaseNotes: string;
   errorMessage: string | null;
+  blockerReasons?: string[];
 }) {
   const { supabase } = await requireAuthenticatedUser();
   const { data: latestReleaseJob } = await supabase
@@ -63,7 +65,8 @@ async function upsertReleaseJob(params: {
         status: params.status,
         track: params.track,
         release_notes: params.releaseNotes,
-        error_message: params.errorMessage
+        error_message: params.errorMessage,
+        blocker_reasons: params.blockerReasons ?? []
       })
       .eq('id', latestReleaseJob.id);
 
@@ -76,7 +79,8 @@ async function upsertReleaseJob(params: {
     status: params.status,
     track: params.track,
     release_notes: params.releaseNotes,
-    error_message: params.errorMessage
+    error_message: params.errorMessage,
+    blocker_reasons: params.blockerReasons ?? []
   });
 
   if (error) throw new Error(`Release kaydı oluşturulamadı: ${error.message}`);
@@ -133,7 +137,7 @@ export async function approveReleaseAction(projectId: string) {
     .maybeSingle();
 
   const releaseNotes = latestReleaseJob?.release_notes ?? '';
-  const track = latestReleaseJob?.track ?? project.release_track ?? 'production';
+  const track = latestReleaseJob?.track ?? project.release_track ?? 'internal';
 
   await upsertReleaseJob({
     projectId,
@@ -178,9 +182,10 @@ export async function publishReleaseAction(projectId: string) {
     await upsertReleaseJob({
       projectId,
       status: 'blocked',
-      track: latestReleaseJob?.track ?? project.release_track ?? 'production',
+      track: latestReleaseJob?.track ?? project.release_track ?? 'internal',
       releaseNotes: latestReleaseJob?.release_notes ?? '',
-      errorMessage: 'AAB artifact bulunamadı.'
+      errorMessage: 'AAB artifact bulunamadı.',
+      blockerReasons: ['AAB artifact bulunamadı.']
     });
     throw new Error('AAB artifact bulunamadı.');
   }
@@ -189,11 +194,44 @@ export async function publishReleaseAction(projectId: string) {
     await upsertReleaseJob({
       projectId,
       status: 'blocked',
-      track: latestReleaseJob?.track ?? project.release_track ?? 'production',
+      track: latestReleaseJob?.track ?? project.release_track ?? 'internal',
       releaseNotes: latestReleaseJob?.release_notes ?? '',
-      errorMessage: 'Google Play bağlantısı doğrulanmış değil.'
+      errorMessage: 'Google Play bağlantısı doğrulanmış değil.',
+      blockerReasons: ['Google Play bağlantısı bulunamadı veya doğrulanmamış.']
     });
     throw new Error('Google Play bağlantısı doğrulanmış değil.');
+  }
+
+  if (!project.workspace_id) {
+    await upsertReleaseJob({
+      projectId,
+      status: 'blocked',
+      track: latestReleaseJob?.track ?? project.release_track ?? 'internal',
+      releaseNotes: latestReleaseJob?.release_notes ?? '',
+      errorMessage: 'Workspace bilgisi eksik.',
+      blockerReasons: ['Workspace bilgisi eksik.']
+    });
+    throw new Error('Workspace bilgisi eksik.');
+  }
+
+  const preflight = await runReleasePreflight({
+    supabase,
+    projectId,
+    userId: user.id,
+    workspaceId: project.workspace_id
+  });
+
+  if (!preflight.ok) {
+    await upsertReleaseJob({
+      projectId,
+      status: 'blocked',
+      track: preflight.selectedTrack,
+      releaseNotes: latestReleaseJob?.release_notes ?? '',
+      errorMessage: preflight.blockers.join(' | '),
+      blockerReasons: preflight.blockers
+    });
+
+    throw new Error(preflight.blockers.join(' | '));
   }
 
   const { data: credentialsRow } = await supabase
@@ -214,9 +252,10 @@ export async function publishReleaseAction(projectId: string) {
     await upsertReleaseJob({
       projectId,
       status: 'blocked',
-      track: latestReleaseJob?.track ?? project.release_track ?? 'production',
+      track: latestReleaseJob?.track ?? project.release_track ?? 'internal',
       releaseNotes: latestReleaseJob?.release_notes ?? '',
-      errorMessage: 'Google Play kimlik bilgileri çözümlenemedi.'
+      errorMessage: 'Google Play kimlik bilgileri çözümlenemedi.',
+      blockerReasons: ['Google Play kimlik bilgileri çözümlenemedi.']
     });
     throw new Error('Google Play kimlik bilgileri çözümlenemedi.');
   }
@@ -224,7 +263,7 @@ export async function publishReleaseAction(projectId: string) {
   const provider = new GooglePlayPublisherProvider();
   const publishResult = await provider.publishRelease({
     packageName: project.package_name,
-    track: latestReleaseJob?.track ?? integration.default_track ?? project.release_track ?? 'production',
+    track: preflight.selectedTrack,
     releaseNotes: latestReleaseJob?.release_notes ?? 'Game Factory yayın güncellemesi',
     aabFileUrl: artifact.file_url,
     serviceAccountJson: decryptCredentials(encryptedCredentials),
@@ -235,9 +274,10 @@ export async function publishReleaseAction(projectId: string) {
   await upsertReleaseJob({
     projectId,
     status: publishResult.status,
-    track: latestReleaseJob?.track ?? integration.default_track ?? project.release_track ?? 'production',
+    track: preflight.selectedTrack,
     releaseNotes: latestReleaseJob?.release_notes ?? '',
-    errorMessage: publishResult.errorMessage ?? null
+    errorMessage: publishResult.errorMessage ?? null,
+    blockerReasons: publishResult.status === 'blocked_by_platform_requirement' && publishResult.errorMessage ? [publishResult.errorMessage] : []
   });
 
   if (publishResult.status !== 'published') {
@@ -275,7 +315,7 @@ export async function setProjectGooglePlayIntegrationAction(projectId: string, f
 
   const { error } = await supabase
     .from('unity_game_projects')
-    .update({ google_play_integration_id: integration.id, release_track: integration.default_track ?? 'production' })
+    .update({ google_play_integration_id: integration.id, release_track: integration.default_track ?? 'internal' })
     .eq('id', projectId)
     .eq('user_id', user.id);
 
@@ -304,7 +344,7 @@ export async function updateReleaseNotesAction(projectId: string, formData: Form
     .maybeSingle();
 
   const status = latestReleaseJob?.status === 'published' ? 'draft' : (latestReleaseJob?.status ?? 'awaiting_user_approval');
-  const track = latestReleaseJob?.track ?? project.release_track ?? 'production';
+  const track = latestReleaseJob?.track ?? project.release_track ?? 'internal';
 
   await upsertReleaseJob({
     projectId,
