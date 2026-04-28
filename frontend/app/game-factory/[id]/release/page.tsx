@@ -25,15 +25,13 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
   } = await supabase.auth.getUser();
   if (!user) redirect('/signin');
 
-  const [{ data: project }, { data: brief }, { data: buildJob }, { data: releaseJob }, { data: artifact }, { data: integrations }, { data: consoleReadiness }, { data: latestPreflight }] = await Promise.all([
+  const [{ data: project }, { data: brief }, { data: buildJob }, { data: releaseJob }, { data: artifact }, { data: integrations }] = await Promise.all([
     supabase.from('unity_game_projects').select('*').eq('id', id).eq('user_id', user.id).maybeSingle(),
     supabase.from('game_briefs').select('*').eq('unity_game_project_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('unity_build_jobs').select('*').eq('unity_game_project_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('game_release_jobs').select('*').eq('unity_game_project_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('game_artifacts').select('*').eq('unity_game_project_id', id).eq('artifact_type', 'aab').order('created_at', { ascending: false }).limit(1).maybeSingle(),
-    supabase.from('user_integrations').select('id, display_name, service_account_email, default_track, status').eq('user_id', user.id).eq('provider', 'google_play').order('created_at', { ascending: false }),
-    supabase.from('play_console_readiness').select('*').eq('project_id', id).eq('user_id', user.id).maybeSingle(),
-    supabase.from('play_release_preflight_checks').select('status, blockers, warnings, details').eq('project_id', id).eq('user_id', user.id).order('created_at', { ascending: false }).limit(1).maybeSingle()
+    supabase.from('user_integrations').select('id, display_name, service_account_email, default_track, status').eq('user_id', user.id).eq('provider', 'google_play').order('created_at', { ascending: false })
   ]);
   const { data: readiness } = await supabase
     .from('google_play_readiness')
@@ -68,23 +66,18 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
     : !selectedIntegration && deliveryMode !== 'apk_aab_only'
       ? 'Google Play’e göndermek için bir Google Play bağlantısı seçin.'
       : null;
-  const preflightDetails = latestPreflight?.details && typeof latestPreflight.details === 'object' && !Array.isArray(latestPreflight.details)
-    ? (latestPreflight.details as Record<string, boolean>)
-    : {};
   const checklistItems = [
-    { label: 'AAB hazır', ok: Boolean(preflightDetails.latest_aab_exists && preflightDetails.artifact_file_url_exists) },
-    { label: 'Google Play bağlantısı', ok: Boolean(preflightDetails.google_play_integration_valid) },
-    { label: 'Package name', ok: Boolean(preflightDetails.package_name_exists) },
-    { label: 'Store listing', ok: Boolean(preflightDetails.store_title_exists && preflightDetails.store_short_description_exists && preflightDetails.store_full_description_exists) },
-    { label: 'Privacy policy', ok: Boolean(preflightDetails.privacy_policy_ready) },
-    { label: 'Data Safety', ok: Boolean(preflightDetails.data_safety_ready) },
-    { label: 'Target audience', ok: Boolean(preflightDetails.target_audience_ready) },
-    { label: 'Ads declaration', ok: Boolean(preflightDetails.ads_declaration_ready) },
-    { label: 'IAP products', ok: Boolean(preflightDetails.iap_products_ready) },
-    { label: 'Release track', ok: Boolean(preflightDetails.release_track_exists && preflightDetails.production_track_gate) }
+    { label: 'AAB hazır', ok: Boolean(artifact?.file_url) },
+    { label: 'Google Play bağlantısı', ok: Boolean(selectedIntegration || deliveryMode === 'apk_aab_only') },
+    { label: 'Package name', ok: Boolean(project.package_name) },
+    { label: 'Store listing', ok: Boolean(brief?.store_title && brief?.store_short_description && brief?.store_full_description) },
+    { label: 'Privacy policy', ok: Boolean(brief?.privacy_policy_url) },
+    { label: 'Data Safety', ok: Boolean(brief?.data_safety_url) },
+    { label: 'Target audience', ok: Boolean(brief?.target_audience) },
+    { label: 'Ads declaration', ok: typeof brief?.contains_ads === 'boolean' },
+    { label: 'IAP products', ok: true },
+    { label: 'Release track', ok: Boolean(releaseJob?.track ?? project.release_track) }
   ];
-  const latestPreflightBlockers = Array.isArray(latestPreflight?.blockers) ? (latestPreflight.blockers as string[]) : [];
-  const latestPreflightWarnings = Array.isArray(latestPreflight?.warnings) ? (latestPreflight.warnings as string[]) : [];
   const artifactBelongsToProject = Boolean(artifact?.file_url && artifact?.unity_game_project_id === id);
   const artifactBelongsToBuild = !artifact?.unity_build_job_id || !buildJob?.id || artifact.unity_build_job_id === buildJob.id;
   const detectedPackageName = readDetectedPackageName((artifact?.metadata as Record<string, unknown> | null) ?? null);
@@ -153,26 +146,6 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
               </li>
             ))}
           </ul>
-          {latestPreflightBlockers.length > 0 ? (
-            <div className="rounded-lg border border-red-400/30 bg-red-950/20 p-3 text-red-100">
-              <p className="font-medium">Preflight blockers</p>
-              <ul className="list-disc pl-5">
-                {latestPreflightBlockers.map((reason) => (
-                  <li key={reason}>{reason}</li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-          {latestPreflightWarnings.length > 0 ? (
-            <div className="rounded-lg border border-amber-400/30 bg-amber-950/20 p-3 text-amber-100">
-              <p className="font-medium">Preflight uyarıları</p>
-              <ul className="list-disc pl-5">
-                {latestPreflightWarnings.map((reason) => (
-                  <li key={reason}>{reason}</li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
         </div>
 
         {blockerReasons.length > 0 ? (
