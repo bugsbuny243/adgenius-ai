@@ -38,22 +38,21 @@ export class UnityApiError extends Error {
     this.name = 'UnityApiError';
     this.status = options?.status;
     this.endpointPath = options?.endpointPath;
-    this.authMode = options?.authMode ?? 'service_account';
+    this.authMode = options?.authMode ?? 'basic_api_key';
   }
 }
 
 function getConfig() {
   const orgId = process.env.UNITY_ORG_ID?.trim();
   const projectId = process.env.UNITY_PROJECT_ID?.trim();
-  const keyId = process.env.UNITY_SERVICE_ACCOUNT_KEY_ID?.trim();
-  const secret = process.env.UNITY_SERVICE_ACCOUNT_SECRET_KEY?.trim();
+  const apiKey = process.env.UNITY_BUILD_API_KEY?.trim();
 
-  if (!orgId || !projectId || !keyId || !secret) {
+  if (!orgId || !projectId || !apiKey) {
     throw new Error('Unity yapılandırması eksik.');
   }
 
-  const encoded = Buffer.from(`${keyId}:${secret}`, 'utf8').toString('base64');
-  return { orgId, projectId, authorization: `Basic ${encoded}`, authMode: 'service_account' as const };
+  const encoded = Buffer.from(`${apiKey}:`, 'utf8').toString('base64');
+  return { orgId, projectId, authorization: `Basic ${encoded}`, authMode: 'basic_api_key' as const };
 }
 
 function normalizeStatus(value: unknown): UnityBuildStatus {
