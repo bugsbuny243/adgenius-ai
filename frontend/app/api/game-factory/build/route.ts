@@ -1,5 +1,6 @@
 import { getApiAuthContext, json } from '@/app/api/game-factory/_auth';
 import { requireActiveGameAgentPackage } from '@/lib/game-agent-access';
+import { writeUnityBuildConfigToRepo } from '@/lib/server/github-unity-build-config';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase-service-role';
 import { getBuilds, triggerBuild, UnityApiError } from '@/lib/server/unity-cloud-build';
 
@@ -21,7 +22,9 @@ export async function POST(request: Request) {
   const serviceRole = getSupabaseServiceRoleClient();
   const { data: project } = await serviceRole
     .from('unity_game_projects')
-    .select('id, approval_status, game_brief')
+    .select(
+      'id, approval_status, game_brief, app_name, package_name, current_version_code, current_version_name, unity_repo_owner, unity_repo_name, unity_branch'
+    )
     .eq('id', projectId)
     .eq('workspace_id', context.workspaceId)
     .eq('user_id', context.userId)
@@ -29,6 +32,21 @@ export async function POST(request: Request) {
 
   if (!project) return json({ ok: false, error: 'Proje bulunamadı.' }, 404);
   if (project.approval_status !== 'approved') return json({ ok: false, error: 'Proje onay bekliyor.' }, 403);
+
+  const appName = String(project.app_name ?? '').trim();
+  const packageName = String(project.package_name ?? '').trim();
+  const versionCodeRaw = Number(project.current_version_code ?? 0);
+  const versionCode = Number.isInteger(versionCodeRaw) && versionCodeRaw > 0 ? versionCodeRaw : 1;
+  const versionName = String(project.current_version_name ?? '').trim() || '1.0.0';
+  const unityRepoOwner = String(project.unity_repo_owner ?? '').trim();
+  const unityRepoName = String(project.unity_repo_name ?? '').trim();
+  const unityBranch = String(project.unity_branch ?? '').trim() || 'main';
+
+  if (!appName) return json({ ok: false, error: 'app_name eksik.' }, 400);
+  if (!packageName) return json({ ok: false, error: 'package_name eksik.' }, 400);
+  if (!unityRepoOwner || !unityRepoName) {
+    return json({ ok: false, error: 'Unity GitHub repo bilgileri eksik.' }, 400);
+  }
 
   const brief = (project.game_brief ?? {}) as {
     backendRequired?: boolean;
@@ -60,6 +78,81 @@ export async function POST(request: Request) {
   const buildTargetId = process.env.UNITY_BUILD_TARGET_ID?.trim();
   if (!buildTargetId) return json({ ok: false, error: 'UNITY_BUILD_TARGET_ID eksik.' }, 500);
 
+  const { data: insertedJob, error: initialJobError } = await serviceRole
+    .from('unity_build_jobs')
+    .insert({
+      unity_game_project_id: projectId,
+      workspace_id: context.workspaceId,
+      user_id: context.userId,
+      requested_by: context.userId,
+      build_target: 'android',
+      build_type: 'release',
+      status: 'queued',
+      queued_at: new Date().toISOString(),
+      version_code: versionCode,
+      version_name: versionName,
+      branch: unityBranch
+    })
+    .select('id')
+    .single();
+
+  if (initialJobError || !insertedJob) {
+    return json({ ok: false, error: initialJobError?.message ?? 'Build kaydı oluşturulamadı.' }, 400);
+  }
+
+  let configWrite: { branch: string; commitSha: string | null; path: string } | null = null;
+
+  try {
+    const writtenConfig = await writeUnityBuildConfigToRepo({
+      owner: unityRepoOwner,
+      repo: unityRepoName,
+      branch: unityBranch,
+      payload: {
+        unity_game_project_id: projectId,
+        build_job_id: insertedJob.id,
+        app_name: appName,
+        package_name: packageName,
+        version_code: versionCode,
+        version_name: versionName,
+        target_platform: 'android',
+        game_brief: (project.game_brief ?? {}) as Record<string, unknown>
+      }
+    });
+
+    configWrite = writtenConfig;
+
+    await serviceRole
+      .from('unity_build_jobs')
+      .update({
+        branch: writtenConfig.branch,
+        commit_sha: writtenConfig.commitSha,
+        metadata: {
+          githubConfigPath: writtenConfig.path,
+          configCommitSha: writtenConfig.commitSha,
+          configBranch: writtenConfig.branch
+        }
+      })
+      .eq('id', insertedJob.id);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unity build config yazma hatası.';
+    await serviceRole
+      .from('unity_build_jobs')
+      .update({
+        status: 'failed',
+        error_message: `Unity build config yazılamadı: ${message}`
+      })
+      .eq('id', insertedJob.id);
+
+    await serviceRole
+      .from('unity_game_projects')
+      .update({ status: 'failed' })
+      .eq('id', projectId)
+      .eq('workspace_id', context.workspaceId)
+      .eq('user_id', context.userId);
+
+    return json({ ok: false, error: `Unity build config yazılamadı: ${message}` }, 500);
+  }
+
   let unityResponse: Awaited<ReturnType<typeof triggerBuild>>;
   let recoveredBuild: Awaited<ReturnType<typeof getBuilds>>[number] | null = null;
 
@@ -67,19 +160,11 @@ export async function POST(request: Request) {
     unityResponse = await triggerBuild(buildTargetId);
   } catch (error) {
     const unityError = error instanceof UnityApiError ? error : new UnityApiError('Unity build tetikleme hatası.');
-    const queuedAt = new Date().toISOString();
 
-    await serviceRole.from('unity_build_jobs').insert({
-      unity_game_project_id: projectId,
-      workspace_id: context.workspaceId,
-      user_id: context.userId,
-      requested_by: context.userId,
-      build_target: 'android',
-      build_type: 'release',
+    await serviceRole.from('unity_build_jobs').update({
       status: 'failed',
-      queued_at: queuedAt,
       error_message: unityError.message
-    });
+    }).eq('id', insertedJob.id);
 
     await serviceRole
       .from('unity_game_projects')
@@ -114,18 +199,19 @@ export async function POST(request: Request) {
       : 'queued';
   const effectiveDownloadUrl = recoveredBuild?.links?.download_primary?.href ?? unityResponse.links?.download_primary?.href ?? null;
 
-  const { data: insertedJob, error: jobError } = await serviceRole
+  const { error: jobError } = await serviceRole
     .from('unity_build_jobs')
-    .insert({
-      unity_game_project_id: projectId,
-      workspace_id: context.workspaceId,
-      user_id: context.userId,
-      requested_by: context.userId,
-      build_target: 'android',
-      build_type: 'release',
+    .update({
       status: initialJobStatus,
-      queued_at: new Date().toISOString(),
       metadata: {
+        ...(configWrite
+          ? {
+              githubConfigPath: configWrite.path,
+              configCommitSha: configWrite.commitSha,
+              configBranch: configWrite.branch
+            }
+          : {}),
+        buildConfigWritten: true,
         ...(unityBuildNumber ? { unityBuildNumber } : {}),
         unityBuildTargetId: buildTargetId,
         unityReturnedBuildTargetId: unityResponse.buildTargetId,
@@ -134,10 +220,9 @@ export async function POST(request: Request) {
         needsUnityBuildNumberRecovery: !unityBuildNumber
       }
     })
-    .select('id')
-    .single();
+    .eq('id', insertedJob.id);
 
-  if (jobError || !insertedJob) {
+  if (jobError) {
     return json({ ok: false, error: jobError?.message ?? 'Build kaydı oluşturulamadı.' }, 400);
   }
 
