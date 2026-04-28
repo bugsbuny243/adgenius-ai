@@ -1,46 +1,53 @@
 'use client';
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { useState } from 'react';
 
 export function StartBuildButton({ projectId }: { projectId: string }) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  async function onClick() {
+  async function handleClick() {
     setLoading(true);
-    setError('');
+    setError(null);
     try {
-      const supabase = createSupabaseBrowserClient();
-      if (!supabase) throw new Error('Supabase yapılandırması eksik.');
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      if (!token) throw new Error('Oturum bulunamadı.');
+      const supabase = (await import('@/lib/supabase-browser')).createSupabaseBrowserClient();
+      if (!supabase) { setError('Supabase yapılandırması eksik.'); return; }
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      if (!token) { setError('Oturum bulunamadı.'); return; }
 
-      const response = await fetch('/api/game-factory/build', {
+      const res = await fetch('/api/game-factory/build', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ projectId })
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ projectId }),
       });
-      const payload = (await response.json()) as { ok: boolean; error?: string };
-      if (!response.ok || !payload.ok) throw new Error(payload.error ?? 'Build başlatılamadı.');
-      router.push(`/game-factory/${projectId}/builds`);
+
+      const data = await res.json();
+      if (!data.ok) { setError(data.error ?? 'Build başlatılamadı.'); return; }
+
       router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Bir hata oluştu.');
+    } catch {
+      setError('Bağlantı hatası. Tekrar dene.');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="space-y-2">
-      <button type="button" onClick={onClick} disabled={loading} className="rounded-lg bg-neon px-4 py-2 font-semibold text-ink disabled:opacity-60">
-        Yeni Build Başlat
+    <div>
+      <button
+        onClick={handleClick}
+        disabled={loading}
+        className="rounded-xl bg-neon px-5 py-2.5 text-sm font-semibold text-ink disabled:opacity-60"
+      >
+        {loading ? 'Build başlatılıyor...' : 'Yeni Build Başlat'}
       </button>
-      {error ? <p className="text-xs text-red-300">{error}</p> : null}
+      {error && <p className="mt-2 text-sm text-rose-400">{error}</p>}
     </div>
   );
 }
