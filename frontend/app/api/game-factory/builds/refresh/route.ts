@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { getBuildStatus } from '@/lib/server/unity-cloud-build';
+import { getBuildStatus, resolveBuildTargetId } from '@/lib/server/unity-cloud-build';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,8 +21,9 @@ export async function POST() {
   for (const job of jobs) {
     const targetId = job.metadata?.unityBuildTargetId || 'android-aab-release';
     const buildNum = job.metadata?.unityBuildNumber || 0;
+    const resolvedTargetId = await resolveBuildTargetId(targetId);
 
-    const status = await getBuildStatus(targetId, buildNum);
+    const status = await getBuildStatus(resolvedTargetId, buildNum);
 
     await supabase
       .from('unity_build_jobs')

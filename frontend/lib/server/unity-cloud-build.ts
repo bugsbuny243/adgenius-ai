@@ -100,7 +100,7 @@ function mapBuild(raw: UnityBuildRaw): UnityBuildResponse {
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-async function resolveBuildTargetId(nameOrId: string): Promise<string> {
+export async function resolveBuildTargetId(nameOrId: string): Promise<string> {
   if (UUID_PATTERN.test(nameOrId)) return nameOrId;
   const { orgId, projectId } = getConfig();
 
