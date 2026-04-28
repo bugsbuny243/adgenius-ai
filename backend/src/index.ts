@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { requireAuth, serviceRoleClient } from './auth.js';
 import { loadEnv } from './env.js';
 import { getBuildStatus, getBuilds, triggerBuild, UnityApiError, type UnityBuildResponse, type UnityBuildStatus } from './unity-bridge.js';
+import { writeUnityBuildConfig } from './unity-repo-config.js';
 import { decryptCredentials, encryptCredentials, serializeEncryptedCredentials, tryParseEncryptedCredentials } from './credentials-encryption.js';
 import { GooglePlayPublisherProvider, validateGooglePlayServiceAccount } from './google-play.js';
 
@@ -85,6 +86,18 @@ function isValidPositiveInt(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }
 
+function toBriefString(value: unknown, fallback = ''): string {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : fallback;
+}
+
+function toBriefFeatures(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => (typeof item === 'string' ? item.trim() : ''))
+    .filter((item) => item.length > 0)
+    .slice(0, 8);
+}
+
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 app.post('/game-factory/generate', async (req, res) => {
@@ -128,7 +141,7 @@ app.post('/game-factory/build', async (req, res) => {
 
   const { data: project } = await serviceRoleClient
     .from('unity_game_projects')
-    .select('id, approval_status')
+    .select('id, approval_status, app_name, package_name, game_brief')
     .eq('id', projectId)
     .eq('workspace_id', auth.workspaceId)
     .eq('user_id', auth.userId)
@@ -138,6 +151,55 @@ app.post('/game-factory/build', async (req, res) => {
   if (project.approval_status !== 'approved') return void res.status(403).json({ ok: false, error: 'Proje onay bekliyor.' });
 
   const buildTargetId = env.UNITY_BUILD_TARGET_ID;
+  const queuedAt = new Date().toISOString();
+  const versionCode = Math.floor(Date.now() / 1000);
+  const { data: insertedJob, error: jobError } = await serviceRoleClient
+    .from('unity_build_jobs')
+    .insert({
+      unity_game_project_id: projectId,
+      workspace_id: auth.workspaceId,
+      user_id: auth.userId,
+      requested_by: auth.userId,
+      build_target: 'android',
+      build_type: 'release',
+      status: 'queued',
+      queued_at: queuedAt,
+      metadata: { unityBuildTargetId: buildTargetId, buildConfigVersionCode: versionCode }
+    })
+    .select('id')
+    .single();
+
+  if (jobError || !insertedJob) return void res.status(400).json({ ok: false, error: jobError?.message ?? 'Build kaydı oluşturulamadı.' });
+
+  const brief = (project.game_brief ?? {}) as Record<string, unknown>;
+  const appName = toBriefString(project.app_name, toBriefString(brief.title, 'Koschei Game'));
+  const packageName = toBriefString(project.package_name, toBriefString(brief.packageName, 'com.koschei.generated.game'));
+  const features = toBriefFeatures(brief.mechanics);
+  const fallbackFeature = toBriefString(brief.summary, 'Core gameplay');
+  const configPayload = {
+    project_id: project.id,
+    build_job_id: insertedJob.id,
+    app_name: appName,
+    package_name: packageName,
+    version_name: `1.0.${versionCode}`,
+    version_code: versionCode,
+    game_type: toBriefString(brief.gameType, 'runner_2d'),
+    short_description: toBriefString(brief.storeShortDescription, toBriefString(brief.summary, appName)),
+    visual_style: toBriefString(brief.visualStyle, 'stylized'),
+    controls: toBriefString(brief.controls, 'tap'),
+    features: features.length ? features : [fallbackFeature],
+    target_platform: 'android' as const
+  };
+
+  try {
+    await writeUnityBuildConfig(configPayload);
+  } catch {
+    const message = 'Unity build config yazılamadı; build başlatılmadı.';
+    await serviceRoleClient.from('unity_build_jobs').update({ status: 'failed', error_message: message }).eq('id', insertedJob.id);
+    await serviceRoleClient.from('unity_game_projects').update({ status: 'failed' }).eq('id', projectId).eq('workspace_id', auth.workspaceId).eq('user_id', auth.userId);
+    return void res.status(502).json({ ok: false, error: message });
+  }
+
   let unityResponse: Awaited<ReturnType<typeof triggerBuild>>;
   let recoveredBuild: Awaited<ReturnType<typeof getBuilds>>[number] | null = null;
 
@@ -145,8 +207,7 @@ app.post('/game-factory/build', async (req, res) => {
     unityResponse = await triggerBuild(buildTargetId);
   } catch (error) {
     const unityError = error instanceof UnityApiError ? error : new UnityApiError('Unity build tetikleme hatası.');
-    const queuedAt = new Date().toISOString();
-    await serviceRoleClient.from('unity_build_jobs').insert({ unity_game_project_id: projectId, workspace_id: auth.workspaceId, user_id: auth.userId, requested_by: auth.userId, build_target: 'android', build_type: 'release', status: 'failed', queued_at: queuedAt, error_message: unityError.message });
+    await serviceRoleClient.from('unity_build_jobs').update({ status: 'failed', error_message: unityError.message }).eq('id', insertedJob.id);
     await serviceRoleClient.from('unity_game_projects').update({ status: 'failed' }).eq('id', projectId).eq('workspace_id', auth.workspaceId).eq('user_id', auth.userId);
     return void res.status(502).json({ ok: false, error: 'Unity build başlatılamadı.' });
   }
@@ -166,13 +227,23 @@ app.post('/game-factory/build', async (req, res) => {
   const initialJobStatus = effectiveUnityStatus === 'sentToBuilder' || effectiveUnityStatus === 'started' || effectiveUnityStatus === 'restarted' ? 'running' : 'queued';
   const effectiveDownloadUrl = recoveredBuild?.links?.download_primary?.href ?? unityResponse.links?.download_primary?.href ?? null;
 
-  const { data: insertedJob, error: jobError } = await serviceRoleClient
+  const { error: updateJobError } = await serviceRoleClient
     .from('unity_build_jobs')
-    .insert({ unity_game_project_id: projectId, workspace_id: auth.workspaceId, user_id: auth.userId, requested_by: auth.userId, build_target: 'android', build_type: 'release', status: initialJobStatus, queued_at: new Date().toISOString(), metadata: { ...(unityBuildNumber ? { unityBuildNumber } : {}), unityBuildTargetId: buildTargetId, unityReturnedBuildTargetId: unityResponse.buildTargetId, unityStatus: effectiveUnityStatus, unityDownloadUrl: effectiveDownloadUrl, needsUnityBuildNumberRecovery: !unityBuildNumber } })
-    .select('id')
-    .single();
+    .update({
+      status: initialJobStatus,
+      metadata: {
+        ...(unityBuildNumber ? { unityBuildNumber } : {}),
+        unityBuildTargetId: buildTargetId,
+        unityReturnedBuildTargetId: unityResponse.buildTargetId,
+        unityStatus: effectiveUnityStatus,
+        unityDownloadUrl: effectiveDownloadUrl,
+        needsUnityBuildNumberRecovery: !unityBuildNumber,
+        buildConfigVersionCode: versionCode
+      }
+    })
+    .eq('id', insertedJob.id);
 
-  if (jobError || !insertedJob) return void res.status(400).json({ ok: false, error: jobError?.message ?? 'Build kaydı oluşturulamadı.' });
+  if (updateJobError) return void res.status(400).json({ ok: false, error: updateJobError.message ?? 'Build kaydı oluşturulamadı.' });
   await serviceRoleClient.from('unity_game_projects').update({ status: 'building' }).eq('id', projectId);
   res.json({ ok: true, jobId: insertedJob.id, unityBuildNumber: unityBuildNumber ?? null });
 });
