@@ -28,16 +28,22 @@ export function RefreshBuildsButton({ projectId }: { projectId: string }) {
       });
 
       const contentType = response.headers.get('content-type') ?? '';
-
       if (contentType.toLowerCase().includes('application/json')) {
-        const payload = (await response.json().catch(() => null)) as { ok?: boolean; error?: string; errors?: string[] } | null;
+        const payload = (await response.json().catch(() => null)) as
+          | { ok?: boolean; error?: string; errors?: Array<string | { message?: string }> }
+          | null;
+
         if (!response.ok || payload?.ok === false) {
-          alert(payload?.error ?? payload?.errors?.[0] ?? `HTTP ${response.status}`);
+          const firstError = payload?.errors?.[0];
+          const firstErrorText = typeof firstError === 'string' ? firstError : firstError?.message;
+          alert(payload?.error ?? firstErrorText ?? `HTTP ${response.status}`);
           return;
         }
 
         if (payload?.errors?.length) {
-          alert(payload.errors[0]);
+          const firstError = payload.errors[0];
+          const firstErrorText = typeof firstError === 'string' ? firstError : firstError?.message;
+          if (firstErrorText) alert(firstErrorText);
         }
 
         router.refresh();
