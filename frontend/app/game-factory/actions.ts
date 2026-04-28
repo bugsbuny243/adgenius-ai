@@ -26,7 +26,7 @@ async function requireOwnedProject(projectId: string) {
   const { supabase, user } = await requireAuthenticatedUser();
   const { data: project, error } = await supabase
     .from('unity_game_projects')
-    .select('id, user_id, package_name, release_track, google_play_integration_id, current_version_code, current_version_name')
+    .select('id, user_id, workspace_id, package_name, release_track, google_play_integration_id, current_version_code, current_version_name')
     .eq('id', projectId)
     .eq('user_id', user.id)
     .maybeSingle();
@@ -138,7 +138,7 @@ export async function approveReleaseAction(projectId: string) {
     .maybeSingle();
 
   const releaseNotes = latestReleaseJob?.release_notes ?? '';
-  const track = latestReleaseJob?.track ?? project.release_track ?? 'production';
+  const track = latestReleaseJob?.track ?? project.release_track ?? 'internal';
 
   await upsertReleaseJob({
     projectId,
@@ -183,7 +183,7 @@ export async function publishReleaseAction(projectId: string) {
     await upsertReleaseJob({
       projectId,
       status: 'blocked',
-      track: latestReleaseJob?.track ?? project.release_track ?? 'production',
+      track: latestReleaseJob?.track ?? project.release_track ?? 'internal',
       releaseNotes: latestReleaseJob?.release_notes ?? '',
       errorMessage: 'AAB artifact bulunamadı.',
       blockerReasons: ['AAB artifact bulunamadı.']
@@ -202,7 +202,7 @@ export async function publishReleaseAction(projectId: string) {
     await upsertReleaseJob({
       projectId,
       status: 'blocked',
-      track: latestReleaseJob?.track ?? project.release_track ?? 'production',
+      track: latestReleaseJob?.track ?? project.release_track ?? 'internal',
       releaseNotes: latestReleaseJob?.release_notes ?? '',
       errorMessage: readiness.blockers[0] ?? 'Google Play bağlantısı doğrulanmış değil.',
       blockerReasons: readiness.blockers
@@ -229,7 +229,7 @@ export async function publishReleaseAction(projectId: string) {
     await upsertReleaseJob({
       projectId,
       status: 'blocked',
-      track: latestReleaseJob?.track ?? project.release_track ?? 'production',
+      track: latestReleaseJob?.track ?? project.release_track ?? 'internal',
       releaseNotes: latestReleaseJob?.release_notes ?? '',
       errorMessage: 'Google Play kimlik bilgileri çözümlenemedi.',
       blockerReasons: ['Google Play kimlik bilgileri çözümlenemedi.']
@@ -240,7 +240,7 @@ export async function publishReleaseAction(projectId: string) {
   const provider = new GooglePlayPublisherProvider();
   const publishResult = await provider.publishRelease({
     packageName: project.package_name,
-    track: latestReleaseJob?.track ?? integration.default_track ?? project.release_track ?? 'production',
+    track: preflight.selectedTrack,
     releaseNotes: latestReleaseJob?.release_notes ?? 'Game Factory yayın güncellemesi',
     aabFileUrl: artifact.file_url,
     serviceAccountJson: decryptCredentials(encryptedCredentials),
@@ -251,7 +251,7 @@ export async function publishReleaseAction(projectId: string) {
   await upsertReleaseJob({
     projectId,
     status: publishResult.status,
-    track: latestReleaseJob?.track ?? integration.default_track ?? project.release_track ?? 'production',
+    track: preflight.selectedTrack,
     releaseNotes: latestReleaseJob?.release_notes ?? '',
     errorMessage: publishResult.errorMessage ?? null,
     blockerReasons: publishResult.status === 'published' ? [] : [publishResult.errorMessage ?? 'Google Play yayını başarısız oldu.']
@@ -292,7 +292,7 @@ export async function setProjectGooglePlayIntegrationAction(projectId: string, f
 
   const { error } = await supabase
     .from('unity_game_projects')
-    .update({ google_play_integration_id: integration.id, release_track: integration.default_track ?? 'production' })
+    .update({ google_play_integration_id: integration.id, release_track: integration.default_track ?? 'internal' })
     .eq('id', projectId)
     .eq('user_id', user.id);
 
@@ -321,7 +321,7 @@ export async function updateReleaseNotesAction(projectId: string, formData: Form
     .maybeSingle();
 
   const status = latestReleaseJob?.status === 'published' ? 'draft' : (latestReleaseJob?.status ?? 'awaiting_user_approval');
-  const track = latestReleaseJob?.track ?? project.release_track ?? 'production';
+  const track = latestReleaseJob?.track ?? project.release_track ?? 'internal';
 
   await upsertReleaseJob({
     projectId,

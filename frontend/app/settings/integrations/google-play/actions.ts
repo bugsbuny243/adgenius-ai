@@ -8,8 +8,8 @@ import { validateGooglePlayServiceAccount } from '@/lib/google-play-server';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase-service-role';
 
 function normalizeTrack(value: string): 'production' | 'closed' | 'internal' {
-  if (value === 'closed' || value === 'internal') return value;
-  return 'production';
+  if (value === 'closed' || value === 'production') return value;
+  return 'internal';
 }
 
 export async function saveGooglePlayIntegrationAction(formData: FormData) {
@@ -19,7 +19,7 @@ export async function saveGooglePlayIntegrationAction(formData: FormData) {
   if (!session?.access_token || !session?.user?.id) redirect('/signin');
 
   const displayName = String(formData.get('display_name') ?? '').trim();
-  const defaultTrack = normalizeTrack(String(formData.get('default_track') ?? 'production').trim());
+  const defaultTrack = normalizeTrack(String(formData.get('default_track') ?? 'internal').trim());
   const jsonUpload = formData.get('service_account_json_file');
   const jsonText = String(formData.get('service_account_json') ?? '').trim();
 
