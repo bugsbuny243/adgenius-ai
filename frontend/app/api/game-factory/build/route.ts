@@ -33,14 +33,16 @@ export async function POST(request: Request) {
   if (!project) return json({ ok: false, error: 'Proje bulunamadı.' }, 404);
   if (project.approval_status !== 'approved') return json({ ok: false, error: 'Proje onay bekliyor.' }, 403);
 
-  const appName = String(project.app_name ?? '').trim();
+  const briefTitle = String((project.game_brief as { title?: unknown } | null)?.title ?? '').trim();
+  const briefName = String((project.game_brief as { name?: unknown } | null)?.name ?? '').trim();
+  const appName = String(project.app_name ?? '').trim() || briefTitle || briefName;
   const packageName = String(project.package_name ?? '').trim();
   const versionCodeRaw = Number(project.current_version_code ?? 0);
   const versionCode = Number.isInteger(versionCodeRaw) && versionCodeRaw > 0 ? versionCodeRaw : 1;
   const versionName = String(project.current_version_name ?? '').trim() || '1.0.0';
-  const unityRepoOwner = String(project.unity_repo_owner ?? '').trim();
-  const unityRepoName = String(project.unity_repo_name ?? '').trim();
-  const unityBranch = String(project.unity_branch ?? '').trim() || 'main';
+  const unityRepoOwner = String(process.env.GITHUB_UNITY_REPO_OWNER ?? '').trim() || String(project.unity_repo_owner ?? '').trim();
+  const unityRepoName = String(process.env.GITHUB_UNITY_REPO_NAME ?? '').trim() || String(project.unity_repo_name ?? '').trim();
+  const unityBranch = String(process.env.GITHUB_UNITY_REPO_BRANCH ?? '').trim() || String(project.unity_branch ?? '').trim() || 'main';
 
   if (!appName) return json({ ok: false, error: 'app_name eksik.' }, 400);
   if (!packageName) return json({ ok: false, error: 'package_name eksik.' }, 400);
@@ -108,18 +110,21 @@ export async function POST(request: Request) {
       repo: unityRepoName,
       branch: unityBranch,
       payload: {
-        unity_game_project_id: projectId,
+        project_id: projectId,
         build_job_id: insertedJob.id,
         app_name: appName,
         package_name: packageName,
         version_code: versionCode,
         version_name: versionName,
-        target_platform: 'android',
-        game_brief: (project.game_brief ?? {}) as Record<string, unknown>
+        target_platform: 'android'
       }
     });
 
     configWrite = writtenConfig;
+    console.info('Koschei Unity build config written', {
+      package_name: packageName,
+      build_job_id: insertedJob.id
+    });
 
     await serviceRole
       .from('unity_build_jobs')

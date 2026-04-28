@@ -4,14 +4,13 @@ const BUILD_CONFIG_PATH = 'Assets/Koschei/Generated/koschei-build-config.json';
 const BUILD_CONFIG_PATH_ENCODED = BUILD_CONFIG_PATH.split('/').map(encodeURIComponent).join('/');
 
 export type KoscheiUnityBuildConfig = {
-  unity_game_project_id: string;
+  project_id: string;
   build_job_id: string;
   app_name: string;
   package_name: string;
   version_code: number;
   version_name: string;
   target_platform: 'android';
-  game_brief: Record<string, unknown>;
 };
 
 export type WriteBuildConfigInput = {
