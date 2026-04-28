@@ -53,6 +53,24 @@ export default async function GameFactoryBuildsPage({ params }: { params: Promis
 
   if (!project) notFound();
 
+  const buildIds = (builds ?? []).map((build) => build.id);
+  const artifactMap = new Map<string, string>();
+
+  if (buildIds.length > 0) {
+    const { data: artifacts } = await supabase
+      .from('game_artifacts')
+      .select('unity_build_job_id, file_url, created_at')
+      .in('unity_build_job_id', buildIds)
+      .order('created_at', { ascending: false });
+
+    for (const artifact of artifacts ?? []) {
+      if (!artifact.unity_build_job_id || !artifact.file_url) continue;
+      if (!artifactMap.has(artifact.unity_build_job_id)) {
+        artifactMap.set(artifact.unity_build_job_id, artifact.file_url);
+      }
+    }
+  }
+
   const activeJob = (builds ?? []).find((job) => job.status === 'queued' || job.status === 'claimed' || job.status === 'running');
 
   return (
@@ -87,13 +105,14 @@ export default async function GameFactoryBuildsPage({ params }: { params: Promis
             {(builds ?? []).map((build, index) => {
               const unityBuildNumber = (build.metadata as { unityBuildNumber?: number } | null)?.unityBuildNumber;
               const normalizedStatus = normalizeBuildStatus(build.status);
+              const downloadUrl = build.artifact_url ?? artifactMap.get(build.id) ?? null;
               return (
                 <tr key={build.id} className="border-t border-white/10">
                   <td className="px-3 py-2">{displayBuildNumber(unityBuildNumber, (builds?.length ?? 0) - index)}</td>
                   <td className="px-3 py-2"><BuildRowStatusAutoRefresh buildId={build.id} projectId={id} initialStatus={normalizedStatus} /></td>
                   <td className="px-3 py-2">{build.started_at ? new Date(build.started_at).toLocaleString('tr-TR') : '-'}</td>
                   <td className="px-3 py-2">{durationLabel(build.started_at, build.finished_at)}</td>
-                  <td className="px-3 py-2">{build.artifact_url ? <a href={build.artifact_url} className="underline" target="_blank" rel="noreferrer">İndir</a> : '-'}</td>
+                  <td className="px-3 py-2">{downloadUrl ? <a href={downloadUrl} className="underline" target="_blank" rel="noreferrer">İndir</a> : '-'}</td>
                   <td className="px-3 py-2">{build.logs_url ? <a href={build.logs_url} className="underline" target="_blank" rel="noreferrer">Logs</a> : '-'}</td>
                 </tr>
               );
