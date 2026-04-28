@@ -8,6 +8,57 @@ import { BuildRowStatusAutoRefresh } from '@/app/game-factory/[id]/BuildRowStatu
 
 export const dynamic = 'force-dynamic';
 
+type ArtifactRow = {
+  unity_build_job_id: string | null;
+  unity_game_project_id: string | null;
+  file_url: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string | null;
+};
+
+function readDetectedPackageName(metadata: Record<string, unknown> | null): string | null {
+  if (!metadata) return null;
+  const detected = metadata.detected_package_name;
+  if (typeof detected === 'string' && detected.trim()) return detected.trim();
+  const packageName = metadata.package_name;
+  if (typeof packageName === 'string' && packageName.trim()) return packageName.trim();
+  return null;
+}
+
+function resolveDownloadState(params: {
+  projectId: string;
+  projectPackageName: string | null;
+  buildId: string;
+  buildProjectId: string | null;
+  buildArtifactUrl: string | null;
+  buildMetadata: Record<string, unknown> | null;
+  artifact: ArtifactRow | null;
+}): { url: string | null; message: string | null } {
+  const {
+    projectId,
+    projectPackageName,
+    buildId,
+    buildProjectId,
+    buildArtifactUrl,
+    buildMetadata,
+    artifact
+  } = params;
+  const ownershipMismatch = buildProjectId !== projectId || (artifact && (artifact.unity_game_project_id !== projectId || artifact.unity_build_job_id !== buildId));
+  if (ownershipMismatch) {
+    return { url: null, message: 'Bu artifact bu projeye ait değil.' };
+  }
+
+  const detectedPackageName = readDetectedPackageName(artifact?.metadata ?? buildMetadata);
+  if (projectPackageName && detectedPackageName && projectPackageName !== detectedPackageName) {
+    return {
+      url: null,
+      message: `Package name uyuşmuyor. Beklenen: ${projectPackageName}, bulunan: ${detectedPackageName}`
+    };
+  }
+
+  return { url: buildArtifactUrl ?? artifact?.file_url ?? null, message: null };
+}
+
 function normalizeBuildStatus(status: string | null): string {
   if (status === 'started') return 'running';
   if (status === 'success') return 'succeeded';
@@ -74,19 +125,19 @@ export default async function GameFactoryBuildsPage({ params }: { params: Promis
   if (!project) notFound();
 
   const buildIds = (builds ?? []).map((build) => build.id);
-  const artifactMap = new Map<string, string>();
+  const artifactMap = new Map<string, ArtifactRow>();
 
   if (buildIds.length > 0) {
     const { data: artifacts } = await supabase
       .from('game_artifacts')
-      .select('unity_build_job_id, file_url, created_at')
+      .select('unity_build_job_id, unity_game_project_id, file_url, metadata, created_at')
       .in('unity_build_job_id', buildIds)
       .order('created_at', { ascending: false });
 
     for (const artifact of artifacts ?? []) {
       if (!artifact.unity_build_job_id || !artifact.file_url) continue;
       if (!artifactMap.has(artifact.unity_build_job_id)) {
-        artifactMap.set(artifact.unity_build_job_id, artifact.file_url);
+        artifactMap.set(artifact.unity_build_job_id, artifact as ArtifactRow);
       }
     }
   }
@@ -128,16 +179,25 @@ export default async function GameFactoryBuildsPage({ params }: { params: Promis
             {(builds ?? []).map((build, index) => {
               const unityBuildNumber = (build.metadata as { unityBuildNumber?: number } | null)?.unityBuildNumber;
               const normalizedStatus = normalizeBuildStatus(build.status);
-              const downloadUrl = build.artifact_url ?? artifactMap.get(build.id) ?? null;
-              const logsUrl = pickExternalUrl(build.logs_url);
+              const download = resolveDownloadState({
+                projectId: id,
+                projectPackageName: project.package_name ?? null,
+                buildId: build.id,
+                buildProjectId: build.unity_game_project_id ?? null,
+                buildArtifactUrl: build.artifact_url ?? null,
+                buildMetadata: (build.metadata as Record<string, unknown> | null) ?? null,
+                artifact: artifactMap.get(build.id) ?? null
+              });
               return (
                 <tr key={build.id} className="border-t border-white/10">
                   <td className="px-3 py-2">{displayBuildNumber(unityBuildNumber, (builds?.length ?? 0) - index)}</td>
                   <td className="px-3 py-2"><BuildRowStatusAutoRefresh buildId={build.id} projectId={id} initialStatus={normalizedStatus} /></td>
                   <td className="px-3 py-2">{build.started_at ? new Date(build.started_at).toLocaleString('tr-TR') : '-'}</td>
                   <td className="px-3 py-2">{durationLabel(build.started_at, build.finished_at)}</td>
-                  <td className="px-3 py-2">{downloadUrl ? <a href={downloadUrl} className="underline" target="_blank" rel="noopener noreferrer">İndir</a> : '-'}</td>
-                  <td className="px-3 py-2">{logsUrl ? <a href={logsUrl} className="underline" target="_blank" rel="noopener noreferrer">Logs</a> : <span className="text-white/50">Log yok</span>}</td>
+                  <td className="px-3 py-2">
+                    {download.url ? <a href={download.url} className="underline" target="_blank" rel="noreferrer">İndir</a> : (download.message ?? '-')}
+                  </td>
+                  <td className="px-3 py-2">{build.logs_url ? <a href={build.logs_url} className="underline" target="_blank" rel="noreferrer">Logs</a> : '-'}</td>
                 </tr>
               );
             })}
