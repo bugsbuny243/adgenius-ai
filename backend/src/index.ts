@@ -437,7 +437,7 @@ app.post('/game-factory/release/publish', async (req, res) => {
 
   const { data: unityProject } = await serviceRoleClient
     .from('unity_game_projects')
-    .select('id, user_id, package_name, project_id')
+    .select('id, user_id, package_name, project_id, google_play_integration_id')
     .eq('id', projectId)
     .eq('user_id', auth.userId)
     .maybeSingle();
@@ -447,6 +447,16 @@ app.post('/game-factory/release/publish', async (req, res) => {
   const { data: gameProject } = unityProject.project_id
     ? await serviceRoleClient.from('game_projects').select('id, release_track, google_play_integration_id, current_version_code, current_version_name').eq('id', unityProject.project_id).maybeSingle()
     : { data: null as any };
+  const { data: readiness } = await serviceRoleClient
+    .from('google_play_readiness')
+    .select('delivery_mode, google_play_account_status')
+    .eq('project_id', projectId)
+    .eq('user_id', auth.userId)
+    .maybeSingle();
+
+  if (readiness?.delivery_mode === 'apk_aab_only') {
+    return void res.status(400).json({ ok: false, error: 'APK/AAB hazır, Play Store yayını için Google Play Console hesabı gerekli.' });
+  }
 
   const [{ data: artifact }, { data: latestReleaseJob }] = await Promise.all([
     serviceRoleClient.from('game_artifacts').select('file_url').eq('unity_game_project_id', projectId).eq('artifact_type', 'aab').order('created_at', { ascending: false }).limit(1).maybeSingle(),
@@ -457,12 +467,15 @@ app.post('/game-factory/release/publish', async (req, res) => {
   const { data: integration } = await serviceRoleClient
     .from('user_integrations')
     .select('id, default_track, status')
-    .eq('id', gameProject?.google_play_integration_id)
+    .eq('id', unityProject.google_play_integration_id ?? gameProject?.google_play_integration_id)
     .eq('user_id', auth.userId)
     .eq('provider', 'google_play')
     .maybeSingle();
 
   if (!integration) return void res.status(400).json({ ok: false, error: 'Google Play bağlantısı bulunamadı.' });
+  if (!['connected', 'active', 'valid'].includes(String(integration.status ?? '').toLowerCase())) {
+    return void res.status(400).json({ ok: false, error: 'Google Play bağlantısı doğrulanmalı (valid) olmalıdır.' });
+  }
 
   const { data: credentialsRow } = await serviceRoleClient
     .from('integration_credentials')

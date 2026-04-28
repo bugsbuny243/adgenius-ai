@@ -23,6 +23,10 @@ type GameBrief = {
   releaseNotes: string;
   storeShortDescription: string;
   storeFullDescription: string;
+  google_play_required: boolean;
+  google_play_account_status: 'unknown' | 'user_has_account' | 'user_needs_setup' | 'artifact_only';
+  publishing_blockers: string[];
+  delivery_mode: 'apk_aab_only' | 'play_publish' | 'setup_assisted';
 };
 
 function logRouteError(stage: 'request_parse' | 'ai_call' | 'ai_parse' | 'db_write', error: unknown, extras?: Record<string, unknown>) {
@@ -80,7 +84,11 @@ const GAME_BRIEF_SCHEMA = {
     'monetizationNotes',
     'releaseNotes',
     'storeShortDescription',
-    'storeFullDescription'
+    'storeFullDescription',
+    'google_play_required',
+    'google_play_account_status',
+    'publishing_blockers',
+    'delivery_mode'
   ],
   properties: {
     title: { type: 'string', minLength: 1 },
@@ -95,7 +103,11 @@ const GAME_BRIEF_SCHEMA = {
     monetizationNotes: { type: 'string', minLength: 1 },
     releaseNotes: { type: 'string', minLength: 1 },
     storeShortDescription: { type: 'string', minLength: 1 },
-    storeFullDescription: { type: 'string', minLength: 1 }
+    storeFullDescription: { type: 'string', minLength: 1 },
+    google_play_required: { type: 'boolean' },
+    google_play_account_status: { type: 'string', enum: ['unknown', 'user_has_account', 'user_needs_setup', 'artifact_only'] },
+    publishing_blockers: { type: 'array', items: { type: 'string', minLength: 1 } },
+    delivery_mode: { type: 'string', enum: ['apk_aab_only', 'play_publish', 'setup_assisted'] }
   }
 } as const;
 
@@ -125,11 +137,15 @@ async function callGroqBriefModel(prompt: string, targetPlatform: 'android', mod
             `Kullanıcı oyun fikri: ${prompt}\n` +
             `Hedef platform: ${targetPlatform}\n\n` +
             'Aşağıdaki alanlarla bir oyun brief JSON nesnesi üret:\n' +
-            'title, slug, packageName, summary, gameType, targetPlatform, mechanics, visualStyle, controls, monetizationNotes, releaseNotes, storeShortDescription, storeFullDescription\n\n' +
+            'title, slug, packageName, summary, gameType, targetPlatform, mechanics, visualStyle, controls, monetizationNotes, releaseNotes, storeShortDescription, storeFullDescription, google_play_required, google_play_account_status, publishing_blockers, delivery_mode\n\n' +
             'Kurallar:\n' +
             '- gameType değeri kesinlikle "runner_2d" olmalı.\n' +
             '- targetPlatform değeri kesinlikle "android" olmalı.\n' +
             '- mechanics en az 1 maddelik dizi olmalı.\n' +
+            '- google_play_required boolean olmalı.\n' +
+            '- google_play_account_status başlangıçta "unknown" olmalı.\n' +
+            '- publishing_blockers en az bir açıklayıcı madde içermeli.\n' +
+            '- delivery_mode başlangıçta "setup_assisted" olmalı.\n' +
             '- Sadece JSON döndür.'
         }
       ],
@@ -197,6 +213,17 @@ function normalizeBrief(raw: Record<string, unknown>, prompt: string, platform: 
   const mechanics = toMechanics(raw.mechanics);
   const storeShortDescription = isNonEmptyString(raw.storeShortDescription) ? raw.storeShortDescription.trim() : '';
   const storeFullDescription = isNonEmptyString(raw.storeFullDescription) ? raw.storeFullDescription.trim() : '';
+  const rawGooglePlayStatus = isNonEmptyString(raw.google_play_account_status) ? raw.google_play_account_status.trim() : '';
+  const googlePlayAccountStatus: GameBrief['google_play_account_status'] = rawGooglePlayStatus === 'user_has_account' || rawGooglePlayStatus === 'user_needs_setup' || rawGooglePlayStatus === 'artifact_only'
+    ? rawGooglePlayStatus
+    : 'unknown';
+  const rawDeliveryMode = isNonEmptyString(raw.delivery_mode) ? raw.delivery_mode.trim() : '';
+  const deliveryMode: GameBrief['delivery_mode'] = rawDeliveryMode === 'apk_aab_only' || rawDeliveryMode === 'play_publish' || rawDeliveryMode === 'setup_assisted'
+    ? rawDeliveryMode
+    : 'setup_assisted';
+  const publishingBlockers = Array.isArray(raw.publishing_blockers)
+    ? raw.publishing_blockers.filter(isNonEmptyString).map((entry) => entry.trim()).filter(Boolean)
+    : [];
 
   const gameType = raw.gameType === 'runner_2d' ? 'runner_2d' : inferRunnerFromPrompt(prompt) ? 'runner_2d' : '';
   const finalSlug = slug || toSlug(title);
@@ -217,7 +244,11 @@ function normalizeBrief(raw: Record<string, unknown>, prompt: string, platform: 
     monetizationNotes: isNonEmptyString(raw.monetizationNotes) ? raw.monetizationNotes.trim() : '',
     releaseNotes: isNonEmptyString(raw.releaseNotes) ? raw.releaseNotes.trim() : '',
     storeShortDescription,
-    storeFullDescription
+    storeFullDescription,
+    google_play_required: typeof raw.google_play_required === 'boolean' ? raw.google_play_required : true,
+    google_play_account_status: googlePlayAccountStatus,
+    publishing_blockers: publishingBlockers.length > 0 ? publishingBlockers : ['Google Play readiness checklist not confirmed.'],
+    delivery_mode: deliveryMode
   };
 }
 
@@ -232,6 +263,7 @@ function getParseFailureReason(brief: GameBrief): ParseFailureReason | null {
   if (!isNonEmptyString(brief.releaseNotes)) return 'missing_release_notes';
   if (!isNonEmptyString(brief.storeShortDescription)) return 'missing_store_short_description';
   if (!isNonEmptyString(brief.storeFullDescription)) return 'missing_store_full_description';
+  if (!Array.isArray(brief.publishing_blockers)) return 'invalid_json';
   return null;
 }
 
@@ -318,11 +350,15 @@ export async function POST(request: Request) {
                   `Kullanıcı oyun fikri: ${prompt}\n` +
                   `Hedef platform: ${targetPlatform}\n\n` +
                   'Aşağıdaki alanlarla bir oyun brief JSON nesnesi üret:\n' +
-                  'title, slug, packageName, summary, gameType, targetPlatform, mechanics, visualStyle, controls, monetizationNotes, releaseNotes, storeShortDescription, storeFullDescription\n\n' +
+                  'title, slug, packageName, summary, gameType, targetPlatform, mechanics, visualStyle, controls, monetizationNotes, releaseNotes, storeShortDescription, storeFullDescription, google_play_required, google_play_account_status, publishing_blockers, delivery_mode\n\n' +
                   'Kurallar:\n' +
                   '- gameType değeri kesinlikle "runner_2d" olmalı.\n' +
                   '- targetPlatform değeri kesinlikle "android" olmalı.\n' +
                   '- mechanics en az 1 maddelik dizi olmalı.\n' +
+                  '- google_play_required boolean olmalı.\n' +
+                  '- google_play_account_status başlangıçta "unknown" olmalı.\n' +
+                  '- publishing_blockers en az bir açıklayıcı madde içermeli.\n' +
+                  '- delivery_mode başlangıçta "setup_assisted" olmalı.\n' +
                   '- Sadece JSON döndür.'
               }
             ]

@@ -19,7 +19,13 @@ type GameBrief = {
   releaseNotes: string;
   storeShortDescription: string;
   storeFullDescription: string;
+  google_play_required: boolean;
+  google_play_account_status: 'unknown' | 'user_has_account' | 'user_needs_setup' | 'artifact_only';
+  publishing_blockers: string[];
+  delivery_mode: 'apk_aab_only' | 'play_publish' | 'setup_assisted';
 };
+
+type GooglePlayAccountChoice = 'user_has_account' | 'artifact_only' | 'user_needs_setup';
 
 async function getAccessToken() {
   const supabase = createSupabaseBrowserClient();
@@ -38,6 +44,9 @@ export default function NewGameFactoryPage() {
   const [projectId, setProjectId] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  const [googlePlayAccountChoice, setGooglePlayAccountChoice] = useState<GooglePlayAccountChoice | ''>('');
+  const [ackAccountRequired, setAckAccountRequired] = useState(false);
+  const [ackUserResponsibilities, setAckUserResponsibilities] = useState(false);
   const router = useRouter();
 
   const isCreateDisabled = useMemo(() => loading || prompt.trim().length < 10, [loading, prompt]);
@@ -84,7 +93,14 @@ export default function NewGameFactoryPage() {
       const response = await fetch('/api/game-factory/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ projectId })
+        body: JSON.stringify({
+          projectId,
+          googlePlayAccountStatus: googlePlayAccountChoice,
+          confirmations: {
+            understandPlayConsoleRequired: ackAccountRequired,
+            understandUserResponsibility: ackUserResponsibilities
+          }
+        })
       });
       const data = (await response.json()) as { ok: boolean; error?: string };
       if (!response.ok || !data.ok) {
@@ -160,13 +176,38 @@ export default function NewGameFactoryPage() {
           <p><b>Store kısa açıklama:</b> {brief.storeShortDescription}</p>
           <p><b>Görsel stil:</b> {brief.visualStyle}</p>
           <p><b>Kontroller:</b> {brief.controls}</p>
+          <p><b>Google Play gerekliliği:</b> {brief.google_play_required ? 'Gerekli (yayın için)' : 'Gerekli değil'}</p>
+          <p><b>Teslim modu:</b> {brief.delivery_mode}</p>
           <ul className="list-disc pl-5">
             {brief.mechanics.map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>
+          <fieldset className="space-y-2 rounded-lg border border-white/15 p-3">
+            <legend className="px-1 text-xs text-white/70">Google Play ön onay checklist</legend>
+            <label className="flex items-start gap-2">
+              <input type="radio" name="gp_choice" checked={googlePlayAccountChoice === 'user_has_account'} onChange={() => setGooglePlayAccountChoice('user_has_account')} />
+              <span>I have a Google Play Console developer account.</span>
+            </label>
+            <label className="flex items-start gap-2">
+              <input type="radio" name="gp_choice" checked={googlePlayAccountChoice === 'artifact_only'} onChange={() => setGooglePlayAccountChoice('artifact_only')} />
+              <span>I do not have a Play Console account; deliver APK/AAB only.</span>
+            </label>
+            <label className="flex items-start gap-2">
+              <input type="radio" name="gp_choice" checked={googlePlayAccountChoice === 'user_needs_setup'} onChange={() => setGooglePlayAccountChoice('user_needs_setup')} />
+              <span>I need setup assistance.</span>
+            </label>
+            <label className="flex items-start gap-2">
+              <input type="checkbox" checked={ackAccountRequired} onChange={(event) => setAckAccountRequired(event.target.checked)} />
+              <span>I understand Play Store publishing requires a user-owned Google Play Console account.</span>
+            </label>
+            <label className="flex items-start gap-2">
+              <input type="checkbox" checked={ackUserResponsibilities} onChange={(event) => setAckUserResponsibilities(event.target.checked)} />
+              <span>I understand account registration, identity verification, fees, payment/tax profile, and policy compliance are user responsibility.</span>
+            </label>
+          </fieldset>
           <div className="flex gap-2">
-            <button type="button" onClick={approveProject} disabled={loading} className="rounded-lg bg-neon px-4 py-2 font-semibold text-ink disabled:opacity-50">
+            <button type="button" onClick={approveProject} disabled={loading || !googlePlayAccountChoice || !ackAccountRequired || !ackUserResponsibilities} className="rounded-lg bg-neon px-4 py-2 font-semibold text-ink disabled:opacity-50">
               Onayla ve Devam Et
             </button>
             <button type="button" onClick={() => setStep(1)} disabled={loading} className="rounded-lg border border-white/20 px-4 py-2 disabled:opacity-50">
