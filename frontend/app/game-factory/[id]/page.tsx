@@ -10,12 +10,39 @@ export const dynamic = 'force-dynamic';
 
 type BuildRow = {
   id: string;
+  unity_game_project_id: string | null;
   status: string | null;
   created_at: string | null;
   updated_at: string | null;
   artifact_url: string | null;
   metadata: Record<string, unknown> | null;
 };
+
+function readDetectedPackageName(metadata: Record<string, unknown> | null): string | null {
+  if (!metadata) return null;
+  const detected = metadata.detected_package_name;
+  if (typeof detected === 'string' && detected.trim()) return detected.trim();
+  const packageName = metadata.package_name;
+  if (typeof packageName === 'string' && packageName.trim()) return packageName.trim();
+  return null;
+}
+
+function resolveBuildDownloadState(build: BuildRow, params: { projectId: string; projectPackageName: string | null }): { url: string | null; message: string | null } {
+  const ownershipMismatch = build.unity_game_project_id !== params.projectId;
+  if (ownershipMismatch) {
+    return { url: null, message: 'Bu artifact bu projeye ait değil.' };
+  }
+
+  const detectedPackageName = readDetectedPackageName(build.metadata);
+  if (params.projectPackageName && detectedPackageName && params.projectPackageName !== detectedPackageName) {
+    return {
+      url: null,
+      message: `Package name uyuşmuyor. Beklenen: ${params.projectPackageName}, bulunan: ${detectedPackageName}`
+    };
+  }
+
+  return { url: build.artifact_url, message: null };
+}
 
 function normalizeBuildStatus(status: string | null): string {
   if (status === 'started') return 'running';
@@ -87,7 +114,7 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
       .maybeSingle(),
     supabase
       .from('unity_build_jobs')
-      .select('id, status, created_at, updated_at, artifact_url, metadata')
+      .select('id, unity_game_project_id, status, created_at, updated_at, artifact_url, metadata')
       .eq('unity_game_project_id', id)
       .order('created_at', { ascending: false })
       .limit(10)
@@ -100,6 +127,9 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
 
   const dedupedBuilds = pickLatestBuildPerNumber((builds ?? []) as BuildRow[]);
   const latestBuild = dedupedBuilds[0] ?? null;
+  const latestDownload = latestBuild
+    ? resolveBuildDownloadState(latestBuild, { projectId: id, projectPackageName: project.package_name ?? null })
+    : null;
 
   return (
     <main className="panel space-y-4">
@@ -125,11 +155,11 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
         <h2 className="mb-2 text-lg font-semibold">Son Build</h2>
         <p><b>Durum:</b> {latestBuild ? <span className={`rounded-full px-3 py-1 text-xs ${statusBadge(normalizeBuildStatus(latestBuild.status))}`}>{normalizeBuildStatus(latestBuild.status)}</span> : 'Henüz build yok'}</p>
         <p><b>Tarih:</b> {latestBuild?.created_at ? new Date(latestBuild.created_at).toLocaleString('tr-TR') : '—'}</p>
-        {latestBuild?.artifact_url ? (
-          <a href={latestBuild.artifact_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex rounded-lg border border-white/20 px-3 py-2">
+        {latestDownload?.url ? (
+          <a href={latestDownload.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex rounded-lg border border-white/20 px-3 py-2">
             İndir
           </a>
-        ) : null}
+        ) : latestDownload?.message ? <p className="mt-2 text-amber-200">{latestDownload.message}</p> : null}
       </section>
 
       <section className="overflow-x-auto rounded-xl border border-white/10 bg-black/20 p-4">
@@ -149,7 +179,13 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
                 <td className="px-3 py-2">{displayBuildNumber(build, dedupedBuilds.length - index)}</td>
                 <td className="px-3 py-2"><span className={`rounded-full px-3 py-1 text-xs ${statusBadge(normalizeBuildStatus(build.status))}`}>{normalizeBuildStatus(build.status)}</span></td>
                 <td className="px-3 py-2">{build.created_at ? new Date(build.created_at).toLocaleString('tr-TR') : '—'}</td>
-                <td className="px-3 py-2">{build.artifact_url ? <a href={build.artifact_url} target="_blank" rel="noreferrer" className="underline">İndir</a> : '—'}</td>
+                <td className="px-3 py-2">
+                  {(() => {
+                    const download = resolveBuildDownloadState(build, { projectId: id, projectPackageName: project.package_name ?? null });
+                    if (download.url) return <a href={download.url} target="_blank" rel="noreferrer" className="underline">İndir</a>;
+                    return download.message ?? '—';
+                  })()}
+                </td>
               </tr>
             ))}
           </tbody>

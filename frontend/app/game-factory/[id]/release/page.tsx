@@ -8,6 +8,15 @@ import { BuildStatusAutoRefresh } from '@/app/game-factory/[id]/BuildStatusAutoR
 
 export const dynamic = 'force-dynamic';
 
+function readDetectedPackageName(metadata: Record<string, unknown> | null): string | null {
+  if (!metadata) return null;
+  const detected = metadata.detected_package_name;
+  if (typeof detected === 'string' && detected.trim()) return detected.trim();
+  const packageName = metadata.package_name;
+  if (typeof packageName === 'string' && packageName.trim()) return packageName.trim();
+  return null;
+}
+
 export default async function GameFactoryReleasePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createSupabaseReadonlyServerClient();
@@ -76,6 +85,18 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
   ];
   const latestPreflightBlockers = Array.isArray(latestPreflight?.blockers) ? (latestPreflight.blockers as string[]) : [];
   const latestPreflightWarnings = Array.isArray(latestPreflight?.warnings) ? (latestPreflight.warnings as string[]) : [];
+  const artifactBelongsToProject = Boolean(artifact?.file_url && artifact?.unity_game_project_id === id);
+  const artifactBelongsToBuild = !artifact?.unity_build_job_id || !buildJob?.id || artifact.unity_build_job_id === buildJob.id;
+  const detectedPackageName = readDetectedPackageName((artifact?.metadata as Record<string, unknown> | null) ?? null);
+  const packageMismatch = Boolean(project.package_name && detectedPackageName && project.package_name !== detectedPackageName);
+  const releaseArtifactMessage = !artifact?.file_url
+    ? null
+    : !artifactBelongsToProject || !artifactBelongsToBuild
+      ? 'Bu artifact bu projeye ait değil.'
+      : packageMismatch
+        ? `Package name uyuşmuyor. Beklenen: ${project.package_name}, bulunan: ${detectedPackageName}`
+        : null;
+  const releaseArtifactUrl = releaseArtifactMessage ? null : artifact?.file_url ?? null;
 
   return (
     <main>
@@ -107,13 +128,15 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
           <p>Detaylı açıklama: {brief?.store_full_description ?? '-'}</p>
           <p>
             AAB:{' '}
-            {artifact?.file_url ? (
+            {releaseArtifactUrl ? (
               <span>
                 AAB oluşturuldu ·{' '}
-                <a className="text-neon underline" href={artifact.file_url}>
+                <a className="text-neon underline" href={releaseArtifactUrl}>
                   AAB indir
                 </a>
               </span>
+            ) : releaseArtifactMessage ? (
+              releaseArtifactMessage
             ) : (
               'Yok'
             )}
