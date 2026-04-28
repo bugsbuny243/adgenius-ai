@@ -35,6 +35,8 @@ type GameBrief = {
   blockersBeforePublish: string[];
 };
 
+type GooglePlayAccountChoice = 'user_has_account' | 'artifact_only' | 'user_needs_setup';
+
 async function getAccessToken() {
   const supabase = createSupabaseBrowserClient();
   if (!supabase) throw new Error('Supabase yapılandırması eksik.');
@@ -119,7 +121,14 @@ export default function NewGameFactoryPage() {
       const response = await fetch('/api/game-factory/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ projectId })
+        body: JSON.stringify({
+          projectId,
+          googlePlayAccountStatus: googlePlayAccountChoice,
+          confirmations: {
+            understandPlayConsoleRequired: ackAccountRequired,
+            understandUserResponsibility: ackUserResponsibilities
+          }
+        })
       });
       const data = (await response.json()) as { ok: boolean; error?: string };
       if (!response.ok || !data.ok) {
@@ -195,6 +204,8 @@ export default function NewGameFactoryPage() {
           <p><b>Store kısa açıklama:</b> {brief.storeShortDescription}</p>
           <p><b>Görsel stil:</b> {brief.visualStyle}</p>
           <p><b>Kontroller:</b> {brief.controls}</p>
+          <p><b>Google Play gerekliliği:</b> {brief.google_play_required ? 'Gerekli (yayın için)' : 'Gerekli değil'}</p>
+          <p><b>Teslim modu:</b> {brief.delivery_mode}</p>
           <ul className="list-disc pl-5">
             {brief.mechanics.map((item) => (
               <li key={item}>{item}</li>

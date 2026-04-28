@@ -300,6 +300,7 @@ function getParseFailureReason(brief: GameBrief): ParseFailureReason | null {
   if (!isNonEmptyString(brief.releaseNotes)) return 'missing_release_notes';
   if (!isNonEmptyString(brief.storeShortDescription)) return 'missing_store_short_description';
   if (!isNonEmptyString(brief.storeFullDescription)) return 'missing_store_full_description';
+  if (!Array.isArray(brief.publishing_blockers)) return 'invalid_json';
   return null;
 }
 

@@ -24,6 +24,12 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
     supabase.from('game_artifacts').select('*').eq('unity_game_project_id', id).eq('artifact_type', 'aab').order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('user_integrations').select('id, display_name, service_account_email, default_track, status').eq('user_id', user.id).eq('provider', 'google_play').order('created_at', { ascending: false })
   ]);
+  const { data: readiness } = await supabase
+    .from('google_play_readiness')
+    .select('delivery_mode, google_play_account_status, confirmed_at, confirmed_requirements')
+    .eq('project_id', id)
+    .eq('user_id', user.id)
+    .maybeSingle();
 
   if (!project) notFound();
 
@@ -47,6 +53,9 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
           <p>Build durumu: {buildJob?.id ? <BuildStatusAutoRefresh jobId={buildJob.id} initialStatus={buildJob.status} withLabel /> : '-'}</p>
           <p>Yayın kanalı: {releaseJob?.track ?? project.release_track}</p>
           <p>Google Play bağlantısı: {selectedIntegration?.display_name ?? 'Seçilmedi'}</p>
+          <p>Teslim modu: {deliveryMode}</p>
+          <p>Google Play hesap durumu: {readinessStatus}</p>
+          <p>Checklist onayı: {readiness?.confirmed_at ? new Date(readiness.confirmed_at).toLocaleString('tr-TR') : 'Bekleniyor'}</p>
           <p>Kısa açıklama: {brief?.store_short_description ?? '-'}</p>
           <p>Detaylı açıklama: {brief?.store_full_description ?? '-'}</p>
           <p>
@@ -109,13 +118,19 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
           </form>
         ) : null}
 
-        {artifact?.file_url ? (
+        {publishBlockedReason ? (
+          <p className="text-sm text-white/70">{publishBlockedReason}</p>
+        ) : (
           <form action={publishReleaseAction.bind(null, id)} className="space-y-2">
             <PublishButton label="Google Play’e gönder" />
           </form>
-        ) : (
-          <p className="text-sm text-white/70">Google Play yayını için önce AAB dosyasının oluşması gerekir.</p>
         )}
+
+        {deliveryMode === 'setup_assisted' ? (
+          <div className="rounded-xl border border-blue-400/30 bg-blue-500/10 p-4 text-sm text-blue-100">
+            Setup assisted durumu aktif. Build devam eder; yayın yalnızca Google Play entegrasyonu bağlanıp doğrulandıktan sonra açılır.
+          </div>
+        ) : null}
 
         {shouldShowConnectionWarning ? (
           <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100 space-y-2">
