@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { Nav } from '@/components/nav';
 import { createSupabaseReadonlyServerClient } from '@/lib/supabase-server';
 import { getWorkspaceContextOrNull } from '@/lib/workspace';
+import { isPlatformOwner } from '@/lib/owner-auth';
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false }
@@ -62,12 +63,13 @@ export default async function DashboardPage() {
   const paymentOrders = paymentOrdersRes.data ?? [];
 
   const planName = subscription?.plan_name ?? 'free';
+  const showOwnerLink = isPlatformOwner(user);
   const planTier = planName.toLowerCase() === 'free' ? 'free' : 'paid';
   const usageSummary = usageItems.length;
 
   return (
     <main>
-      <Nav />
+      <Nav showOwnerLink={showOwnerLink} />
 
       <section className="panel mb-4">
         <p className="text-xs uppercase tracking-wide text-lilac">Dashboard</p>

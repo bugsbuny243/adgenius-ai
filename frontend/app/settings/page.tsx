@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { Nav } from '@/components/nav';
 import { createSupabaseReadonlyServerClient } from '@/lib/supabase-server';
 import { getWorkspaceContextOrNull } from '@/lib/workspace';
+import { isPlatformOwner } from '@/lib/owner-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,9 +23,11 @@ export default async function SettingsPage() {
     supabase.from('usage_counters').select('*').eq('workspace_id', workspace.workspaceId).limit(50)
   ]);
 
+  const showOwnerLink = isPlatformOwner(user);
+
   return (
     <main>
-      <Nav />
+      <Nav showOwnerLink={showOwnerLink} />
       <section className="mb-4 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">Profil, plan ve kullanım özetini tek ekranda yönetin.</section>
       <section className="grid gap-4 lg:grid-cols-2">
         <article className="panel"><h2 className="text-xl font-semibold">Profil</h2><div className="mt-3 space-y-2 text-sm text-white/80"><p><span className="text-white/60">Ad:</span> {profile?.full_name ?? 'Belirtilmedi'}</p><p><span className="text-white/60">E-posta:</span> {profile?.email ?? 'Belirtilmedi'}</p></div></article>

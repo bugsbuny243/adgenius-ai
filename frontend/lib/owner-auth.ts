@@ -10,6 +10,20 @@ function normalizeValue(value?: string | null): string | null {
   return normalized.length > 0 ? normalized : null;
 }
 
+function getOwnerEmailAllowlist(): string[] {
+  const ownerEmail = normalizeValue(process.env.OWNER_EMAIL)?.toLowerCase();
+  const ownerEmailAllowlist = normalizeValue(process.env.OWNER_EMAIL_ALLOWLIST)
+    ?.split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter((item) => item.length > 0) ?? [];
+
+  if (ownerEmail) {
+    ownerEmailAllowlist.push(ownerEmail);
+  }
+
+  return Array.from(new Set(ownerEmailAllowlist));
+}
+
 export async function getCurrentUser(): Promise<User | null> {
   const supabase = await createSupabaseServerClient();
   const {
@@ -23,13 +37,13 @@ export function isPlatformOwner(user: Pick<User, 'id' | 'email'> | null | undefi
   if (!user) return false;
 
   const ownerUserId = normalizeValue(process.env.OWNER_USER_ID);
-  const ownerEmail = normalizeValue(process.env.OWNER_EMAIL)?.toLowerCase();
+  const ownerEmails = getOwnerEmailAllowlist();
 
   const normalizedUserId = normalizeValue(user.id);
   const normalizedEmail = normalizeValue(user.email)?.toLowerCase();
 
   if (ownerUserId && normalizedUserId === ownerUserId) return true;
-  if (ownerEmail && normalizedEmail === ownerEmail) return true;
+  if (normalizedEmail && ownerEmails.includes(normalizedEmail)) return true;
 
   return false;
 }

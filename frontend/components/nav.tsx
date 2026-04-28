@@ -12,11 +12,7 @@ const userLinks = [
 ] as const satisfies ReadonlyArray<{ href: Route; label: string }>;
 
 const ownerLinks = [
-  { href: '/owner', label: 'Genel Bakış' },
-  { href: '/owner/users', label: 'Kullanıcılar' },
-  { href: '/owner/payments', label: 'Ödemeler' },
-  { href: '/owner/subscriptions', label: 'Abonelikler' },
-  { href: '/owner/integrations', label: 'Sistem Entegrasyonları' }
+  { href: '/owner', label: 'Owner Panel' }
 ] as const satisfies ReadonlyArray<{ href: Route; label: string }>;
 
 type NavProps = {
