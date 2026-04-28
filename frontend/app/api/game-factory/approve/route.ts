@@ -105,6 +105,7 @@ export async function POST(request: Request) {
 
   return json({
     ok: true,
+    unity_game_project_id: approvedProject.id,
     unity_game_project: {
       id: approvedProject.id,
       title: approvedProject.app_name,

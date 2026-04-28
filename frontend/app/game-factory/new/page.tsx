@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
@@ -70,7 +71,7 @@ async function getAccessToken() {
 }
 
 export default function NewGameFactoryPage() {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2>(1);
   const [platform, setPlatform] = useState<Platform>('android');
   const [prompt, setPrompt] = useState('');
   const [brief, setBrief] = useState<GameBrief | null>(null);
@@ -181,6 +182,7 @@ export default function NewGameFactoryPage() {
       const data = (await response.json()) as {
         ok: boolean;
         error?: string;
+        unity_game_project_id?: string;
         unity_game_project?: {
           id?: string;
           title?: string | null;
@@ -190,34 +192,11 @@ export default function NewGameFactoryPage() {
       if (!response.ok || !data.ok) {
         throw new Error(data.error ?? 'Onay işlemi başarısız.');
       }
-      const approvedProjectId = data.unity_game_project?.id?.trim();
+      const approvedProjectId = data.unity_game_project_id?.trim();
       if (!approvedProjectId) {
-        throw new Error('Proje bulunamadı.');
+        throw new Error('Proje oluşturuldu ancak proje bağlantısı alınamadı. Lütfen Game Factory listesine dönün.');
       }
-      setProjectId(approvedProjectId);
-      setStep(3);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Bir hata oluştu.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function startBuild() {
-    setLoading(true);
-    setError('');
-    try {
-      const token = await getAccessToken();
-      const response = await fetch('/api/game-factory/build', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ projectId })
-      });
-      const data = (await response.json()) as { ok: boolean; error?: string };
-      if (!response.ok || !data.ok) {
-        throw new Error(data.error ?? 'Build başlatılamadı.');
-      }
-      router.push(`/game-factory/${projectId}/builds`);
+      router.push(`/game-factory/${approvedProjectId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Bir hata oluştu.');
     } finally {
@@ -342,17 +321,16 @@ export default function NewGameFactoryPage() {
         </section>
       ) : null}
 
-      {step === 3 ? (
-        <section className="space-y-3 rounded-xl border border-white/10 bg-black/20 p-4">
-          <h2 className="text-xl font-semibold">3) Build Başlat</h2>
-          <p className="text-sm text-white/70">Projen onaylandı. Şimdi ilk build işlemini başlatabilirsin.</p>
-          <button type="button" onClick={startBuild} disabled={loading} className="rounded-lg bg-neon px-4 py-2 font-semibold text-ink disabled:opacity-50">
-            Build Başlat
-          </button>
-        </section>
+      {error ? (
+        <div className="space-y-3 rounded-lg border border-red-500/30 bg-red-950/30 p-3 text-sm text-red-200">
+          <p>{error}</p>
+          {error === 'Proje oluşturuldu ancak proje bağlantısı alınamadı. Lütfen Game Factory listesine dönün.' ? (
+            <Link href="/game-factory" className="inline-flex rounded-lg border border-white/20 px-3 py-2 text-white">
+              Game Factory listesine dön
+            </Link>
+          ) : null}
+        </div>
       ) : null}
-
-      {error ? <p className="rounded-lg border border-red-500/30 bg-red-950/30 p-3 text-sm text-red-200">{error}</p> : null}
     </main>
   );
 }
