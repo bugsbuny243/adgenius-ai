@@ -19,6 +19,14 @@ type BuildRow = {
   metadata: Record<string, unknown> | null;
 };
 
+type ArtifactRow = {
+  unity_build_job_id: string | null;
+  unity_game_project_id: string | null;
+  file_url: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string | null;
+};
+
 function readDetectedPackageName(metadata: Record<string, unknown> | null): string | null {
   if (!metadata) return null;
   const detected = metadata.detected_package_name;
@@ -28,13 +36,19 @@ function readDetectedPackageName(metadata: Record<string, unknown> | null): stri
   return null;
 }
 
-function resolveBuildDownloadState(build: BuildRow, params: { projectId: string; projectPackageName: string | null }): { url: string | null; message: string | null } {
-  const ownershipMismatch = build.unity_game_project_id !== params.projectId;
+function resolveBuildDownloadState(
+  build: BuildRow,
+  artifact: ArtifactRow | null,
+  params: { projectId: string; projectPackageName: string | null }
+): { url: string | null; message: string | null } {
+  const ownershipMismatch =
+    build.unity_game_project_id !== params.projectId ||
+    (artifact && (artifact.unity_game_project_id !== params.projectId || artifact.unity_build_job_id !== build.id));
   if (ownershipMismatch) {
     return { url: null, message: 'Bu artifact bu projeye ait değil.' };
   }
 
-  const detectedPackageName = readDetectedPackageName(build.metadata);
+  const detectedPackageName = readDetectedPackageName(artifact?.metadata ?? build.metadata);
   if (params.projectPackageName && detectedPackageName && params.projectPackageName !== detectedPackageName) {
     return {
       url: null,
@@ -42,7 +56,7 @@ function resolveBuildDownloadState(build: BuildRow, params: { projectId: string;
     };
   }
 
-  return { url: build.artifact_url, message: null };
+  return { url: build.artifact_url ?? artifact?.file_url ?? null, message: null };
 }
 
 function normalizeBuildStatus(status: string | null): string {
@@ -146,11 +160,28 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
 
   const brief = (project.game_brief ?? {}) as Record<string, unknown>;
   const features = Array.isArray(brief.keyFeatures) ? brief.keyFeatures.map((item) => String(item)) : [];
+  const buildIds = (builds ?? []).map((build) => build.id);
+  const artifactMap = new Map<string, ArtifactRow>();
+
+  if (buildIds.length > 0) {
+    const { data: artifacts } = await supabase
+      .from('game_artifacts')
+      .select('unity_build_job_id, unity_game_project_id, file_url, metadata, created_at')
+      .in('unity_build_job_id', buildIds)
+      .order('created_at', { ascending: false });
+
+    for (const artifact of artifacts ?? []) {
+      if (!artifact.unity_build_job_id || !artifact.file_url) continue;
+      if (!artifactMap.has(artifact.unity_build_job_id)) {
+        artifactMap.set(artifact.unity_build_job_id, artifact as ArtifactRow);
+      }
+    }
+  }
 
   const dedupedBuilds = pickLatestBuildPerNumber((builds ?? []) as BuildRow[]);
   const latestBuild = dedupedBuilds[0] ?? null;
   const latestDownload = latestBuild
-    ? resolveBuildDownloadState(latestBuild, { projectId: id, projectPackageName: project.package_name ?? null })
+    ? resolveBuildDownloadState(latestBuild, artifactMap.get(latestBuild.id) ?? null, { projectId: id, projectPackageName: project.package_name ?? null })
     : null;
 
   return (
@@ -204,7 +235,11 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
                 <td className="px-3 py-2">{build.created_at ? new Date(build.created_at).toLocaleString('tr-TR') : '—'}</td>
                 <td className="px-3 py-2">
                   {(() => {
-                    const download = resolveBuildDownloadState(build, { projectId: id, projectPackageName: project.package_name ?? null });
+                    const download = resolveBuildDownloadState(
+                      build,
+                      artifactMap.get(build.id) ?? null,
+                      { projectId: id, projectPackageName: project.package_name ?? null }
+                    );
                     if (download.url) return <a href={download.url} target="_blank" rel="noreferrer" className="underline">İndir</a>;
                     return download.message ?? '—';
                   })()}
