@@ -54,6 +54,8 @@ type GameBrief = {
   required_budget_to_include_deferred_features: number;
   infrastructure_gap_analysis: string[];
   recommended_next_step: string;
+  feature_status?: 'coming_soon';
+  warning?: string;
 };
 
 type GooglePlayAccountChoice = 'user_has_account' | 'artifact_only' | 'user_needs_setup';
@@ -75,7 +77,7 @@ export default function NewGameFactoryPage() {
   const [projectId, setProjectId] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
-  const [advancedIntake, setAdvancedIntake] = useState({
+  const [advancedIntake] = useState({
     project_type: 'other',
     desired_game_or_app_description: '',
     existing_server_provider: '',
@@ -164,20 +166,6 @@ export default function NewGameFactoryPage() {
       const ackAccountRequired = technicalChecks.google_play_ack;
       const ackUserResponsibilities = technicalChecks.publish_blocker_ack;
       const token = await getAccessToken();
-      const confirmationKeys = Object.entries(technicalChecks)
-        .filter(([, checked]) => checked)
-        .map(([key]) => key);
-
-      const technicalResponse = await fetch('/api/game-factory/technical-checklist/confirm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ projectId, confirmedItems: confirmationKeys })
-      });
-      const technicalPayload = (await technicalResponse.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
-      if (!technicalResponse.ok || !technicalPayload?.ok) {
-        throw new Error(technicalPayload?.error ?? 'Teknik gereksinim onayı tamamlanamadı.');
-      }
-
       const response = await fetch('/api/game-factory/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -248,45 +236,19 @@ export default function NewGameFactoryPage() {
             </button>
           </div>
           <div className="space-y-3 rounded-lg border border-white/15 bg-black/20 p-3 text-sm">
-            <h3 className="text-base font-semibold">Altyapı ve Bütçe Analizi</h3>
+            <h3 className="text-base font-semibold">Teknik Kapsam</h3>
             <p className="text-white/80">
-              Gelişmiş online/sunucu gerektiren projeler kullanıcıya ait altyapı veya yönetilen setup gerektirir.
-              Koschei, bütçene göre gerçekçi kapsam önerir ve özellikleri MVP + sonraki fazlara bölebilir.
+              Varsayılan akış normal Android tek oyunculu/offline oyunlar içindir. Multiplayer/server/MMO projeleri şu an <b>Yakında / Özel kapsam</b>.
             </p>
             <div className="grid gap-2 md:grid-cols-2">
-              <input value={advancedIntake.desired_game_or_app_description} onChange={(event) => setAdvancedIntake((prev) => ({ ...prev, desired_game_or_app_description: event.target.value }))} placeholder="desired_game_or_app_description" className="rounded-lg border border-white/20 bg-black/30 px-2 py-1 md:col-span-2" />
-              <input value={advancedIntake.project_type} onChange={(event) => setAdvancedIntake((prev) => ({ ...prev, project_type: event.target.value }))} placeholder="project_type" className="rounded-lg border border-white/20 bg-black/30 px-2 py-1" />
-              <input value={advancedIntake.existing_server_provider} onChange={(event) => setAdvancedIntake((prev) => ({ ...prev, existing_server_provider: event.target.value }))} placeholder="existing_server_provider" className="rounded-lg border border-white/20 bg-black/30 px-2 py-1" />
-              <input value={advancedIntake.one_time_budget_usd} onChange={(event) => setAdvancedIntake((prev) => ({ ...prev, one_time_budget_usd: event.target.value }))} placeholder="one_time_budget_usd" className="rounded-lg border border-white/20 bg-black/30 px-2 py-1" />
-              <input value={advancedIntake.monthly_infrastructure_budget_usd} onChange={(event) => setAdvancedIntake((prev) => ({ ...prev, monthly_infrastructure_budget_usd: event.target.value }))} placeholder="monthly_infrastructure_budget_usd" className="rounded-lg border border-white/20 bg-black/30 px-2 py-1" />
-              <input value={advancedIntake.expected_daily_users} onChange={(event) => setAdvancedIntake((prev) => ({ ...prev, expected_daily_users: event.target.value }))} placeholder="expected_daily_users" className="rounded-lg border border-white/20 bg-black/30 px-2 py-1" />
-              <input value={advancedIntake.expected_concurrent_users} onChange={(event) => setAdvancedIntake((prev) => ({ ...prev, expected_concurrent_users: event.target.value }))} placeholder="expected_concurrent_users" className="rounded-lg border border-white/20 bg-black/30 px-2 py-1" />
-              <input value={advancedIntake.target_regions} onChange={(event) => setAdvancedIntake((prev) => ({ ...prev, target_regions: event.target.value }))} placeholder="target_regions (virgülle)" className="rounded-lg border border-white/20 bg-black/30 px-2 py-1 md:col-span-2" />
-              <input value={advancedIntake.required_features} onChange={(event) => setAdvancedIntake((prev) => ({ ...prev, required_features: event.target.value }))} placeholder="required_features (virgülle)" className="rounded-lg border border-white/20 bg-black/30 px-2 py-1 md:col-span-2" />
-              <input value={advancedIntake.optional_features} onChange={(event) => setAdvancedIntake((prev) => ({ ...prev, optional_features: event.target.value }))} placeholder="optional_features (virgülle)" className="rounded-lg border border-white/20 bg-black/30 px-2 py-1 md:col-span-2" />
-              <select value={advancedIntake.delivery_mode} onChange={(event) => setAdvancedIntake((prev) => ({ ...prev, delivery_mode: event.target.value as DeliveryMode }))} className="rounded-lg border border-white/20 bg-black/30 px-2 py-1">
-                <option value="play_publish">play_publish</option>
-                <option value="setup_assisted">setup_assisted</option>
-                <option value="apk_aab_only">apk_aab_only</option>
-              </select>
-            </div>
-            <div className="grid gap-2 md:grid-cols-2">
-              {([
-                ['has_vps_or_dedicated_server', 'VPS/Dedicated server'],
-                ['has_backend_api', 'Backend API'],
-                ['has_database', 'Database'],
-                ['has_auth_system', 'Auth'],
-                ['has_realtime_server', 'Realtime server'],
-                ['has_domain_ssl', 'Domain+SSL'],
-                ['has_google_play_console', 'Google Play Console'],
-                ['has_admob_or_ads_account', 'AdMob/Ads account'],
-                ['has_iap_setup', 'IAP setup']
-              ] as const).map(([key, label]) => (
-                <label key={key} className="flex items-center gap-2">
-                  <input type="checkbox" checked={advancedIntake[key]} onChange={(event) => setAdvancedIntake((prev) => ({ ...prev, [key]: event.target.checked }))} />
-                  <span>{label}</span>
-                </label>
-              ))}
+              <label className="flex items-center gap-2 text-white/60">
+                <input type="checkbox" disabled />
+                <span>Multiplayer server (Yakında)</span>
+              </label>
+              <label className="flex items-center gap-2 text-white/60">
+                <input type="checkbox" disabled />
+                <span>Realtime server (Yakında)</span>
+              </label>
             </div>
           </div>
           <button type="button" disabled={isCreateDisabled} onClick={createBrief} className="rounded-lg bg-neon px-4 py-2 font-semibold text-ink disabled:opacity-50">
@@ -315,19 +277,23 @@ export default function NewGameFactoryPage() {
           </ul>
           <div className="space-y-2 rounded-lg border border-white/15 bg-black/25 p-3">
             <h3 className="text-base font-semibold">Technical Requirements</h3>
+            {brief.feature_status === 'coming_soon' ? (
+              <p className="rounded-md border border-amber-500/40 bg-amber-900/20 p-2 text-amber-200">{brief.warning}</p>
+            ) : null}
             <p><b>Karmaşıklık:</b> {brief.complexityLevel}</p>
             <p><b>Altyapı seviyesi:</b> {brief.infrastructureLevel}</p>
             <p><b>Gerekli altyapı:</b> {brief.requiredInfrastructure.length ? brief.requiredInfrastructure.join(', ') : 'Yok'}</p>
             <p><b>Google Play hesabı:</b> Gerekli (veya sadece APK/AAB teslim seçeneği)</p>
             <p><b>Server/Backend/DB:</b> {brief.backendRequired ? 'Gerekli' : 'Gerekli değil'}</p>
-            <p><b>IAP gereksinimi:</b> {brief.iapRequired ? 'Gerekli' : 'Yok'}</p>
-            <p><b>Ads gereksinimi:</b> {brief.adsRequired ? 'Gerekli' : 'Yok'}</p>
+            <p><b>Realtime server:</b> {brief.multiplayerRequired ? 'Yakında / Özel kapsam' : 'Gerekli değil'}</p>
+            <p><b>IAP:</b> {brief.iapRequired ? 'Opsiyonel (ayrı kurulum gerektirir)' : 'Opsiyonel, ayrıca kurulum gerektirir'}</p>
+            <p><b>Ads/AdMob:</b> {brief.adsRequired ? 'Opsiyonel (ayrı kurulum gerektirir)' : 'Opsiyonel, ayrıca kurulum gerektirir'}</p>
             <p><b>Kullanıcı sorumlulukları:</b> Hesap bağlantıları, dış servis kurulumları, politika/uyumluluk belgeleri</p>
             <p><b>Opsiyonel kurulum hizmetleri:</b> Backend/IAP/Ads entegrasyon desteği ayrıca planlanabilir</p>
             <p><b>Özel kapsam:</b> {brief.requires_custom_scope ? 'Gerekli' : 'Gerekli değil'}</p>
             <p><b>Tahmini minimum bütçe:</b> ${brief.estimated_minimum_budget}</p>
             <p><b>Tahmini aylık altyapı:</b> ${brief.estimated_monthly_infrastructure_cost}</p>
-            <p><b>Deferred özellikler için gerekli bütçe:</b> ${brief.required_budget_to_include_deferred_features}</p>
+            <p><b>Minimum altyapı bütçesi:</b> ${brief.required_budget_to_include_deferred_features}</p>
             <p><b>Önerilen sonraki adım:</b> {brief.recommended_next_step}</p>
             <p><b>Feasible MVP scope:</b> {brief.feasible_mvp_scope.join(', ') || 'Yok'}</p>
             <p><b>Deferred features:</b> {brief.deferred_features.join(', ') || 'Yok'}</p>
@@ -353,7 +319,7 @@ export default function NewGameFactoryPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            <button type="button" onClick={approveProject} disabled={loading || Object.values(technicalChecks).some((v) => !v)} className="rounded-lg bg-neon px-4 py-2 font-semibold text-ink disabled:opacity-50">
+            <button type="button" onClick={approveProject} disabled={loading || brief.feature_status === 'coming_soon'} className="rounded-lg bg-neon px-4 py-2 font-semibold text-ink disabled:opacity-50">
               Onayla ve Devam Et
             </button>
             <button type="button" onClick={() => setStep(1)} disabled={loading} className="rounded-lg border border-white/20 px-4 py-2 disabled:opacity-50">

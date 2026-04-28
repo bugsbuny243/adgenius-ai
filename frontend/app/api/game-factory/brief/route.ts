@@ -352,8 +352,8 @@ function inferRunnerFromPrompt(prompt: string): boolean {
 
 function inferTechnicalRequirements(prompt: string, monetizationNotes: string) {
   const haystack = `${prompt} ${monetizationNotes}`.toLowerCase();
-  const multiplayerRequired = /(multiplayer|çok oyunculu|co-op|coop|pvp|realtime|real-time|socket|matchmaking)/i.test(haystack);
-  const backendRequired = /(backend|sunucu|server|api|auth|giriş|login|hesap|database|veritaban|firebase|leaderboard|bulut)/i.test(haystack) || multiplayerRequired;
+  const multiplayerRequired = /(multiplayer|çok oyunculu|co-op|coop|pvp|realtime|real-time|socket|matchmaking|mmo)/i.test(haystack);
+  const backendRequired = /(backend|sunucu|server|api|auth|database|veritaban|hesap sistemi|account system|economy|ekonomi|live ops)/i.test(haystack) || multiplayerRequired;
   const iapRequired = /(iap|in-app|in app|satın al|purchase|coin pack|premium item|store)/i.test(haystack);
   const adsRequired = /(ads|admob|ad unit|rewarded|interstitial|banner|reklam)/i.test(haystack);
   const subscriptionsRequired = /(subscription|abonelik|monthly|yearly)/i.test(haystack);
@@ -382,9 +382,9 @@ function inferTechnicalRequirements(prompt: string, monetizationNotes: string) {
     ...(backendRequired ? ['Backend endpoints configured'] : [])
   ];
 
-  const technicalCount = [multiplayerRequired, backendRequired, iapRequired, adsRequired, subscriptionsRequired].filter(Boolean).length;
+  const technicalCount = [multiplayerRequired, backendRequired].filter(Boolean).length;
   const complexityLevel: ComplexityLevel = technicalCount >= 3 ? 'advanced' : technicalCount >= 1 ? 'medium' : 'simple';
-  const infrastructureRequired = backendRequired || multiplayerRequired || iapRequired || adsRequired;
+  const infrastructureRequired = backendRequired || multiplayerRequired;
   const infrastructureLevel: InfrastructureLevel = !infrastructureRequired ? 'none' : multiplayerRequired || backendRequired ? 'advanced' : 'basic';
 
   return {
@@ -400,21 +400,27 @@ function inferTechnicalRequirements(prompt: string, monetizationNotes: string) {
     backendRequired,
     multiplayerRequired,
     publishingRequirements,
-    blockersBeforeBuild: infrastructureRequired ? ['Technical checklist confirmation required before build.'] : [],
+    blockersBeforeBuild: [],
     blockersBeforePublish: ['Google Play integration, release configuration and required monetization/backend setup must be complete before publish.']
   };
 }
 
-const COMING_SOON_WARNING = 'Bu özellikler yakında desteklenecek profesyonel altyapı paketine dahildir.';
+const COMING_SOON_WARNING = 'Bu proje multiplayer/server altyapısı gerektirir. Bu özellik şu an yakında/özel kapsam olarak değerlendirilecektir.';
 
-function inferComingSoonInfrastructureRequirement(prompt: string, intake: NormalizedAdvancedIntake): boolean {
+function hasAdvancedScopeRequest(prompt: string, intake: NormalizedAdvancedIntake): boolean {
   const featureHaystack = intake.requiredFeatures.join(' ');
   const haystack = `${prompt} ${featureHaystack} ${intake.projectType}`.toLowerCase();
-  return /(multiplayer|çok oyunculu|mmo|live[-\s]?service|realtime|real-time|matchmaking|lobby|chat server|dedicated server|game server|socket|sunucu|server)/i.test(haystack)
+  return /(multiplayer|çok oyunculu|mmo|realtime|real-time|server|sunucu|backend|account system|hesap sistemi|economy system|ekonomi sistemi|live ops|social\/video app|video app|tiktok-like|tiktok|gta|darkorbit)/i.test(haystack)
     || intake.projectType === 'multiplayer'
     || intake.projectType === 'mmo'
     || intake.projectType === 'realtime'
+    || intake.projectType === 'video'
+    || intake.projectType === 'heavy_backend'
     || intake.projectType === 'server_required';
+}
+
+function inferComingSoonInfrastructureRequirement(prompt: string, intake: NormalizedAdvancedIntake): boolean {
+  return hasAdvancedScopeRequest(prompt, intake);
 }
 
 function getProjectComplexitySignal(prompt: string, intake: NormalizedAdvancedIntake) {
@@ -456,6 +462,22 @@ function getProjectComplexitySignal(prompt: string, intake: NormalizedAdvancedIn
 }
 
 function generateBudgetScope(prompt: string, intake: NormalizedAdvancedIntake) {
+  if (!hasAdvancedScopeRequest(prompt, intake)) {
+    return {
+      requires_custom_scope: false,
+      budget_required: false,
+      infrastructure_intake_required: false,
+      estimated_minimum_budget: 0,
+      estimated_monthly_infrastructure_cost: 0,
+      scalable_scope_options: [],
+      feasible_mvp_scope: ['Core gameplay/app loop and basic UI'],
+      deferred_features: [],
+      required_budget_to_include_deferred_features: 0,
+      infrastructure_gap_analysis: [],
+      recommended_next_step: 'Normal Android tek oyunculu proje akışıyla devam edebilirsiniz.'
+    };
+  }
+
   const oneTimeBudget = typeof intake.budgetJson.one_time_budget_usd === 'number' ? intake.budgetJson.one_time_budget_usd : 0;
   const monthlyBudget = typeof intake.budgetJson.monthly_infrastructure_budget_usd === 'number' ? intake.budgetJson.monthly_infrastructure_budget_usd : 0;
   const complexity = getProjectComplexitySignal(prompt, intake);
@@ -560,18 +582,18 @@ function normalizeBrief(raw: Record<string, unknown>, prompt: string, platform: 
     storeShortDescription,
     storeFullDescription,
     complexityLevel: raw.complexityLevel === 'simple' || raw.complexityLevel === 'medium' || raw.complexityLevel === 'advanced' ? raw.complexityLevel : inferred.complexityLevel,
-    infrastructureRequired: toBool(raw.infrastructureRequired) || inferred.infrastructureRequired,
-    infrastructureLevel: raw.infrastructureLevel === 'none' || raw.infrastructureLevel === 'basic' || raw.infrastructureLevel === 'advanced' ? raw.infrastructureLevel : inferred.infrastructureLevel,
-    requiredInfrastructure: toStringArray(raw.requiredInfrastructure).length ? toStringArray(raw.requiredInfrastructure) : inferred.requiredInfrastructure,
+    infrastructureRequired: infrastructureRequiredSoon,
+    infrastructureLevel: infrastructureRequiredSoon ? 'advanced' : 'none',
+    requiredInfrastructure: infrastructureRequiredSoon ? ['Multiplayer/server altyapısı (Yakında/Özel kapsam)'] : [],
     requiredUserAccounts: toStringArray(raw.requiredUserAccounts).length ? toStringArray(raw.requiredUserAccounts) : inferred.requiredUserAccounts,
     monetizationRequired: toBool(raw.monetizationRequired) || inferred.monetizationRequired,
     iapRequired: toBool(raw.iapRequired) || inferred.iapRequired,
     adsRequired: toBool(raw.adsRequired) || inferred.adsRequired,
     subscriptionsRequired: toBool(raw.subscriptionsRequired) || inferred.subscriptionsRequired,
-    backendRequired: toBool(raw.backendRequired) || inferred.backendRequired,
-    multiplayerRequired: toBool(raw.multiplayerRequired) || inferred.multiplayerRequired,
+    backendRequired: infrastructureRequiredSoon,
+    multiplayerRequired: infrastructureRequiredSoon,
     publishingRequirements: toStringArray(raw.publishingRequirements).length ? toStringArray(raw.publishingRequirements) : inferred.publishingRequirements,
-    blockersBeforeBuild: toStringArray(raw.blockersBeforeBuild).length ? toStringArray(raw.blockersBeforeBuild) : inferred.blockersBeforeBuild,
+    blockersBeforeBuild: [],
     blockersBeforePublish: toStringArray(raw.blockersBeforePublish).length ? toStringArray(raw.blockersBeforePublish) : inferred.blockersBeforePublish,
     google_play_required: toBool(raw.google_play_required) || toBool(raw.googlePlayRequired) || true,
     google_play_account_status:
@@ -592,11 +614,11 @@ function normalizeBrief(raw: Record<string, unknown>, prompt: string, platform: 
         ? toStringArray(raw.blockersBeforePublish)
         : inferred.blockersBeforePublish,
     delivery_mode: normalizeDeliveryMode(raw.delivery_mode ?? raw.deliveryMode ?? advancedIntake.deliveryMode),
-    requires_custom_scope: toBool(raw.requires_custom_scope) || budgetScope.requires_custom_scope,
-    budget_required: toBool(raw.budget_required) || budgetScope.budget_required,
-    infrastructure_intake_required: toBool(raw.infrastructure_intake_required) || budgetScope.infrastructure_intake_required,
-    estimated_minimum_budget: clampInt(toNumber(raw.estimated_minimum_budget), budgetScope.estimated_minimum_budget),
-    estimated_monthly_infrastructure_cost: clampInt(toNumber(raw.estimated_monthly_infrastructure_cost), budgetScope.estimated_monthly_infrastructure_cost),
+    requires_custom_scope: infrastructureRequiredSoon || toBool(raw.requires_custom_scope) || budgetScope.requires_custom_scope,
+    budget_required: infrastructureRequiredSoon ? false : toBool(raw.budget_required) || budgetScope.budget_required,
+    infrastructure_intake_required: infrastructureRequiredSoon ? false : toBool(raw.infrastructure_intake_required) || budgetScope.infrastructure_intake_required,
+    estimated_minimum_budget: infrastructureRequiredSoon ? 0 : clampInt(toNumber(raw.estimated_minimum_budget), budgetScope.estimated_minimum_budget),
+    estimated_monthly_infrastructure_cost: infrastructureRequiredSoon ? 0 : clampInt(toNumber(raw.estimated_monthly_infrastructure_cost), budgetScope.estimated_monthly_infrastructure_cost),
     scalable_scope_options: Array.isArray(raw.scalable_scope_options) && raw.scalable_scope_options.length
       ? (raw.scalable_scope_options as Array<Record<string, unknown>>).map((option) => ({
           label: isNonEmptyString(option.label) ? option.label.trim() : 'Option',
@@ -607,9 +629,9 @@ function normalizeBrief(raw: Record<string, unknown>, prompt: string, platform: 
       : budgetScope.scalable_scope_options,
     feasible_mvp_scope: toStringArray(raw.feasible_mvp_scope).length ? toStringArray(raw.feasible_mvp_scope) : budgetScope.feasible_mvp_scope,
     deferred_features: toStringArray(raw.deferred_features).length ? toStringArray(raw.deferred_features) : budgetScope.deferred_features,
-    required_budget_to_include_deferred_features: clampInt(toNumber(raw.required_budget_to_include_deferred_features), budgetScope.required_budget_to_include_deferred_features),
-    infrastructure_gap_analysis: toStringArray(raw.infrastructure_gap_analysis).length ? toStringArray(raw.infrastructure_gap_analysis) : budgetScope.infrastructure_gap_analysis,
-    recommended_next_step: isNonEmptyString(raw.recommended_next_step) ? raw.recommended_next_step.trim() : budgetScope.recommended_next_step,
+    required_budget_to_include_deferred_features: infrastructureRequiredSoon ? 0 : clampInt(toNumber(raw.required_budget_to_include_deferred_features), budgetScope.required_budget_to_include_deferred_features),
+    infrastructure_gap_analysis: infrastructureRequiredSoon ? [COMING_SOON_WARNING] : (toStringArray(raw.infrastructure_gap_analysis).length ? toStringArray(raw.infrastructure_gap_analysis) : budgetScope.infrastructure_gap_analysis),
+    recommended_next_step: infrastructureRequiredSoon ? COMING_SOON_WARNING : (isNonEmptyString(raw.recommended_next_step) ? raw.recommended_next_step.trim() : budgetScope.recommended_next_step),
     ...(infrastructureRequiredSoon
       ? {
           infrastructure_required: true,
