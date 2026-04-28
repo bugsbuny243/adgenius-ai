@@ -35,19 +35,7 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
 
   const selectedIntegration = (integrations ?? []).find((integration) => integration.id === project.google_play_integration_id) ?? null;
   const shouldShowConnectionWarning = Boolean(releaseJob?.error_message && /google play bağlantısı gerekli/i.test(releaseJob.error_message));
-  const deliveryMode = readiness?.delivery_mode ?? 'setup_assisted';
-  const readinessStatus = readiness?.google_play_account_status ?? 'unknown';
-  const integrationStatus = (selectedIntegration?.status ?? '').toLowerCase();
-  const integrationReady = ['connected', 'active', 'valid'].includes(integrationStatus);
-  const publishBlockedReason = !artifact?.file_url
-    ? 'Google Play yayını için önce AAB dosyasının oluşması gerekir.'
-    : deliveryMode === 'apk_aab_only'
-      ? 'APK/AAB hazır, Play Store yayını için Google Play Console hesabı gerekli.'
-      : !selectedIntegration
-        ? 'Google Play bağlantısı seçilmeden yayın başlatılamaz.'
-        : !integrationReady
-          ? 'Google Play bağlantısı doğrulanmalı (valid) olmadan yayın başlatılamaz.'
-          : null;
+  const blockerReasons = Array.isArray(releaseJob?.blocker_reasons) ? (releaseJob?.blocker_reasons as string[]) : [];
 
   return (
     <main>
@@ -84,6 +72,17 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
             )}
           </p>
         </div>
+
+        {blockerReasons.length > 0 ? (
+          <div className="rounded-xl border border-red-400/30 bg-red-950/20 p-4 text-sm text-red-100">
+            <h3 className="font-semibold">Publish Blockers</h3>
+            <ul className="list-disc pl-5">
+              {blockerReasons.map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         {(integrations ?? []).length > 0 ? (
           <form action={setProjectGooglePlayIntegrationAction.bind(null, id)} className="space-y-2 rounded-xl border border-white/10 bg-black/20 p-4">
