@@ -21,9 +21,18 @@ function badge(status: string) {
 function normalizeStatus(status: string | null | undefined): string {
   const normalized = (status ?? '').toLowerCase();
   if (normalized === 'started') return 'running';
-  if (normalized === 'success') return 'succeeded';
+  if (normalized === 'success' || normalized === 'completed') return 'succeeded';
+  if (normalized === 'error') return 'failed';
   if (normalized === 'failure') return 'failed';
   return normalized;
+}
+
+function statusLabel(status: string): string {
+  if (status === 'queued') return 'Bekliyor';
+  if (status === 'building' || status === 'running' || status === 'started') return 'Build devam ediyor';
+  if (status === 'succeeded' || status === 'success' || status === 'completed') return 'Başarılı';
+  if (status === 'failed' || status === 'failure' || status === 'error') return 'Başarısız';
+  return status;
 }
 
 export function BuildRowStatusAutoRefresh({ buildId, projectId, initialStatus }: Props) {
@@ -83,5 +92,6 @@ export function BuildRowStatusAutoRefresh({ buildId, projectId, initialStatus }:
     return () => clearInterval(timer);
   }, [buildId, projectId, status]);
 
-  return <span className={`rounded-full px-3 py-1 text-xs ${badge(normalizeStatus(status))}`}>{normalizeStatus(status)}</span>;
+  const normalized = normalizeStatus(status);
+  return <span className={`rounded-full px-3 py-1 text-xs ${badge(normalized)}`}>{statusLabel(normalized)}</span>;
 }

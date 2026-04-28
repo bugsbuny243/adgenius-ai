@@ -19,10 +19,18 @@ type BuildRow = {
 
 function normalizeBuildStatus(status: string | null): string {
   if (status === 'started') return 'running';
-  if (status === 'success') return 'succeeded';
-  if (status === 'failure') return 'failed';
+  if (status === 'success' || status === 'completed') return 'succeeded';
+  if (status === 'error' || status === 'failure') return 'failed';
   if (status === 'canceled') return 'cancelled';
   return status ?? '-';
+}
+
+function statusLabel(status: string): string {
+  if (status === 'queued') return 'Bekliyor';
+  if (status === 'building' || status === 'running' || status === 'started') return 'Build devam ediyor';
+  if (status === 'succeeded' || status === 'success' || status === 'completed') return 'Başarılı';
+  if (status === 'failed' || status === 'failure' || status === 'error') return 'Başarısız';
+  return status;
 }
 
 function statusBadge(status: string): string {
@@ -123,7 +131,7 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
 
       <section className="rounded-xl border border-white/10 bg-black/20 p-4 text-sm">
         <h2 className="mb-2 text-lg font-semibold">Son Build</h2>
-        <p><b>Durum:</b> {latestBuild ? <span className={`rounded-full px-3 py-1 text-xs ${statusBadge(normalizeBuildStatus(latestBuild.status))}`}>{normalizeBuildStatus(latestBuild.status)}</span> : 'Henüz build yok'}</p>
+        <p><b>Durum:</b> {latestBuild ? <span className={`rounded-full px-3 py-1 text-xs ${statusBadge(normalizeBuildStatus(latestBuild.status))}`}>{statusLabel(normalizeBuildStatus(latestBuild.status))}</span> : 'Henüz build yok'}</p>
         <p><b>Tarih:</b> {latestBuild?.created_at ? new Date(latestBuild.created_at).toLocaleString('tr-TR') : '—'}</p>
         {latestBuild?.artifact_url ? (
           <a href={latestBuild.artifact_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex rounded-lg border border-white/20 px-3 py-2">
@@ -147,7 +155,7 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
             {dedupedBuilds.map((build, index) => (
               <tr key={build.id} className="border-t border-white/10">
                 <td className="px-3 py-2">{displayBuildNumber(build, dedupedBuilds.length - index)}</td>
-                <td className="px-3 py-2"><span className={`rounded-full px-3 py-1 text-xs ${statusBadge(normalizeBuildStatus(build.status))}`}>{normalizeBuildStatus(build.status)}</span></td>
+                <td className="px-3 py-2"><span className={`rounded-full px-3 py-1 text-xs ${statusBadge(normalizeBuildStatus(build.status))}`}>{statusLabel(normalizeBuildStatus(build.status))}</span></td>
                 <td className="px-3 py-2">{build.created_at ? new Date(build.created_at).toLocaleString('tr-TR') : '—'}</td>
                 <td className="px-3 py-2">{build.artifact_url ? <a href={build.artifact_url} target="_blank" rel="noreferrer" className="underline">İndir</a> : '—'}</td>
               </tr>
