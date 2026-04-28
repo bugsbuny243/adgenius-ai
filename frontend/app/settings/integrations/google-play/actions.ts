@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { createSupabaseActionServerClient } from '@/lib/supabase-server';
 import { encryptCredentials, serializeEncryptedCredentials } from '@/lib/credentials-encryption';
 import { validateGooglePlayServiceAccount } from '@/lib/google-play-server';
+import { getSupabaseServiceRoleClient } from '@/lib/supabase-service-role';
 
 function normalizeTrack(value: string): 'production' | 'closed' | 'internal' {
   if (value === 'closed' || value === 'internal') return value;
@@ -39,10 +40,22 @@ export async function saveGooglePlayIntegrationAction(formData: FormData) {
 
   const validation = await validateGooglePlayServiceAccount(rawJson);
   const encryptedPayload = serializeEncryptedCredentials(encryptCredentials(JSON.stringify(parsed)));
+  const serviceRole = getSupabaseServiceRoleClient();
+
+  const { data: membership } = await serviceRole
+    .from('workspace_members')
+    .select('workspace_id')
+    .eq('user_id', session.user.id)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  const workspaceId = membership?.workspace_id ?? null;
 
   const { data: integration, error: integrationError } = await supabase
     .from('user_integrations')
     .insert({
+      workspace_id: workspaceId,
       user_id: session.user.id,
       provider: 'google_play',
       display_name: displayName,
@@ -61,7 +74,9 @@ export async function saveGooglePlayIntegrationAction(formData: FormData) {
     throw new Error(`Google Play bağlantısı kaydedilemedi: ${integrationError?.message ?? 'unknown_error'}`);
   }
 
-  const { error: credentialsError } = await supabase.from('integration_credentials').insert({
+  const { error: credentialsError } = await serviceRole.from('integration_credentials').insert({
+    workspace_id: workspaceId,
+    user_id: session.user.id,
     user_integration_id: integration.id,
     provider: 'google_play',
     credential_type: 'service_account_json',

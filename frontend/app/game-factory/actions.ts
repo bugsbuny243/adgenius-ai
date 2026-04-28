@@ -6,6 +6,8 @@ import { redirect } from 'next/navigation';
 import { createSupabaseActionServerClient } from '@/lib/supabase-server';
 import { decryptCredentials, tryParseEncryptedCredentials } from '@/lib/credentials-encryption';
 import { GooglePlayPublisherProvider } from '@/lib/google-play-server';
+import { evaluateGooglePlayReadiness } from '@/lib/google-play-readiness';
+import { getSupabaseServiceRoleClient } from '@/lib/supabase-service-role';
 
 async function requireAuthenticatedUser() {
   const supabase = await createSupabaseActionServerClient();
@@ -46,6 +48,7 @@ async function upsertReleaseJob(params: {
   track: string;
   releaseNotes: string;
   errorMessage: string | null;
+  blockerReasons?: string[];
 }) {
   const { supabase } = await requireAuthenticatedUser();
   const { data: latestReleaseJob } = await supabase
@@ -63,7 +66,8 @@ async function upsertReleaseJob(params: {
         status: params.status,
         track: params.track,
         release_notes: params.releaseNotes,
-        error_message: params.errorMessage
+        error_message: params.errorMessage,
+        blocker_reasons: params.blockerReasons ?? []
       })
       .eq('id', latestReleaseJob.id);
 
@@ -76,7 +80,8 @@ async function upsertReleaseJob(params: {
     status: params.status,
     track: params.track,
     release_notes: params.releaseNotes,
-    error_message: params.errorMessage
+    error_message: params.errorMessage,
+    blocker_reasons: params.blockerReasons ?? []
   });
 
   if (error) throw new Error(`Release kaydı oluşturulamadı: ${error.message}`);
@@ -180,23 +185,33 @@ export async function publishReleaseAction(projectId: string) {
       status: 'blocked',
       track: latestReleaseJob?.track ?? project.release_track ?? 'production',
       releaseNotes: latestReleaseJob?.release_notes ?? '',
-      errorMessage: 'AAB artifact bulunamadı.'
+      errorMessage: 'AAB artifact bulunamadı.',
+      blockerReasons: ['AAB artifact bulunamadı.']
     });
     throw new Error('AAB artifact bulunamadı.');
   }
 
-  if (!integration || integration.status !== 'connected') {
+  const readiness = await evaluateGooglePlayReadiness({
+    userId: user.id,
+    projectId,
+    packageName: project.package_name,
+    integrationId: integration?.id ?? project.google_play_integration_id
+  });
+
+  if (!integration || integration.status !== 'connected' || readiness.status !== 'ready') {
     await upsertReleaseJob({
       projectId,
       status: 'blocked',
       track: latestReleaseJob?.track ?? project.release_track ?? 'production',
       releaseNotes: latestReleaseJob?.release_notes ?? '',
-      errorMessage: 'Google Play bağlantısı doğrulanmış değil.'
+      errorMessage: readiness.blockers[0] ?? 'Google Play bağlantısı doğrulanmış değil.',
+      blockerReasons: readiness.blockers
     });
-    throw new Error('Google Play bağlantısı doğrulanmış değil.');
+    throw new Error(readiness.blockers[0] ?? 'Google Play bağlantısı doğrulanmış değil.');
   }
 
-  const { data: credentialsRow } = await supabase
+  const serviceRole = getSupabaseServiceRoleClient();
+  const { data: credentialsRow } = await serviceRole
     .from('integration_credentials')
     .select('encrypted_payload')
     .eq('user_integration_id', integration.id)
@@ -216,7 +231,8 @@ export async function publishReleaseAction(projectId: string) {
       status: 'blocked',
       track: latestReleaseJob?.track ?? project.release_track ?? 'production',
       releaseNotes: latestReleaseJob?.release_notes ?? '',
-      errorMessage: 'Google Play kimlik bilgileri çözümlenemedi.'
+      errorMessage: 'Google Play kimlik bilgileri çözümlenemedi.',
+      blockerReasons: ['Google Play kimlik bilgileri çözümlenemedi.']
     });
     throw new Error('Google Play kimlik bilgileri çözümlenemedi.');
   }
@@ -237,7 +253,8 @@ export async function publishReleaseAction(projectId: string) {
     status: publishResult.status,
     track: latestReleaseJob?.track ?? integration.default_track ?? project.release_track ?? 'production',
     releaseNotes: latestReleaseJob?.release_notes ?? '',
-    errorMessage: publishResult.errorMessage ?? null
+    errorMessage: publishResult.errorMessage ?? null,
+    blockerReasons: publishResult.status === 'published' ? [] : [publishResult.errorMessage ?? 'Google Play yayını başarısız oldu.']
   });
 
   if (publishResult.status !== 'published') {

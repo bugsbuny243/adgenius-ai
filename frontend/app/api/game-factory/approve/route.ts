@@ -42,8 +42,21 @@ export async function POST(request: Request) {
   const { error: readinessError } = await context.supabase
     .from('google_play_readiness')
     .upsert({
+      unity_game_project_id: projectId,
       project_id: projectId,
+      workspace_id: context.workspaceId,
       user_id: context.userId,
+      package_name: null,
+      google_email: context.userEmail,
+      has_google_account: true,
+      has_play_console: googlePlayAccountStatus === 'user_has_account',
+      has_service_account: false,
+      service_account_valid: false,
+      permissions_valid: false,
+      app_access_valid: false,
+      status: googlePlayAccountStatus === 'user_has_account' ? 'needs_setup' : 'not_connected',
+      blockers: publishingBlockers,
+      checked_at: new Date().toISOString(),
       delivery_mode: deliveryMode,
       google_play_account_status: googlePlayAccountStatus,
       confirmed_requirements: {
@@ -53,7 +66,7 @@ export async function POST(request: Request) {
         publishing_blockers: publishingBlockers
       },
       confirmed_at: new Date().toISOString()
-    }, { onConflict: 'project_id' });
+    }, { onConflict: 'unity_game_project_id' });
 
   if (readinessError) return json({ ok: false, error: readinessError.message }, 400);
 

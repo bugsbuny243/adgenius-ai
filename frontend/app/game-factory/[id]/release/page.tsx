@@ -26,8 +26,8 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
   ]);
   const { data: readiness } = await supabase
     .from('google_play_readiness')
-    .select('delivery_mode, google_play_account_status, confirmed_at, confirmed_requirements')
-    .eq('project_id', id)
+    .select('delivery_mode, google_play_account_status, confirmed_at, confirmed_requirements, status, blockers, has_google_account, has_play_console, has_service_account, service_account_valid, permissions_valid, app_access_valid')
+    .eq('unity_game_project_id', id)
     .eq('user_id', user.id)
     .maybeSingle();
 
@@ -36,6 +36,7 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
   const selectedIntegration = (integrations ?? []).find((integration) => integration.id === project.google_play_integration_id) ?? null;
   const shouldShowConnectionWarning = Boolean(releaseJob?.error_message && /google play bağlantısı gerekli/i.test(releaseJob.error_message));
   const blockerReasons = Array.isArray(releaseJob?.blocker_reasons) ? (releaseJob?.blocker_reasons as string[]) : [];
+  const readinessBlockers = Array.isArray(readiness?.blockers) ? (readiness.blockers as string[]) : [];
   const deliveryMode = readiness?.delivery_mode ?? 'play_publish';
   const deliveryModeLabel =
     deliveryMode === 'apk_aab_only'
@@ -75,7 +76,14 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
           <p>Google Play bağlantısı: {selectedIntegration?.display_name ?? 'Seçilmedi'}</p>
           <p>Teslim modu: {deliveryModeLabel}</p>
           <p>Google Play hesap durumu: {readinessStatus}</p>
+          <p>Readiness: {readiness?.status ?? 'not_connected'}</p>
           <p>Checklist onayı: {readiness?.confirmed_at ? new Date(readiness.confirmed_at).toLocaleString('tr-TR') : 'Bekleniyor'}</p>
+          <p>Google hesabı: {readiness?.has_google_account ? 'Bağlı' : 'Bağlı değil'}</p>
+          <p>Play Console: {readiness?.has_play_console ? 'Bağlı' : 'Bağlı değil'}</p>
+          <p>Service account: {readiness?.has_service_account ? 'Yüklü' : 'Yok'}</p>
+          <p>API token: {readiness?.service_account_valid ? 'Geçerli' : 'Eksik/Geçersiz'}</p>
+          <p>API izinleri: {readiness?.permissions_valid ? 'Geçerli' : 'Eksik'}</p>
+          <p>Package erişimi: {readiness?.app_access_valid ? 'Geçerli' : 'Eksik'}</p>
           <p>Kısa açıklama: {brief?.store_short_description ?? '-'}</p>
           <p>Detaylı açıklama: {brief?.store_full_description ?? '-'}</p>
           <p>
@@ -123,6 +131,26 @@ export default async function GameFactoryReleasePage({ params }: { params: Promi
             </div>
           </form>
         ) : null}
+
+        <div className="rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/80 space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href="/settings/integrations/google-play" className="rounded-lg border border-white/20 px-3 py-2 text-sm">
+              Google / Play Console Bağla
+            </Link>
+            <Link href="/settings/integrations/google-play" className="rounded-lg border border-white/20 px-3 py-2 text-sm">
+              Entegrasyon ayarları
+            </Link>
+          </div>
+          {readinessBlockers.length > 0 ? (
+            <ul className="list-disc pl-5 text-amber-100">
+              {readinessBlockers.map((blocker) => (
+                <li key={blocker}>{blocker}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-emerald-200">Google Play readiness kontrolünde blocker yok.</p>
+          )}
+        </div>
 
         <form action={updateReleaseNotesAction.bind(null, id)} className="space-y-2">
           <label className="block text-sm">Yayın notları</label>
