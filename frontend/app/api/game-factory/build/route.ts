@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   const serviceRole = getSupabaseServiceRoleClient();
   const { data: project } = await serviceRole
     .from('unity_game_projects')
-    .select('id, approval_status')
+    .select('id, approval_status, game_brief')
     .eq('id', projectId)
     .eq('workspace_id', context.workspaceId)
     .eq('user_id', context.userId)
@@ -29,6 +29,33 @@ export async function POST(request: Request) {
 
   if (!project) return json({ ok: false, error: 'Proje bulunamadı.' }, 404);
   if (project.approval_status !== 'approved') return json({ ok: false, error: 'Proje onay bekliyor.' }, 403);
+
+  const brief = (project.game_brief ?? {}) as {
+    backendRequired?: boolean;
+    multiplayerRequired?: boolean;
+    iapRequired?: boolean;
+    adsRequired?: boolean;
+    infrastructureRequired?: boolean;
+  };
+  const needsTechnicalChecklist = Boolean(
+    brief.infrastructureRequired || brief.backendRequired || brief.multiplayerRequired || brief.iapRequired || brief.adsRequired
+  );
+
+  if (needsTechnicalChecklist) {
+    const { data: checklist } = await serviceRole
+      .from('game_technical_checklists')
+      .select('status')
+      .eq('unity_game_project_id', projectId)
+      .eq('workspace_id', context.workspaceId)
+      .eq('checklist_type', 'pre_build')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!checklist || checklist.status !== 'confirmed') {
+      return json({ ok: false, error: 'Teknik gereksinimler onaylanmadan build başlatılamaz.' }, 403);
+    }
+  }
 
   const buildTargetId = process.env.UNITY_BUILD_TARGET_ID?.trim();
   if (!buildTargetId) return json({ ok: false, error: 'UNITY_BUILD_TARGET_ID eksik.' }, 500);

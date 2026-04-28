@@ -437,7 +437,7 @@ app.post('/game-factory/release/publish', async (req, res) => {
 
   const { data: unityProject } = await serviceRoleClient
     .from('unity_game_projects')
-    .select('id, user_id, package_name, project_id')
+    .select('id, user_id, package_name, project_id, game_brief')
     .eq('id', projectId)
     .eq('user_id', auth.userId)
     .maybeSingle();
@@ -448,11 +448,25 @@ app.post('/game-factory/release/publish', async (req, res) => {
     ? await serviceRoleClient.from('game_projects').select('id, release_track, google_play_integration_id, current_version_code, current_version_name').eq('id', unityProject.project_id).maybeSingle()
     : { data: null as any };
 
-  const [{ data: artifact }, { data: latestReleaseJob }] = await Promise.all([
+  const [{ data: artifact }, { data: latestReleaseJob }, { data: checklist }, { data: monetizationConfig }] = await Promise.all([
     serviceRoleClient.from('game_artifacts').select('file_url').eq('unity_game_project_id', projectId).eq('artifact_type', 'aab').order('created_at', { ascending: false }).limit(1).maybeSingle(),
-    serviceRoleClient.from('game_release_jobs').select('id, status, release_notes, track').eq('unity_game_project_id', projectId).order('created_at', { ascending: false }).limit(1).maybeSingle()
+    serviceRoleClient.from('game_release_jobs').select('id, status, release_notes, track').eq('unity_game_project_id', projectId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    serviceRoleClient.from('game_technical_checklists').select('status').eq('unity_game_project_id', projectId).eq('checklist_type', 'pre_build').order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    serviceRoleClient.from('game_monetization_configs').select('iap_required, ads_required, backend_required, privacy_policy_required').eq('unity_game_project_id', projectId).maybeSingle()
   ]);
-  if (!artifact?.file_url) return void res.status(400).json({ ok: false, error: 'Yayın için AAB dosyası bulunamadı.' });
+
+  const brief = (unityProject.game_brief ?? {}) as Record<string, unknown>;
+  const iapRequired = Boolean(monetizationConfig?.iap_required ?? brief.iapRequired);
+  const adsRequired = Boolean(monetizationConfig?.ads_required ?? brief.adsRequired);
+  const backendRequired = Boolean(monetizationConfig?.backend_required ?? brief.backendRequired);
+  const privacyPolicyRequired = Boolean(monetizationConfig?.privacy_policy_required ?? (iapRequired || adsRequired));
+  const track = latestReleaseJob?.track ?? gameProject?.release_track ?? 'production';
+
+  const blockers: string[] = [];
+  if (!artifact?.file_url) blockers.push('AAB artifact bulunamadı.');
+  if (!unityProject.package_name) blockers.push('package_name eksik.');
+  if (!track) blockers.push('Release track seçilmemiş.');
+  if (!checklist || checklist.status !== 'confirmed') blockers.push('Teknik checklist onayı tamamlanmamış.');
 
   const { data: integration } = await serviceRoleClient
     .from('user_integrations')
@@ -462,26 +476,63 @@ app.post('/game-factory/release/publish', async (req, res) => {
     .eq('provider', 'google_play')
     .maybeSingle();
 
-  if (!integration) return void res.status(400).json({ ok: false, error: 'Google Play bağlantısı bulunamadı.' });
+  if (!integration) blockers.push('Google Play bağlantısı bulunamadı.');
+  if (integration && integration.status !== 'connected') blockers.push('Google Play bağlantısı doğrulanmış/connected değil.');
 
-  const { data: credentialsRow } = await serviceRoleClient
-    .from('integration_credentials')
-    .select('encrypted_payload')
-    .eq('user_integration_id', integration.id)
-    .eq('provider', 'google_play')
-    .eq('status', 'active')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const { data: credentialsRow } = integration?.id
+    ? await serviceRoleClient
+      .from('integration_credentials')
+      .select('encrypted_payload')
+      .eq('user_integration_id', integration.id)
+      .eq('provider', 'google_play')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    : { data: null as { encrypted_payload?: unknown } | null };
 
   const encrypted = tryParseEncryptedCredentials(credentialsRow?.encrypted_payload ?? null);
-  if (!encrypted) return void res.status(400).json({ ok: false, error: 'Google Play kimlik bilgileri çözümlenemedi.' });
+  if (!encrypted) blockers.push('Google Play kimlik bilgileri çözümlenemedi.');
+
+  if (iapRequired) {
+    const { count } = await serviceRoleClient.from('game_iap_products').select('id', { count: 'exact', head: true }).eq('unity_game_project_id', projectId);
+    if (!count) blockers.push('IAP gerekli ancak IAP ürünleri yapılandırılmamış.');
+  }
+  if (adsRequired) {
+    const { count } = await serviceRoleClient.from('game_ad_units').select('id', { count: 'exact', head: true }).eq('unity_game_project_id', projectId);
+    if (!count) blockers.push('Ads gerekli ancak ad unit yapılandırılmamış.');
+  }
+  if (backendRequired) {
+    const backendEndpoint = typeof brief.backendEndpoint === 'string' ? brief.backendEndpoint.trim() : '';
+    if (!backendEndpoint) blockers.push('Backend gerekli ancak endpoint yapılandırılmamış.');
+  }
+  if (privacyPolicyRequired) {
+    const privacyPolicyUrl = typeof brief.privacyPolicyUrl === 'string' ? brief.privacyPolicyUrl.trim() : '';
+    if (!privacyPolicyUrl) blockers.push('Privacy policy gereksinimi karşılanmamış.');
+  }
+
+  if (blockers.length > 0) {
+    await serviceRoleClient.from('game_release_jobs').insert({
+      unity_game_project_id: projectId,
+      status: 'blocked',
+      track,
+      release_notes: latestReleaseJob?.release_notes ?? '',
+      error_message: blockers.join(' '),
+      blocker_reasons: blockers,
+      workspace_id: auth.workspaceId,
+      user_id: auth.userId
+    });
+    return void res.status(400).json({ ok: false, error: blockers.join(' '), blockers });
+  }
+
+  const integrationResolved = integration as { default_track: string | null };
+  const encryptedResolved = encrypted!;
 
   const provider = new GooglePlayPublisherProvider();
-  const publishResult = await provider.publishRelease({ packageName: unityProject.package_name, track: latestReleaseJob?.track ?? integration.default_track ?? gameProject?.release_track ?? 'production', releaseNotes: latestReleaseJob?.release_notes ?? 'Game Factory yayın güncellemesi', aabFileUrl: artifact.file_url, serviceAccountJson: decryptCredentials(encrypted), versionCode: gameProject?.current_version_code ?? undefined, versionName: gameProject?.current_version_name ?? undefined });
+  const publishResult = await provider.publishRelease({ packageName: unityProject.package_name, track: latestReleaseJob?.track ?? integrationResolved.default_track ?? gameProject?.release_track ?? 'production', releaseNotes: latestReleaseJob?.release_notes ?? 'Game Factory yayın güncellemesi', aabFileUrl: artifact!.file_url, serviceAccountJson: decryptCredentials(encryptedResolved), versionCode: gameProject?.current_version_code ?? undefined, versionName: gameProject?.current_version_name ?? undefined });
 
   const status = publishResult.status === 'published' ? 'published' : publishResult.status;
-  await serviceRoleClient.from('game_release_jobs').insert({ unity_game_project_id: projectId, status, track: latestReleaseJob?.track ?? integration.default_track ?? gameProject?.release_track ?? 'production', release_notes: latestReleaseJob?.release_notes ?? '', error_message: publishResult.errorMessage ?? null, workspace_id: auth.workspaceId, user_id: auth.userId });
+  await serviceRoleClient.from('game_release_jobs').insert({ unity_game_project_id: projectId, status, track: latestReleaseJob?.track ?? integrationResolved.default_track ?? gameProject?.release_track ?? 'production', release_notes: latestReleaseJob?.release_notes ?? '', error_message: publishResult.errorMessage ?? null, blocker_reasons: [], workspace_id: auth.workspaceId, user_id: auth.userId });
 
   if (publishResult.status !== 'published') return void res.status(400).json({ ok: false, error: publishResult.errorMessage ?? 'Google Play yayını başarısız oldu.' });
   res.json({ ok: true });

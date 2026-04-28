@@ -9,6 +9,9 @@ type BriefRequest = {
   platform?: unknown;
 };
 
+type ComplexityLevel = 'simple' | 'medium' | 'advanced';
+type InfrastructureLevel = 'none' | 'basic' | 'advanced';
+
 type GameBrief = {
   title: string;
   slug: string;
@@ -23,6 +26,20 @@ type GameBrief = {
   releaseNotes: string;
   storeShortDescription: string;
   storeFullDescription: string;
+  complexityLevel: ComplexityLevel;
+  infrastructureRequired: boolean;
+  infrastructureLevel: InfrastructureLevel;
+  requiredInfrastructure: string[];
+  requiredUserAccounts: string[];
+  monetizationRequired: boolean;
+  iapRequired: boolean;
+  adsRequired: boolean;
+  subscriptionsRequired: boolean;
+  backendRequired: boolean;
+  multiplayerRequired: boolean;
+  publishingRequirements: string[];
+  blockersBeforeBuild: string[];
+  blockersBeforePublish: string[];
 };
 
 function logRouteError(stage: 'request_parse' | 'ai_call' | 'ai_parse' | 'db_write', error: unknown, extras?: Record<string, unknown>) {
@@ -30,16 +47,25 @@ function logRouteError(stage: 'request_parse' | 'ai_call' | 'ai_parse' | 'db_wri
     ? { message: error.message, stack: error.stack }
     : { message: typeof error === 'string' ? error : 'Unknown error' };
 
-  console.error('[game-factory brief]', {
-    route: 'game-factory brief',
-    stage,
-    ...extras,
-    ...normalized
-  });
+  console.error('[game-factory brief]', { route: 'game-factory brief', stage, ...extras, ...normalized });
 }
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
+}
+
+function toBool(value: unknown): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') return ['true', 'yes', '1', 'evet'].includes(value.trim().toLowerCase());
+  return false;
+}
+
+function toStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter(isNonEmptyString).map((entry) => entry.trim());
+  if (isNonEmptyString(value)) {
+    return value.split(/\n|,|;|•|-/g).map((entry) => entry.trim()).filter(Boolean);
+  }
+  return [];
 }
 
 type ParseFailureReason =
@@ -68,19 +94,11 @@ const GAME_BRIEF_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   required: [
-    'title',
-    'slug',
-    'packageName',
-    'summary',
-    'gameType',
-    'targetPlatform',
-    'mechanics',
-    'visualStyle',
-    'controls',
-    'monetizationNotes',
-    'releaseNotes',
-    'storeShortDescription',
-    'storeFullDescription'
+    'title', 'slug', 'packageName', 'summary', 'gameType', 'targetPlatform', 'mechanics', 'visualStyle', 'controls',
+    'monetizationNotes', 'releaseNotes', 'storeShortDescription', 'storeFullDescription',
+    'complexityLevel', 'infrastructureRequired', 'infrastructureLevel', 'requiredInfrastructure', 'requiredUserAccounts',
+    'monetizationRequired', 'iapRequired', 'adsRequired', 'subscriptionsRequired', 'backendRequired', 'multiplayerRequired',
+    'publishingRequirements', 'blockersBeforeBuild', 'blockersBeforePublish'
   ],
   properties: {
     title: { type: 'string', minLength: 1 },
@@ -95,29 +113,37 @@ const GAME_BRIEF_SCHEMA = {
     monetizationNotes: { type: 'string', minLength: 1 },
     releaseNotes: { type: 'string', minLength: 1 },
     storeShortDescription: { type: 'string', minLength: 1 },
-    storeFullDescription: { type: 'string', minLength: 1 }
+    storeFullDescription: { type: 'string', minLength: 1 },
+    complexityLevel: { type: 'string', enum: ['simple', 'medium', 'advanced'] },
+    infrastructureRequired: { type: 'boolean' },
+    infrastructureLevel: { type: 'string', enum: ['none', 'basic', 'advanced'] },
+    requiredInfrastructure: { type: 'array', items: { type: 'string', minLength: 1 } },
+    requiredUserAccounts: { type: 'array', items: { type: 'string', minLength: 1 } },
+    monetizationRequired: { type: 'boolean' },
+    iapRequired: { type: 'boolean' },
+    adsRequired: { type: 'boolean' },
+    subscriptionsRequired: { type: 'boolean' },
+    backendRequired: { type: 'boolean' },
+    multiplayerRequired: { type: 'boolean' },
+    publishingRequirements: { type: 'array', items: { type: 'string', minLength: 1 } },
+    blockersBeforeBuild: { type: 'array', items: { type: 'string', minLength: 1 } },
+    blockersBeforePublish: { type: 'array', items: { type: 'string', minLength: 1 } }
   }
 } as const;
 
 async function callGroqBriefModel(prompt: string, targetPlatform: 'android', model: string): Promise<string> {
   const groqApiKey = process.env.GROQ_API_KEY?.trim();
-  if (!groqApiKey) {
-    throw new Error('missing_groq_key');
-  }
+  if (!groqApiKey) throw new Error('missing_groq_key');
 
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${groqApiKey}`,
-      'Content-Type': 'application/json'
-    },
+    headers: { Authorization: `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model,
       messages: [
         {
           role: 'system',
-          content:
-            'Sen bir oyun tasarımcısısın. SADECE geçerli bir JSON nesnesi döndür. Markdown, kod bloğu, açıklama, yorum veya ek metin yazma.'
+          content: 'Sen bir oyun tasarımcısısın. SADECE geçerli bir JSON nesnesi döndür. Markdown, kod bloğu, açıklama, yorum veya ek metin yazma.'
         },
         {
           role: 'user',
@@ -125,12 +151,8 @@ async function callGroqBriefModel(prompt: string, targetPlatform: 'android', mod
             `Kullanıcı oyun fikri: ${prompt}\n` +
             `Hedef platform: ${targetPlatform}\n\n` +
             'Aşağıdaki alanlarla bir oyun brief JSON nesnesi üret:\n' +
-            'title, slug, packageName, summary, gameType, targetPlatform, mechanics, visualStyle, controls, monetizationNotes, releaseNotes, storeShortDescription, storeFullDescription\n\n' +
-            'Kurallar:\n' +
-            '- gameType değeri kesinlikle "runner_2d" olmalı.\n' +
-            '- targetPlatform değeri kesinlikle "android" olmalı.\n' +
-            '- mechanics en az 1 maddelik dizi olmalı.\n' +
-            '- Sadece JSON döndür.'
+            'title, slug, packageName, summary, gameType, targetPlatform, mechanics, visualStyle, controls, monetizationNotes, releaseNotes, storeShortDescription, storeFullDescription, complexityLevel, infrastructureRequired, infrastructureLevel, requiredInfrastructure, requiredUserAccounts, monetizationRequired, iapRequired, adsRequired, subscriptionsRequired, backendRequired, multiplayerRequired, publishingRequirements, blockersBeforeBuild, blockersBeforePublish\n\n' +
+            'Kurallar:\n- gameType değeri kesinlikle "runner_2d" olmalı.\n- targetPlatform değeri kesinlikle "android" olmalı.\n- mechanics en az 1 maddelik dizi olmalı.\n- Sadece JSON döndür.'
         }
       ],
       response_format: { type: 'json_object' }
@@ -147,18 +169,8 @@ async function callGroqBriefModel(prompt: string, targetPlatform: 'android', mod
   };
 
   const rawContent = payload.choices?.[0]?.message?.content;
-  if (typeof rawContent === 'string') {
-    return rawContent.trim();
-  }
-
-  if (Array.isArray(rawContent)) {
-    const text = rawContent
-      .map((item) => (typeof item?.text === 'string' ? item.text : ''))
-      .join('\n')
-      .trim();
-    return text;
-  }
-
+  if (typeof rawContent === 'string') return rawContent.trim();
+  if (Array.isArray(rawContent)) return rawContent.map((item) => (typeof item?.text === 'string' ? item.text : '')).join('\n').trim();
   return '';
 }
 
@@ -173,36 +185,78 @@ function toSlug(input: string): string {
     .replace(/-{2,}/g, '-');
 }
 
-function toMechanics(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.filter(isNonEmptyString).map((entry) => entry.trim());
-  }
-  if (isNonEmptyString(value)) {
-    return value
-      .split(/\n|,|;|•|-/g)
-      .map((entry) => entry.trim())
-      .filter(Boolean);
-  }
-  return [];
-}
-
 function inferRunnerFromPrompt(prompt: string): boolean {
   return /(runner|sonsuz koşu|koşu|engel|zıpla|zipl)/i.test(prompt);
+}
+
+function inferTechnicalRequirements(prompt: string, monetizationNotes: string) {
+  const haystack = `${prompt} ${monetizationNotes}`.toLowerCase();
+  const multiplayerRequired = /(multiplayer|çok oyunculu|co-op|coop|pvp|realtime|real-time|socket|matchmaking)/i.test(haystack);
+  const backendRequired = /(backend|sunucu|server|api|auth|giriş|login|hesap|database|veritaban|firebase|leaderboard|bulut)/i.test(haystack) || multiplayerRequired;
+  const iapRequired = /(iap|in-app|in app|satın al|purchase|coin pack|premium item|store)/i.test(haystack);
+  const adsRequired = /(ads|admob|ad unit|rewarded|interstitial|banner|reklam)/i.test(haystack);
+  const subscriptionsRequired = /(subscription|abonelik|monthly|yearly)/i.test(haystack);
+  const monetizationRequired = iapRequired || adsRequired || subscriptionsRequired || /(monetizasyon|gelir|para kazan)/i.test(haystack);
+
+  const requiredInfrastructure = [
+    ...(backendRequired ? ['Server/backend API', 'Database'] : []),
+    ...(multiplayerRequired ? ['Realtime multiplayer service'] : []),
+    ...(iapRequired ? ['Google Play Billing product catalog'] : []),
+    ...(adsRequired ? ['Ad network account + ad unit setup'] : [])
+  ];
+
+  const requiredUserAccounts = [
+    'Google Play Console account',
+    ...(backendRequired ? ['Backend hosting provider account'] : []),
+    ...(adsRequired ? ['Ad network account (AdMob vb.)'] : [])
+  ];
+
+  const publishingRequirements = [
+    'AAB artifact ready',
+    'Google Play integration connected',
+    'Package name configured and matched',
+    'Release track selected',
+    ...(iapRequired ? ['IAP products configured'] : []),
+    ...(adsRequired ? ['Ad units configured'] : []),
+    ...(backendRequired ? ['Backend endpoints configured'] : [])
+  ];
+
+  const technicalCount = [multiplayerRequired, backendRequired, iapRequired, adsRequired, subscriptionsRequired].filter(Boolean).length;
+  const complexityLevel: ComplexityLevel = technicalCount >= 3 ? 'advanced' : technicalCount >= 1 ? 'medium' : 'simple';
+  const infrastructureRequired = backendRequired || multiplayerRequired || iapRequired || adsRequired;
+  const infrastructureLevel: InfrastructureLevel = !infrastructureRequired ? 'none' : multiplayerRequired || backendRequired ? 'advanced' : 'basic';
+
+  return {
+    complexityLevel,
+    infrastructureRequired,
+    infrastructureLevel,
+    requiredInfrastructure,
+    requiredUserAccounts,
+    monetizationRequired,
+    iapRequired,
+    adsRequired,
+    subscriptionsRequired,
+    backendRequired,
+    multiplayerRequired,
+    publishingRequirements,
+    blockersBeforeBuild: infrastructureRequired ? ['Technical checklist confirmation required before build.'] : [],
+    blockersBeforePublish: ['Google Play integration, release configuration and required monetization/backend setup must be complete before publish.']
+  };
 }
 
 function normalizeBrief(raw: Record<string, unknown>, prompt: string, platform: 'android'): GameBrief {
   const title = isNonEmptyString(raw.title) ? raw.title.trim() : '';
   const summary = isNonEmptyString(raw.summary) ? raw.summary.trim() : '';
   const slug = isNonEmptyString(raw.slug) ? toSlug(raw.slug) : toSlug(title);
-  const mechanics = toMechanics(raw.mechanics);
+  const mechanics = toStringArray(raw.mechanics);
   const storeShortDescription = isNonEmptyString(raw.storeShortDescription) ? raw.storeShortDescription.trim() : '';
   const storeFullDescription = isNonEmptyString(raw.storeFullDescription) ? raw.storeFullDescription.trim() : '';
+  const monetizationNotes = isNonEmptyString(raw.monetizationNotes) ? raw.monetizationNotes.trim() : '';
 
   const gameType = raw.gameType === 'runner_2d' ? 'runner_2d' : inferRunnerFromPrompt(prompt) ? 'runner_2d' : '';
   const finalSlug = slug || toSlug(title);
-  const packageName = isNonEmptyString(raw.packageName)
-    ? raw.packageName.trim()
-    : `com.koschei.generated.${finalSlug.replace(/-/g, '') || 'game'}`;
+  const packageName = isNonEmptyString(raw.packageName) ? raw.packageName.trim() : `com.koschei.generated.${finalSlug.replace(/-/g, '') || 'game'}`;
+  const inferred = inferTechnicalRequirements(prompt, monetizationNotes);
 
   return {
     title,
@@ -214,10 +268,24 @@ function normalizeBrief(raw: Record<string, unknown>, prompt: string, platform: 
     mechanics,
     visualStyle: isNonEmptyString(raw.visualStyle) ? raw.visualStyle.trim() : '',
     controls: isNonEmptyString(raw.controls) ? raw.controls.trim() : '',
-    monetizationNotes: isNonEmptyString(raw.monetizationNotes) ? raw.monetizationNotes.trim() : '',
+    monetizationNotes,
     releaseNotes: isNonEmptyString(raw.releaseNotes) ? raw.releaseNotes.trim() : '',
     storeShortDescription,
-    storeFullDescription
+    storeFullDescription,
+    complexityLevel: raw.complexityLevel === 'simple' || raw.complexityLevel === 'medium' || raw.complexityLevel === 'advanced' ? raw.complexityLevel : inferred.complexityLevel,
+    infrastructureRequired: toBool(raw.infrastructureRequired) || inferred.infrastructureRequired,
+    infrastructureLevel: raw.infrastructureLevel === 'none' || raw.infrastructureLevel === 'basic' || raw.infrastructureLevel === 'advanced' ? raw.infrastructureLevel : inferred.infrastructureLevel,
+    requiredInfrastructure: toStringArray(raw.requiredInfrastructure).length ? toStringArray(raw.requiredInfrastructure) : inferred.requiredInfrastructure,
+    requiredUserAccounts: toStringArray(raw.requiredUserAccounts).length ? toStringArray(raw.requiredUserAccounts) : inferred.requiredUserAccounts,
+    monetizationRequired: toBool(raw.monetizationRequired) || inferred.monetizationRequired,
+    iapRequired: toBool(raw.iapRequired) || inferred.iapRequired,
+    adsRequired: toBool(raw.adsRequired) || inferred.adsRequired,
+    subscriptionsRequired: toBool(raw.subscriptionsRequired) || inferred.subscriptionsRequired,
+    backendRequired: toBool(raw.backendRequired) || inferred.backendRequired,
+    multiplayerRequired: toBool(raw.multiplayerRequired) || inferred.multiplayerRequired,
+    publishingRequirements: toStringArray(raw.publishingRequirements).length ? toStringArray(raw.publishingRequirements) : inferred.publishingRequirements,
+    blockersBeforeBuild: toStringArray(raw.blockersBeforeBuild).length ? toStringArray(raw.blockersBeforeBuild) : inferred.blockersBeforeBuild,
+    blockersBeforePublish: toStringArray(raw.blockersBeforePublish).length ? toStringArray(raw.blockersBeforePublish) : inferred.blockersBeforePublish
   };
 }
 
@@ -245,10 +313,7 @@ export async function POST(request: Request) {
   let requestBody: BriefRequest;
   try {
     const rawBody = await request.text();
-    if (!rawBody || !rawBody.trim()) {
-      return json({ ok: false, error: 'Oyun fikri okunamadı. Lütfen tekrar deneyin.' }, 400);
-    }
-
+    if (!rawBody || !rawBody.trim()) return json({ ok: false, error: 'Oyun fikri okunamadı. Lütfen tekrar deneyin.' }, 400);
     requestBody = JSON.parse(rawBody) as BriefRequest;
   } catch (error) {
     logRouteError('request_parse', error);
@@ -257,40 +322,18 @@ export async function POST(request: Request) {
 
   const promptValue = requestBody.prompt ?? requestBody.userPrompt ?? requestBody.gameIdea;
   const prompt = typeof promptValue === 'string' ? promptValue.trim() : '';
+  if (!prompt) return json({ ok: false, error: 'Oyun fikri boş olamaz.' }, 400);
 
-  if (!prompt) {
-    return json({ ok: false, error: 'Oyun fikri boş olamaz.' }, 400);
-  }
-
-  const requestedPlatform = requestBody.targetPlatform ?? requestBody.platform;
-  void requestedPlatform;
-  const normalizedTargetPlatform = 'android';
-  const targetPlatform = normalizedTargetPlatform;
-
+  const targetPlatform = 'android';
   const provider = resolveAiProvider(process.env.AI_PROVIDER);
   const isGroqProvider = provider === 'groq';
-  const model = isGroqProvider
-    ? process.env.GROQ_MODEL?.trim() || DEFAULT_GROQ_MODEL
-    : process.env.OPENAI_MODEL_PRIMARY?.trim() || 'gpt-4o';
+  const model = isGroqProvider ? process.env.GROQ_MODEL?.trim() || DEFAULT_GROQ_MODEL : process.env.OPENAI_MODEL_PRIMARY?.trim() || 'gpt-4o';
 
-  if (isGroqProvider) {
-    if (!process.env.GROQ_API_KEY?.trim()) {
-      return json({ ok: false, error: 'GROQ_API_KEY eksik.' }, 500);
-    }
-  } else if (!process.env.OPENAI_API_KEY?.trim()) {
-    return json({ ok: false, error: 'OPENAI_API_KEY eksik.' }, 500);
-  }
+  if (isGroqProvider && !process.env.GROQ_API_KEY?.trim()) return json({ ok: false, error: 'GROQ_API_KEY eksik.' }, 500);
+  if (!isGroqProvider && !process.env.OPENAI_API_KEY?.trim()) return json({ ok: false, error: 'OPENAI_API_KEY eksik.' }, 500);
 
   let aiText = '';
   try {
-    console.info('[game-factory brief]', {
-      stage: 'ai_call_started',
-      provider,
-      model,
-      promptLength: prompt.length,
-      platform: targetPlatform
-    });
-
     if (isGroqProvider) {
       aiText = await callGroqBriefModel(prompt, targetPlatform, model);
     } else {
@@ -299,78 +342,32 @@ export async function POST(request: Request) {
       const response = await client.responses.create({
         model,
         input: [
-          {
-            role: 'system',
-            content: [
-              {
-                type: 'input_text',
-                text:
-                  'Sen bir oyun tasarımcısısın. SADECE geçerli bir JSON nesnesi döndür. Markdown, kod bloğu, açıklama, yorum veya ek metin yazma.'
-              }
-            ]
-          },
+          { role: 'system', content: [{ type: 'input_text', text: 'Sen bir oyun tasarımcısısın. SADECE geçerli bir JSON nesnesi döndür. Markdown, kod bloğu, açıklama, yorum veya ek metin yazma.' }] },
           {
             role: 'user',
-            content: [
-              {
-                type: 'input_text',
-                text:
-                  `Kullanıcı oyun fikri: ${prompt}\n` +
-                  `Hedef platform: ${targetPlatform}\n\n` +
-                  'Aşağıdaki alanlarla bir oyun brief JSON nesnesi üret:\n' +
-                  'title, slug, packageName, summary, gameType, targetPlatform, mechanics, visualStyle, controls, monetizationNotes, releaseNotes, storeShortDescription, storeFullDescription\n\n' +
-                  'Kurallar:\n' +
-                  '- gameType değeri kesinlikle "runner_2d" olmalı.\n' +
-                  '- targetPlatform değeri kesinlikle "android" olmalı.\n' +
-                  '- mechanics en az 1 maddelik dizi olmalı.\n' +
-                  '- Sadece JSON döndür.'
-              }
-            ]
+            content: [{
+              type: 'input_text',
+              text:
+                `Kullanıcı oyun fikri: ${prompt}\n` +
+                `Hedef platform: ${targetPlatform}\n\n` +
+                'Aşağıdaki alanlarla bir oyun brief JSON nesnesi üret:\n' +
+                'title, slug, packageName, summary, gameType, targetPlatform, mechanics, visualStyle, controls, monetizationNotes, releaseNotes, storeShortDescription, storeFullDescription, complexityLevel, infrastructureRequired, infrastructureLevel, requiredInfrastructure, requiredUserAccounts, monetizationRequired, iapRequired, adsRequired, subscriptionsRequired, backendRequired, multiplayerRequired, publishingRequirements, blockersBeforeBuild, blockersBeforePublish\n\n' +
+                'Kurallar:\n- gameType değeri kesinlikle "runner_2d" olmalı.\n- targetPlatform değeri kesinlikle "android" olmalı.\n- mechanics en az 1 maddelik dizi olmalı.\n- Sadece JSON döndür.'
+            }]
           }
         ],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'game_factory_brief',
-            strict: true,
-            schema: GAME_BRIEF_SCHEMA
-          }
-        }
+        text: { format: { type: 'json_schema', name: 'game_factory_brief', strict: true, schema: GAME_BRIEF_SCHEMA } }
       } as never);
-
       aiText = typeof response.output_text === 'string' ? response.output_text.trim() : '';
     }
-    console.info('[game-factory brief]', {
-      stage: 'ai_response_received',
-      rawResponseLength: aiText.length,
-      rawResponsePreview: aiText.slice(0, 800)
-    });
 
     if (!aiText) {
-      console.error('[game-factory brief]', {
-        stage: 'ai_parse_failed',
-        reason: 'empty_ai_response'
-      });
-      return json(
-        { ok: false, error: "Oyun brief'i oluşturulamadı. Lütfen fikri biraz daha net yazıp tekrar deneyin." },
-        502
-      );
+      console.error('[game-factory brief]', { stage: 'ai_parse_failed', reason: 'empty_ai_response' });
+      return json({ ok: false, error: "Oyun brief'i oluşturulamadı. Lütfen fikri biraz daha net yazıp tekrar deneyin." }, 502);
     }
   } catch (error) {
-    const reason = error instanceof Error && /json_schema|response_format|not supported|unsupported/i.test(error.message)
-      ? 'unsupported_model_json_mode'
-      : isGroqProvider
-        ? 'groq_error'
-        : 'openai_error';
-    console.error('[game-factory brief]', {
-      stage: 'ai_parse_failed',
-      reason
-    });
     logRouteError('ai_call', error);
-    return json(
-      { ok: false, error: "Oyun brief'i oluşturulamadı. Lütfen fikri biraz daha net yazıp tekrar deneyin." },
-      502
-    );
+    return json({ ok: false, error: "Oyun brief'i oluşturulamadı. Lütfen fikri biraz daha net yazıp tekrar deneyin." }, 502);
   }
 
   let parsed: GameBrief;
@@ -378,28 +375,13 @@ export async function POST(request: Request) {
     const normalized = normalizeBrief(JSON.parse(aiText) as Record<string, unknown>, prompt, targetPlatform);
     const reason = getParseFailureReason(normalized);
     if (reason) {
-      console.error('[game-factory brief]', {
-        stage: 'ai_parse_failed',
-        reason
-      });
-      return json(
-        { ok: false, error: "Oyun brief'i oluşturulamadı. Lütfen fikri biraz daha net yazıp tekrar deneyin." },
-        422
-      );
+      console.error('[game-factory brief]', { stage: 'ai_parse_failed', reason });
+      return json({ ok: false, error: "Oyun brief'i oluşturulamadı. Lütfen fikri biraz daha net yazıp tekrar deneyin." }, 422);
     }
     parsed = normalized;
   } catch (error) {
-    const reason = error instanceof SyntaxError ? 'invalid_json' : 'invalid_json';
-    console.error('[game-factory brief]', {
-      stage: 'ai_parse_failed',
-      reason,
-      details: error instanceof Error ? error.message : String(error)
-    });
     logRouteError('ai_parse', error, { rawAiResponse: aiText.slice(0, 1200) });
-    return json(
-      { ok: false, error: "Oyun brief'i oluşturulamadı. Lütfen fikri biraz daha net yazıp tekrar deneyin." },
-      422
-    );
+    return json({ ok: false, error: "Oyun brief'i oluşturulamadı. Lütfen fikri biraz daha net yazıp tekrar deneyin." }, 422);
   }
 
   const { data, error } = await context.supabase
@@ -410,7 +392,7 @@ export async function POST(request: Request) {
       app_name: parsed.title,
       user_prompt: prompt,
       package_name: parsed.packageName,
-      target_platform: normalizedTargetPlatform,
+      target_platform: targetPlatform,
       status: 'draft',
       approval_status: 'pending',
       game_brief: parsed
@@ -419,22 +401,25 @@ export async function POST(request: Request) {
     .single();
 
   if (error || !data) {
-    const insertPayload = {
-      status: 'draft' as const,
-      approval_status: 'pending' as const,
-      target_platform: normalizedTargetPlatform
-    };
-    console.error('[game-factory brief]', {
-      stage: 'db_write',
-      table: 'unity_game_projects',
-      status: insertPayload.status,
-      approvalStatus: insertPayload.approval_status,
-      targetPlatform: insertPayload.target_platform,
-      message: error?.message
-    });
     logRouteError('db_write', error ?? new Error('Missing inserted row data'));
     return json({ error: 'Oyun projesi kaydedilemedi. Lütfen tekrar deneyin.' }, 400);
   }
+
+  await context.supabase.from('game_monetization_configs').upsert({
+    workspace_id: context.workspaceId,
+    unity_game_project_id: data.id,
+    monetization_required: parsed.monetizationRequired,
+    iap_required: parsed.iapRequired,
+    ads_required: parsed.adsRequired,
+    subscriptions_required: parsed.subscriptionsRequired,
+    backend_required: parsed.backendRequired,
+    multiplayer_required: parsed.multiplayerRequired,
+    privacy_policy_required: parsed.iapRequired || parsed.adsRequired,
+    metadata: {
+      complexity_level: parsed.complexityLevel,
+      infrastructure_level: parsed.infrastructureLevel
+    }
+  }, { onConflict: 'unity_game_project_id' });
 
   return json({ ok: true, projectId: data.id, brief: parsed });
 }

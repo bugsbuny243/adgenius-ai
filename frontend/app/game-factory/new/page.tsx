@@ -19,6 +19,20 @@ type GameBrief = {
   releaseNotes: string;
   storeShortDescription: string;
   storeFullDescription: string;
+  complexityLevel: 'simple' | 'medium' | 'advanced';
+  infrastructureRequired: boolean;
+  infrastructureLevel: 'none' | 'basic' | 'advanced';
+  requiredInfrastructure: string[];
+  requiredUserAccounts: string[];
+  monetizationRequired: boolean;
+  iapRequired: boolean;
+  adsRequired: boolean;
+  subscriptionsRequired: boolean;
+  backendRequired: boolean;
+  multiplayerRequired: boolean;
+  publishingRequirements: string[];
+  blockersBeforeBuild: string[];
+  blockersBeforePublish: string[];
 };
 
 async function getAccessToken() {
@@ -38,6 +52,13 @@ export default function NewGameFactoryPage() {
   const [projectId, setProjectId] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  const [technicalChecks, setTechnicalChecks] = useState<Record<string, boolean>>({
+    infra_ack: false,
+    backend_ack: false,
+    google_play_ack: false,
+    monetization_ack: false,
+    publish_blocker_ack: false
+  });
   const router = useRouter();
 
   const isCreateDisabled = useMemo(() => loading || prompt.trim().length < 10, [loading, prompt]);
@@ -81,6 +102,20 @@ export default function NewGameFactoryPage() {
     setError('');
     try {
       const token = await getAccessToken();
+      const confirmationKeys = Object.entries(technicalChecks)
+        .filter(([, checked]) => checked)
+        .map(([key]) => key);
+
+      const technicalResponse = await fetch('/api/game-factory/technical-checklist/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ projectId, confirmedItems: confirmationKeys })
+      });
+      const technicalPayload = (await technicalResponse.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!technicalResponse.ok || !technicalPayload?.ok) {
+        throw new Error(technicalPayload?.error ?? 'Teknik gereksinim onayı tamamlanamadı.');
+      }
+
       const response = await fetch('/api/game-factory/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -165,8 +200,39 @@ export default function NewGameFactoryPage() {
               <li key={item}>{item}</li>
             ))}
           </ul>
+          <div className="space-y-2 rounded-lg border border-white/15 bg-black/25 p-3">
+            <h3 className="text-base font-semibold">Technical Requirements</h3>
+            <p><b>Karmaşıklık:</b> {brief.complexityLevel}</p>
+            <p><b>Altyapı seviyesi:</b> {brief.infrastructureLevel}</p>
+            <p><b>Gerekli altyapı:</b> {brief.requiredInfrastructure.length ? brief.requiredInfrastructure.join(', ') : 'Yok'}</p>
+            <p><b>Google Play hesabı:</b> Gerekli (veya sadece APK/AAB teslim seçeneği)</p>
+            <p><b>Server/Backend/DB:</b> {brief.backendRequired ? 'Gerekli' : 'Gerekli değil'}</p>
+            <p><b>IAP gereksinimi:</b> {brief.iapRequired ? 'Gerekli' : 'Yok'}</p>
+            <p><b>Ads gereksinimi:</b> {brief.adsRequired ? 'Gerekli' : 'Yok'}</p>
+            <p><b>Kullanıcı sorumlulukları:</b> Hesap bağlantıları, dış servis kurulumları, politika/uyumluluk belgeleri</p>
+            <p><b>Opsiyonel kurulum hizmetleri:</b> Backend/IAP/Ads entegrasyon desteği ayrıca planlanabilir</p>
+            <div className="space-y-2 rounded-lg border border-white/10 bg-black/20 p-3">
+              {([
+                ['infra_ack', 'I understand this project may require external/user-owned infrastructure.'],
+                ['backend_ack', 'I have or will provide the required server/backend/database services.'],
+                ['google_play_ack', 'I have a Google Play Console account or choose APK/AAB-only delivery.'],
+                ['monetization_ack', 'I understand IAP/ads require additional setup.'],
+                ['publish_blocker_ack', 'I understand Koschei cannot publish until required accounts/configuration are connected.']
+              ] as const).map(([key, label]) => (
+                <label key={key} className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={technicalChecks[key]}
+                    onChange={(event) => setTechnicalChecks((prev) => ({ ...prev, [key]: event.target.checked }))}
+                    className="mt-0.5"
+                  />
+                  <span>{label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
           <div className="flex gap-2">
-            <button type="button" onClick={approveProject} disabled={loading} className="rounded-lg bg-neon px-4 py-2 font-semibold text-ink disabled:opacity-50">
+            <button type="button" onClick={approveProject} disabled={loading || Object.values(technicalChecks).some((v) => !v)} className="rounded-lg bg-neon px-4 py-2 font-semibold text-ink disabled:opacity-50">
               Onayla ve Devam Et
             </button>
             <button type="button" onClick={() => setStep(1)} disabled={loading} className="rounded-lg border border-white/20 px-4 py-2 disabled:opacity-50">
