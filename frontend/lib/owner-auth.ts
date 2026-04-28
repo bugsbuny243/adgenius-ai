@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { notFound, redirect } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import type { User } from '@supabase/supabase-js';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 
@@ -34,15 +34,24 @@ export function isPlatformOwner(user: Pick<User, 'id' | 'email'> | null | undefi
   return false;
 }
 
-export async function requirePlatformOwner() {
+export async function getOwnerAccess() {
   const user = await getCurrentUser();
 
   if (!user) {
     redirect('/signin');
   }
 
-  if (!isPlatformOwner(user)) {
-    notFound();
+  return {
+    user,
+    isOwner: isPlatformOwner(user)
+  };
+}
+
+export async function requirePlatformOwner() {
+  const { user, isOwner } = await getOwnerAccess();
+
+  if (!isOwner) {
+    throw new Error('OWNER_ACCESS_DENIED');
   }
 
   return user;
