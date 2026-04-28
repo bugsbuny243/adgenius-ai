@@ -614,11 +614,11 @@ function normalizeBrief(raw: Record<string, unknown>, prompt: string, platform: 
         ? toStringArray(raw.blockersBeforePublish)
         : inferred.blockersBeforePublish,
     delivery_mode: normalizeDeliveryMode(raw.delivery_mode ?? raw.deliveryMode ?? advancedIntake.deliveryMode),
-    requires_custom_scope: infrastructureRequiredSoon || toBool(raw.requires_custom_scope) || budgetScope.requires_custom_scope,
-    budget_required: infrastructureRequiredSoon ? false : toBool(raw.budget_required) || budgetScope.budget_required,
-    infrastructure_intake_required: infrastructureRequiredSoon ? false : toBool(raw.infrastructure_intake_required) || budgetScope.infrastructure_intake_required,
-    estimated_minimum_budget: infrastructureRequiredSoon ? 0 : clampInt(toNumber(raw.estimated_minimum_budget), budgetScope.estimated_minimum_budget),
-    estimated_monthly_infrastructure_cost: infrastructureRequiredSoon ? 0 : clampInt(toNumber(raw.estimated_monthly_infrastructure_cost), budgetScope.estimated_monthly_infrastructure_cost),
+    requires_custom_scope: infrastructureRequiredSoon ? true : budgetScope.requires_custom_scope,
+    budget_required: infrastructureRequiredSoon ? false : budgetScope.budget_required,
+    infrastructure_intake_required: infrastructureRequiredSoon ? false : budgetScope.infrastructure_intake_required,
+    estimated_minimum_budget: infrastructureRequiredSoon ? 0 : budgetScope.estimated_minimum_budget,
+    estimated_monthly_infrastructure_cost: infrastructureRequiredSoon ? 0 : budgetScope.estimated_monthly_infrastructure_cost,
     scalable_scope_options: Array.isArray(raw.scalable_scope_options) && raw.scalable_scope_options.length
       ? (raw.scalable_scope_options as Array<Record<string, unknown>>).map((option) => ({
           label: isNonEmptyString(option.label) ? option.label.trim() : 'Option',
@@ -629,8 +629,8 @@ function normalizeBrief(raw: Record<string, unknown>, prompt: string, platform: 
       : budgetScope.scalable_scope_options,
     feasible_mvp_scope: toStringArray(raw.feasible_mvp_scope).length ? toStringArray(raw.feasible_mvp_scope) : budgetScope.feasible_mvp_scope,
     deferred_features: toStringArray(raw.deferred_features).length ? toStringArray(raw.deferred_features) : budgetScope.deferred_features,
-    required_budget_to_include_deferred_features: infrastructureRequiredSoon ? 0 : clampInt(toNumber(raw.required_budget_to_include_deferred_features), budgetScope.required_budget_to_include_deferred_features),
-    infrastructure_gap_analysis: infrastructureRequiredSoon ? [COMING_SOON_WARNING] : (toStringArray(raw.infrastructure_gap_analysis).length ? toStringArray(raw.infrastructure_gap_analysis) : budgetScope.infrastructure_gap_analysis),
+    required_budget_to_include_deferred_features: infrastructureRequiredSoon ? 0 : budgetScope.required_budget_to_include_deferred_features,
+    infrastructure_gap_analysis: infrastructureRequiredSoon ? [COMING_SOON_WARNING] : budgetScope.infrastructure_gap_analysis,
     recommended_next_step: infrastructureRequiredSoon ? COMING_SOON_WARNING : (isNonEmptyString(raw.recommended_next_step) ? raw.recommended_next_step.trim() : budgetScope.recommended_next_step),
     ...(infrastructureRequiredSoon
       ? {
@@ -780,7 +780,7 @@ export async function POST(request: Request) {
     }
   }, { onConflict: 'unity_game_project_id' });
 
-  await context.supabase.from('advanced_project_intakes').insert({
+  const { error: advancedIntakeError } = await context.supabase.from('advanced_project_intakes').insert({
     workspace_id: context.workspaceId,
     user_id: context.userId,
     project_id: data.id,
@@ -800,6 +800,14 @@ export async function POST(request: Request) {
     },
     status: 'draft'
   });
+  if (advancedIntakeError) {
+    console.warn('[game-factory brief] optional advanced_project_intakes insert skipped', {
+      projectId: data.id,
+      workspaceId: context.workspaceId,
+      userId: context.userId,
+      error: advancedIntakeError.message
+    });
+  }
 
   return json({ ok: true, projectId: data.id, brief: parsed });
 }

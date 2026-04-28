@@ -4,10 +4,6 @@ import { requireActiveGameAgentPackage } from '@/lib/game-agent-access';
 type ApproveRequest = {
   projectId: string;
   googlePlayAccountStatus?: 'user_has_account' | 'artifact_only' | 'user_needs_setup';
-  confirmations?: {
-    understandPlayConsoleRequired?: boolean;
-    understandUserResponsibility?: boolean;
-  };
 };
 
 export async function POST(request: Request) {
@@ -24,10 +20,6 @@ export async function POST(request: Request) {
   if (!googlePlayAccountStatus || !['user_has_account', 'artifact_only', 'user_needs_setup'].includes(googlePlayAccountStatus)) {
     return json({ ok: false, error: 'Google Play hesap durumu seçilmelidir.' }, 400);
   }
-  if (!body.confirmations?.understandPlayConsoleRequired || !body.confirmations?.understandUserResponsibility) {
-    return json({ ok: false, error: 'Google Play checklist onayları zorunludur.' }, 400);
-  }
-
   const deliveryMode = googlePlayAccountStatus === 'artifact_only'
     ? 'apk_aab_only'
     : googlePlayAccountStatus === 'user_has_account'
@@ -68,7 +60,14 @@ export async function POST(request: Request) {
       confirmed_at: new Date().toISOString()
     }, { onConflict: 'unity_game_project_id' });
 
-  if (readinessError) return json({ ok: false, error: readinessError.message }, 400);
+  if (readinessError) {
+    console.warn('[game-factory approve] optional google_play_readiness upsert skipped', {
+      projectId,
+      workspaceId: context.workspaceId,
+      userId: context.userId,
+      error: readinessError.message
+    });
+  }
 
   const { data: project, error: projectError } = await context.supabase
     .from('unity_game_projects')
