@@ -208,11 +208,8 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
         <h2 className="mb-2 text-lg font-semibold">Son Build</h2>
         <p><b>Durum:</b> {latestBuild ? <span className={`rounded-full px-3 py-1 text-xs ${statusBadge(normalizeBuildStatus(latestBuild.status))}`}>{statusLabel(normalizeBuildStatus(latestBuild.status))}</span> : 'Henüz build yok'}</p>
         <p><b>Tarih:</b> {latestBuild?.created_at ? new Date(latestBuild.created_at).toLocaleString('tr-TR') : '—'}</p>
-        {latestDownload?.url ? (
-          <a href={latestDownload.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex rounded-lg border border-white/20 px-3 py-2">
-            İndir
-          </a>
-        ) : latestDownload?.message ? <p className="mt-2 text-amber-200">{latestDownload.message}</p> : null}
+        <p><b>İndir:</b> {latestBuild ? renderBuildAction(normalizeBuildStatus(latestBuild.status), latestDownload?.url ?? null, latestBuild.logs_url ?? null) : '—'}</p>
+        {!latestDownload?.url && latestDownload?.message ? <p className="mt-2 text-amber-200">{latestDownload.message}</p> : null}
       </section>
 
       <section className="overflow-x-auto rounded-xl border border-white/10 bg-black/20 p-4">
@@ -240,8 +237,10 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
                       artifactMap.get(build.id) ?? null,
                       { projectId: id, projectPackageName: project.package_name ?? null }
                     );
-                    if (download.url) return <a href={download.url} target="_blank" rel="noreferrer" className="underline">İndir</a>;
-                    return download.message ?? '—';
+                    const normalizedStatus = normalizeBuildStatus(build.status);
+                    const action = renderBuildAction(normalizedStatus, download.url, build.logs_url ?? null);
+                    if (download.message && action === '—') return download.message;
+                    return action;
                   })()}
                 </td>
               </tr>

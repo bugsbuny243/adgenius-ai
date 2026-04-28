@@ -195,7 +195,11 @@ export default async function GameFactoryBuildsPage({ params }: { params: Promis
                   <td className="px-3 py-2">{build.started_at ? new Date(build.started_at).toLocaleString('tr-TR') : '-'}</td>
                   <td className="px-3 py-2">{durationLabel(build.started_at, build.finished_at)}</td>
                   <td className="px-3 py-2">
-                    {download.url ? <a href={download.url} className="underline" target="_blank" rel="noreferrer">İndir</a> : (download.message ?? '-')}
+                    {(() => {
+                      const cell = renderDownloadCell(normalizedStatus, download.url, pickExternalUrl(build.logs_url));
+                      if (download.message && cell === '-') return download.message;
+                      return cell;
+                    })()}
                   </td>
                   <td className="px-3 py-2">{build.logs_url ? <a href={build.logs_url} className="underline" target="_blank" rel="noreferrer">Logs</a> : '-'}</td>
                 </tr>
