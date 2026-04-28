@@ -237,10 +237,13 @@ export async function publishReleaseAction(projectId: string) {
     throw new Error('Google Play kimlik bilgileri çözümlenemedi.');
   }
 
+  const selectedTrack =
+    latestReleaseJob?.track ?? project.release_track ?? integration.default_track ?? 'internal';
+
   const provider = new GooglePlayPublisherProvider();
   const publishResult = await provider.publishRelease({
     packageName: project.package_name,
-    track: preflight.selectedTrack,
+    track: selectedTrack,
     releaseNotes: latestReleaseJob?.release_notes ?? 'Game Factory yayın güncellemesi',
     aabFileUrl: artifact.file_url,
     serviceAccountJson: decryptCredentials(encryptedCredentials),
@@ -251,7 +254,7 @@ export async function publishReleaseAction(projectId: string) {
   await upsertReleaseJob({
     projectId,
     status: publishResult.status,
-    track: preflight.selectedTrack,
+    track: selectedTrack,
     releaseNotes: latestReleaseJob?.release_notes ?? '',
     errorMessage: publishResult.errorMessage ?? null,
     blockerReasons: publishResult.status === 'published' ? [] : [publishResult.errorMessage ?? 'Google Play yayını başarısız oldu.']
