@@ -1,33 +1,29 @@
 'use client';
 
-import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { useEffect } from 'react';
 
-export function BuildStatusPoller({ activeJobId, projectId }: { activeJobId: string | null; projectId: string }) {
+export function BuildStatusPoller({ jobId, token }: { jobId: string; token: string }) {
   const router = useRouter();
 
   useEffect(() => {
-    if (!activeJobId) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/game-factory/build-status?jobId=${jobId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (data.status === 'success' || data.status === 'failed' || data.status === 'cancelled') {
+          clearInterval(interval);
+          router.refresh();
+        }
+      } catch {
+        // sessizce devam et
+      }
+    }, 20_000); // 20 saniyede bir
 
-    const timer = setInterval(async () => {
-      const supabase = createSupabaseBrowserClient();
-      const token = (await supabase?.auth.getSession())?.data.session?.access_token;
-      if (!token) return;
-
-      await fetch('/api/game-factory/builds/refresh', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ projectId })
-      });
-      router.refresh();
-    }, 30000);
-
-    return () => clearInterval(timer);
-  }, [activeJobId, projectId, router]);
+    return () => clearInterval(interval);
+  }, [jobId, token, router]);
 
   return null;
 }

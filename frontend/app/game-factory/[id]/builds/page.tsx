@@ -1,209 +1,136 @@
-import Link from 'next/link';
-import { notFound, redirect } from 'next/navigation';
-import { createSupabaseReadonlyServerClient } from '@/lib/supabase-server';
-import { StartBuildButton } from '@/app/game-factory/[id]/StartBuildButton';
-import { BuildStatusAutoRefresh } from '@/app/game-factory/[id]/BuildStatusAutoRefresh';
-import { RefreshBuildsButton } from '@/app/game-factory/[id]/RefreshBuildsButton';
-import { BuildRowStatusAutoRefresh } from '@/app/game-factory/[id]/BuildRowStatusAutoRefresh';
+import { redirect } from 'next/navigation';
+import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { StartBuildButton } from '../StartBuildButton';
+import { BuildStatusPoller } from '../BuildStatusPoller';
 
 export const dynamic = 'force-dynamic';
 
-type ArtifactRow = {
-  unity_build_job_id: string | null;
-  unity_game_project_id: string | null;
-  file_url: string | null;
-  metadata: Record<string, unknown> | null;
-  created_at: string | null;
-};
-
-function readDetectedPackageName(metadata: Record<string, unknown> | null): string | null {
-  if (!metadata) return null;
-  const detected = metadata.detected_package_name;
-  if (typeof detected === 'string' && detected.trim()) return detected.trim();
-  const packageName = metadata.package_name;
-  if (typeof packageName === 'string' && packageName.trim()) return packageName.trim();
-  return null;
+function statusBadge(status: string) {
+  const map: Record<string, string> = {
+    queued: 'bg-amber-500/20 text-amber-300',
+    running: 'bg-blue-500/20 text-blue-300',
+    success: 'bg-emerald-500/20 text-emerald-300',
+    failed: 'bg-rose-500/20 text-rose-300',
+    cancelled: 'bg-zinc-500/20 text-zinc-300',
+  };
+  const label: Record<string, string> = {
+    queued: '⏳ Sırada',
+    running: '🔄 Devam Ediyor',
+    success: '✅ Başarılı',
+    failed: '❌ Hata',
+    cancelled: '⛔ İptal',
+  };
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${map[status] ?? 'bg-zinc-700 text-zinc-300'}`}>
+      {label[status] ?? status}
+    </span>
+  );
 }
 
-function resolveDownloadState(params: {
-  projectId: string;
-  projectPackageName: string | null;
-  buildId: string;
-  buildProjectId: string | null;
-  buildArtifactUrl: string | null;
-  buildMetadata: Record<string, unknown> | null;
-  artifact: ArtifactRow | null;
-}): { url: string | null; message: string | null } {
-  const {
-    projectId,
-    projectPackageName,
-    buildId,
-    buildProjectId,
-    buildArtifactUrl,
-    buildMetadata,
-    artifact
-  } = params;
-  const ownershipMismatch = buildProjectId !== projectId || (artifact && (artifact.unity_game_project_id !== projectId || artifact.unity_build_job_id !== buildId));
-  if (ownershipMismatch) {
-    return { url: null, message: 'Bu artifact bu projeye ait değil.' };
-  }
-
-  const detectedPackageName = readDetectedPackageName(artifact?.metadata ?? buildMetadata);
-  if (projectPackageName && detectedPackageName && projectPackageName !== detectedPackageName) {
-    return {
-      url: null,
-      message: `Package name uyuşmuyor. Beklenen: ${projectPackageName}, bulunan: ${detectedPackageName}`
-    };
-  }
-
-  return { url: buildArtifactUrl ?? artifact?.file_url ?? null, message: null };
-}
-
-function normalizeBuildStatus(status: string | null): string {
-  if (status === 'started') return 'running';
-  if (status === 'success') return 'succeeded';
-  if (status === 'completed') return 'succeeded';
-  if (status === 'failure') return 'failed';
-  return status ?? '-';
-}
-
-function displayBuildNumber(unityBuildNumber: unknown, fallback: number): string {
-  if (typeof unityBuildNumber === 'number' && Number.isInteger(unityBuildNumber) && unityBuildNumber > 0) {
-    return `#${unityBuildNumber}`;
-  }
-  if (fallback > 0) return `local #${fallback}`;
-  return '-';
-}
-
-
-function pickExternalUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
-  return url.startsWith('http://') || url.startsWith('https://') ? url : null;
-}
-
-function durationLabel(start: string | null, end: string | null) {
-  if (!start) return '-';
-  const startTime = new Date(start).getTime();
-  const endTime = end ? new Date(end).getTime() : Date.now();
-  const seconds = Math.max(0, Math.floor((endTime - startTime) / 1000));
-  const minutes = Math.floor(seconds / 60);
-  const rem = seconds % 60;
-  return `${minutes}dk ${rem}sn`;
-}
-
-function renderDownloadCell(status: string, downloadUrl: string | null, logsUrl: string | null) {
-  if (status === 'queued') return 'Bekliyor';
-  if (status === 'building' || status === 'claimed' || status === 'running' || status === 'started') return 'Build devam ediyor';
-  if (status === 'failed') {
-    if (logsUrl) return <a href={logsUrl} className="underline" target="_blank" rel="noreferrer">Logs / Hata</a>;
-    return 'Hata';
-  }
-  if (status === 'succeeded' && downloadUrl) {
-    return <a href={downloadUrl} className="underline" target="_blank" rel="noreferrer">İndir</a>;
-  }
-  return '-';
-}
-
-export default async function GameFactoryBuildsPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const supabase = await createSupabaseReadonlyServerClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
+export default async function BuildsPage({ params }: { params: { id: string } }) {
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/signin');
 
-  const [{ data: project }, { data: builds }] = await Promise.all([
-    supabase
-      .from('unity_game_projects')
-      .select('id, app_name, package_name, approval_status')
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .maybeSingle(),
-    supabase.from('unity_build_jobs').select('*').eq('unity_game_project_id', id).order('created_at', { ascending: false })
-  ]);
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token ?? '';
 
-  if (!project) notFound();
+  const { data: project } = await supabase
+    .from('unity_game_projects')
+    .select('id, app_name, package_name, status, approval_status')
+    .eq('id', params.id)
+    .maybeSingle();
 
-  const buildIds = (builds ?? []).map((build) => build.id);
-  const artifactMap = new Map<string, ArtifactRow>();
+  if (!project) redirect('/game-factory');
 
-  if (buildIds.length > 0) {
-    const { data: artifacts } = await supabase
-      .from('game_artifacts')
-      .select('unity_build_job_id, unity_game_project_id, file_url, metadata, created_at')
-      .in('unity_build_job_id', buildIds)
-      .order('created_at', { ascending: false });
+  const { data: jobs } = await supabase
+    .from('unity_build_jobs')
+    .select('id, status, queued_at, started_at, finished_at, artifact_url, metadata, version_name, version_code')
+    .eq('unity_game_project_id', params.id)
+    .order('created_at', { ascending: false });
 
-    for (const artifact of artifacts ?? []) {
-      if (!artifact.unity_build_job_id || !artifact.file_url) continue;
-      if (!artifactMap.has(artifact.unity_build_job_id)) {
-        artifactMap.set(artifact.unity_build_job_id, artifact as ArtifactRow);
-      }
-    }
-  }
-
-  const activeJob = (builds ?? []).find((job) => {
-    const normalized = normalizeBuildStatus(job.status).toLowerCase();
-    return normalized === 'queued' || normalized === 'building' || normalized === 'claimed' || normalized === 'running' || normalized === 'started';
-  });
+  const activeJob = jobs?.find(j => j.status === 'queued' || j.status === 'running');
 
   return (
-    <main className="panel space-y-4">
-      <BuildStatusAutoRefresh projectId={activeJob ? id : null} />
-      <header className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-6 p-4">
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{project.app_name}</h1>
-          <p className="text-sm text-white/70">{project.package_name}</p>
+          <h1 className="text-xl font-bold">{project.app_name}</h1>
+          <p className="text-sm text-white/50">{project.package_name}</p>
         </div>
         <div className="flex gap-2">
-          <Link href={`/game-factory/${id}`} className="rounded-lg border border-white/20 px-3 py-2 text-sm">Projeye dön</Link>
-          <RefreshBuildsButton projectId={id} />
+          <a href={`/game-factory/${params.id}`} className="rounded-lg border border-white/20 px-3 py-1.5 text-sm hover:border-white/40">
+            Projeye Dön
+          </a>
+          {project.approval_status === 'approved' && (
+            <StartBuildButton projectId={params.id} />
+          )}
         </div>
-      </header>
+      </div>
 
-      {project.approval_status === 'approved' ? <StartBuildButton projectId={id} /> : <p className="text-sm text-amber-300">Yeni build için proje onayı gerekiyor.</p>}
+      {activeJob && <BuildStatusPoller jobId={activeJob.id} token={token} />}
 
-      <section className="overflow-x-auto rounded-xl border border-white/10">
-        <table className="min-w-full text-sm">
-          <thead className="bg-black/30 text-left">
-            <tr>
-              <th className="px-3 py-2">Build</th>
-              <th className="px-3 py-2">Durum</th>
-              <th className="px-3 py-2">Başlangıç</th>
-              <th className="px-3 py-2">Süre</th>
-              <th className="px-3 py-2">İndir</th>
-              <th className="px-3 py-2">Logs</th>
+      <div className="rounded-2xl border border-white/10 bg-black/20 overflow-auto">
+        <table className="w-full text-sm">
+          <thead className="border-b border-white/10">
+            <tr className="text-left text-white/50">
+              <th className="px-4 py-3">Build</th>
+              <th className="px-4 py-3">Durum</th>
+              <th className="px-4 py-3">Başlangıç</th>
+              <th className="px-4 py-3">Süre</th>
+              <th className="px-4 py-3">İndir</th>
             </tr>
           </thead>
           <tbody>
-            {(builds ?? []).map((build, index) => {
-              const unityBuildNumber = (build.metadata as { unityBuildNumber?: number } | null)?.unityBuildNumber;
-              const normalizedStatus = normalizeBuildStatus(build.status);
-              const download = resolveDownloadState({
-                projectId: id,
-                projectPackageName: project.package_name ?? null,
-                buildId: build.id,
-                buildProjectId: build.unity_game_project_id ?? null,
-                buildArtifactUrl: build.artifact_url ?? null,
-                buildMetadata: (build.metadata as Record<string, unknown> | null) ?? null,
-                artifact: artifactMap.get(build.id) ?? null
-              });
+            {!jobs?.length && (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-white/40">
+                  Henüz build yok.
+                </td>
+              </tr>
+            )}
+            {jobs?.map((job, i) => {
+              const meta = (job.metadata ?? {}) as Record<string, unknown>;
+              const buildNum = meta.unityBuildNumber as number | undefined;
+              const start = job.started_at ? new Date(job.started_at) : null;
+              const end = job.finished_at ? new Date(job.finished_at) : null;
+              const durationSec = start && end ? Math.round((end.getTime() - start.getTime()) / 1000) : null;
+              const duration = durationSec
+                ? durationSec >= 60
+                  ? `${Math.floor(durationSec / 60)}d ${durationSec % 60}s`
+                  : `${durationSec}s`
+                : '-';
+
               return (
-                <tr key={build.id} className="border-t border-white/10">
-                  <td className="px-3 py-2">{displayBuildNumber(unityBuildNumber, (builds?.length ?? 0) - index)}</td>
-                  <td className="px-3 py-2"><BuildRowStatusAutoRefresh buildId={build.id} projectId={id} initialStatus={normalizedStatus} /></td>
-                  <td className="px-3 py-2">{build.started_at ? new Date(build.started_at).toLocaleString('tr-TR') : '-'}</td>
-                  <td className="px-3 py-2">{durationLabel(build.started_at, build.finished_at)}</td>
-                  <td className="px-3 py-2">
-                    {download.url ? <a href={download.url} className="underline" target="_blank" rel="noreferrer">İndir</a> : (download.message ?? '-')}
+                <tr key={job.id} className="border-b border-white/5 hover:bg-white/5">
+                  <td className="px-4 py-3 font-mono">
+                    #{buildNum ?? (jobs.length - i)}
                   </td>
-                  <td className="px-3 py-2">{build.logs_url ? <a href={build.logs_url} className="underline" target="_blank" rel="noreferrer">Logs</a> : '-'}</td>
+                  <td className="px-4 py-3">{statusBadge(job.status)}</td>
+                  <td className="px-4 py-3 text-white/60">
+                    {start ? start.toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '-'}
+                  </td>
+                  <td className="px-4 py-3 text-white/60">{duration}</td>
+                  <td className="px-4 py-3">
+                    {job.artifact_url ? (
+                      <a
+                        href={job.artifact_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-lg bg-emerald-500/20 px-3 py-1 text-xs text-emerald-300 hover:bg-emerald-500/30"
+                      >
+                        ⬇ AAB İndir
+                      </a>
+                    ) : (
+                      <span className="text-white/30">-</span>
+                    )}
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
-      </section>
-    </main>
+      </div>
+    </div>
   );
 }
