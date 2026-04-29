@@ -3,6 +3,87 @@ import { requireActiveGameAgentPackage } from '@/lib/game-agent-access';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase-service-role';
 import { getBuilds, triggerBuild, UnityApiError } from '@/lib/server/unity-cloud-build';
 
+const KOSCHEI_CONFIG_PATH = 'Assets/Koschei/Generated/koschei-build-config.json';
+
+function encodeBase64(value: string): string {
+  return Buffer.from(value, 'utf8').toString('base64');
+}
+
+function safeVersionCode(input: unknown): number {
+  if (typeof input === 'number' && Number.isInteger(input) && input > 0) return input;
+  const ts = Math.floor(Date.now() / 1000);
+  return ts > 0 ? ts : 1;
+}
+
+async function writeAndVerifyKoscheiBuildConfig(input: {
+  project: Record<string, unknown>;
+  buildJobId: string;
+  versionCode: number;
+}) {
+  const owner = process.env.GITHUB_UNITY_REPO_OWNER?.trim();
+  const repo = process.env.GITHUB_UNITY_REPO_NAME?.trim();
+  const branch = process.env.GITHUB_UNITY_REPO_BRANCH?.trim() || 'main';
+  const token = process.env.GITHUB_UNITY_REPO_TOKEN?.trim();
+  if (!owner || !repo || !token) throw new Error('missing_unity_repo_env');
+
+  const brief = ((input.project.game_brief as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+  const appName = String(input.project.app_name ?? input.project.name ?? 'Koschei Game');
+  const packageName = String(input.project.package_name ?? '').trim();
+  if (!packageName) throw new Error('missing_package_name');
+
+  const payload = {
+    project_id: String(input.project.id ?? ''),
+    build_job_id: input.buildJobId,
+    app_name: appName,
+    package_name: packageName,
+    version_name: `1.0.${input.versionCode}`,
+    version_code: input.versionCode,
+    game_type: String(brief.gameType ?? 'runner_2d') || 'runner_2d',
+    short_description: String(brief.storeShortDescription ?? ''),
+    visual_style: String(brief.visualStyle ?? ''),
+    controls: String(brief.controls ?? ''),
+    features: Array.isArray(brief.mechanics) ? brief.mechanics.map((item) => String(item)) : [],
+    target_platform: 'android'
+  };
+
+  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(KOSCHEI_CONFIG_PATH)}`;
+  const body = {
+    message: `chore: update Koschei build config for ${input.buildJobId}`,
+    content: encodeBase64(JSON.stringify(payload, null, 2) + '\n'),
+    branch
+  };
+
+  const writeResponse = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github+json',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!writeResponse.ok) {
+    const details = await writeResponse.text().catch(() => '');
+    throw new Error(`config_write_failed:${writeResponse.status}:${details.slice(0, 180)}`);
+  }
+
+  const writeJson = (await writeResponse.json().catch(() => null)) as { commit?: { sha?: string } } | null;
+
+  const verifyResponse = await fetch(`${url}?ref=${encodeURIComponent(branch)}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github+json'
+    }
+  });
+  if (!verifyResponse.ok) {
+    const details = await verifyResponse.text().catch(() => '');
+    throw new Error(`config_verify_failed:${verifyResponse.status}:${details.slice(0, 180)}`);
+  }
+
+  return { branch, commitSha: writeJson?.commit?.sha ?? null, payload };
+}
+
 function isValidPositiveInt(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }
@@ -21,7 +102,7 @@ export async function POST(request: Request) {
   const serviceRole = getSupabaseServiceRoleClient();
   const { data: project } = await serviceRole
     .from('unity_game_projects')
-    .select('id, approval_status')
+    .select('id, approval_status, app_name, name, package_name, game_brief')
     .eq('id', projectId)
     .eq('workspace_id', context.workspaceId)
     .eq('user_id', context.userId)
@@ -33,6 +114,53 @@ export async function POST(request: Request) {
   const buildTargetId = process.env.UNITY_BUILD_TARGET_ID?.trim();
   if (!buildTargetId) return json({ ok: false, error: 'UNITY_BUILD_TARGET_ID eksik.' }, 500);
 
+  const versionCode = safeVersionCode(Date.now());
+  const { data: insertedJob, error: jobError } = await serviceRole
+    .from('unity_build_jobs')
+    .insert({
+      unity_game_project_id: projectId,
+      workspace_id: context.workspaceId,
+      user_id: context.userId,
+      requested_by: context.userId,
+      build_target: 'android',
+      build_type: 'release',
+      status: 'queued',
+      queued_at: new Date().toISOString(),
+      metadata: {
+        unityBuildTargetId: buildTargetId,
+        koscheiConfigPath: KOSCHEI_CONFIG_PATH,
+        koscheiConfigVersionCode: versionCode
+      }
+    })
+    .select('id')
+    .single();
+
+  if (jobError || !insertedJob) {
+    return json({ ok: false, error: jobError?.message ?? 'Build kaydı oluşturulamadı.' }, 400);
+  }
+
+  try {
+    const result = await writeAndVerifyKoscheiBuildConfig({ project, buildJobId: insertedJob.id, versionCode });
+    console.info('Koschei Unity build config written and verified', {
+      package_name: result.payload.package_name,
+      app_name: result.payload.app_name,
+      build_job_id: insertedJob.id,
+      branch: result.branch,
+      commit_sha: result.commitSha
+    });
+  } catch (error) {
+    await serviceRole
+      .from('unity_build_jobs')
+      .update({
+        status: 'failed',
+        error_message: 'Unity build config yazılamadı; build başlatılmadı.'
+      })
+      .eq('id', insertedJob.id);
+
+    await serviceRole.from('unity_game_projects').update({ status: 'failed' }).eq('id', projectId);
+    return json({ ok: false, error: 'Unity build config yazılamadı; build başlatılmadı.' }, 502);
+  }
+
   let unityResponse: Awaited<ReturnType<typeof triggerBuild>>;
   let recoveredBuild: Awaited<ReturnType<typeof getBuilds>>[number] | null = null;
 
@@ -40,19 +168,14 @@ export async function POST(request: Request) {
     unityResponse = await triggerBuild(buildTargetId);
   } catch (error) {
     const unityError = error instanceof UnityApiError ? error : new UnityApiError('Unity build tetikleme hatası.');
-    const queuedAt = new Date().toISOString();
 
-    await serviceRole.from('unity_build_jobs').insert({
-      unity_game_project_id: projectId,
-      workspace_id: context.workspaceId,
-      user_id: context.userId,
-      requested_by: context.userId,
-      build_target: 'android',
-      build_type: 'release',
-      status: 'failed',
-      queued_at: queuedAt,
-      error_message: unityError.message
-    });
+    await serviceRole
+      .from('unity_build_jobs')
+      .update({
+        status: 'failed',
+        error_message: unityError.message
+      })
+      .eq('id', insertedJob.id);
 
     await serviceRole
       .from('unity_game_projects')
@@ -87,32 +210,22 @@ export async function POST(request: Request) {
       : 'queued';
   const effectiveDownloadUrl = recoveredBuild?.links?.download_primary?.href ?? unityResponse.links?.download_primary?.href ?? null;
 
-  const { data: insertedJob, error: jobError } = await serviceRole
+  await serviceRole
     .from('unity_build_jobs')
-    .insert({
-      unity_game_project_id: projectId,
-      workspace_id: context.workspaceId,
-      user_id: context.userId,
-      requested_by: context.userId,
-      build_target: 'android',
-      build_type: 'release',
+    .update({
       status: initialJobStatus,
-      queued_at: new Date().toISOString(),
       metadata: {
         ...(unityBuildNumber ? { unityBuildNumber } : {}),
         unityBuildTargetId: buildTargetId,
         unityReturnedBuildTargetId: unityResponse.buildTargetId,
         unityStatus: effectiveUnityStatus,
         unityDownloadUrl: effectiveDownloadUrl,
-        needsUnityBuildNumberRecovery: !unityBuildNumber
+        needsUnityBuildNumberRecovery: !unityBuildNumber,
+        koscheiConfigPath: KOSCHEI_CONFIG_PATH,
+        koscheiConfigVersionCode: versionCode
       }
     })
-    .select('id')
-    .single();
-
-  if (jobError || !insertedJob) {
-    return json({ ok: false, error: jobError?.message ?? 'Build kaydı oluşturulamadı.' }, 400);
-  }
+    .eq('id', insertedJob.id);
 
   await serviceRole.from('unity_game_projects').update({ status: 'building' }).eq('id', projectId);
   return json({ ok: true, jobId: insertedJob.id, unityBuildNumber: unityBuildNumber ?? null });
