@@ -150,7 +150,6 @@ export async function POST(request: Request) {
     .select('id, approval_status, app_name, name, package_name, game_brief')
     .eq('id', projectId)
     .eq('workspace_id', context.workspaceId)
-    .eq('user_id', context.userId)
     .maybeSingle();
 
   if (!project) return json({ ok: false, error: 'Proje bulunamadı.' }, 404);
@@ -226,8 +225,7 @@ export async function POST(request: Request) {
       .from('unity_game_projects')
       .update({ status: 'failed' })
       .eq('id', projectId)
-      .eq('workspace_id', context.workspaceId)
-      .eq('user_id', context.userId);
+      .eq('workspace_id', context.workspaceId);
 
     return json({ ok: false, error: 'Unity build başlatılamadı.' }, 502);
   }

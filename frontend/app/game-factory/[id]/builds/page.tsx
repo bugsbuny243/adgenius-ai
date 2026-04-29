@@ -5,6 +5,7 @@ import { StartBuildButton } from '@/app/game-factory/[id]/StartBuildButton';
 import { BuildStatusAutoRefresh } from '@/app/game-factory/[id]/BuildStatusAutoRefresh';
 import { RefreshBuildsButton } from '@/app/game-factory/[id]/RefreshBuildsButton';
 import { BuildRowStatusAutoRefresh } from '@/app/game-factory/[id]/BuildRowStatusAutoRefresh';
+import { getWorkspaceContextOrNull } from '@/lib/workspace';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,13 +41,15 @@ export default async function GameFactoryBuildsPage({ params }: { params: Promis
     data: { user }
   } = await supabase.auth.getUser();
   if (!user) redirect('/signin');
+  const workspace = await getWorkspaceContextOrNull();
+  if (!workspace) notFound();
 
   const [{ data: project }, { data: builds }] = await Promise.all([
     supabase
       .from('unity_game_projects')
       .select('id, app_name, package_name, approval_status')
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq('workspace_id', workspace.workspaceId)
       .maybeSingle(),
     supabase.from('unity_build_jobs').select('*').eq('unity_game_project_id', id).order('created_at', { ascending: false })
   ]);
