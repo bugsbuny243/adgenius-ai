@@ -11,7 +11,7 @@ export default async function OwnerLayout({ children }: { children: React.ReactN
   if (!isOwner) {
     return (
       <main>
-        <OwnerShell ownerLabel={ownerLabel}>
+        <OwnerShell ownerLabel={ownerLabel} isOwner={false}>
           <section className="panel">
             <h2 className="text-lg font-semibold">Owner Panel</h2>
             <p className="mt-3 text-sm text-rose-200">Bu sayfaya erişim yetkiniz yok.</p>
@@ -21,5 +21,5 @@ export default async function OwnerLayout({ children }: { children: React.ReactN
     );
   }
 
-  return <OwnerShell ownerLabel={ownerLabel}>{children}</OwnerShell>;
+  return <OwnerShell ownerLabel={ownerLabel} isOwner>{children}</OwnerShell>;
 }
