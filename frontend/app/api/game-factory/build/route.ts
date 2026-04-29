@@ -46,7 +46,7 @@ async function writeAndVerifyKoscheiBuildConfig(input: {
     target_platform: 'android'
   };
 
-  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(KOSCHEI_CONFIG_PATH)}`;
+  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${KOSCHEI_CONFIG_PATH}`;
   const body = {
     message: `chore: update Koschei build config for ${input.buildJobId}`,
     content: encodeBase64(JSON.stringify(payload, null, 2) + '\n'),
@@ -68,7 +68,13 @@ async function writeAndVerifyKoscheiBuildConfig(input: {
     throw new Error(`config_write_failed:${writeResponse.status}:${details.slice(0, 180)}`);
   }
 
-  const writeJson = (await writeResponse.json().catch(() => null)) as { commit?: { sha?: string } } | null;
+  const writeJson = (await writeResponse.json().catch(() => null)) as
+    | { commit?: { sha?: string }; content?: { path?: string } }
+    | null;
+
+  if (writeJson?.content?.path !== KOSCHEI_CONFIG_PATH) {
+    throw new Error(`config_write_path_mismatch:${writeJson?.content?.path ?? 'unknown'}`);
+  }
 
   const verifyResponse = await fetch(`${url}?ref=${encodeURIComponent(branch)}`, {
     headers: {
@@ -79,6 +85,45 @@ async function writeAndVerifyKoscheiBuildConfig(input: {
   if (!verifyResponse.ok) {
     const details = await verifyResponse.text().catch(() => '');
     throw new Error(`config_verify_failed:${verifyResponse.status}:${details.slice(0, 180)}`);
+  }
+
+  const verifyJson = (await verifyResponse.json().catch(() => null)) as
+    | { path?: string; content?: string; encoding?: string }
+    | null;
+  if (verifyJson?.path !== KOSCHEI_CONFIG_PATH) {
+    throw new Error(`config_verify_path_mismatch:${verifyJson?.path ?? 'unknown'}`);
+  }
+
+  const decodedContent =
+    verifyJson?.encoding === 'base64' && typeof verifyJson.content === 'string'
+      ? Buffer.from(verifyJson.content.replace(/\n/g, ''), 'base64').toString('utf8')
+      : '';
+
+  let parsed: Record<string, unknown> | null = null;
+  try {
+    parsed = decodedContent ? (JSON.parse(decodedContent) as Record<string, unknown>) : null;
+  } catch {
+    parsed = null;
+  }
+
+  const requiredFields = [
+    'project_id',
+    'build_job_id',
+    'app_name',
+    'package_name',
+    'version_name',
+    'version_code',
+    'game_type',
+    'short_description',
+    'visual_style',
+    'controls',
+    'features',
+    'target_platform'
+  ];
+
+  const missingField = requiredFields.find((field) => !(field in (parsed ?? {})));
+  if (missingField) {
+    throw new Error(`config_verify_missing_field:${missingField}`);
   }
 
   return { branch, commitSha: writeJson?.commit?.sha ?? null, payload };
