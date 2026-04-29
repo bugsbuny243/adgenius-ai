@@ -3,6 +3,7 @@ import { Nav } from '@/components/nav';
 
 type OwnerShellProps = {
   ownerLabel: string;
+  isOwner: boolean;
   children: React.ReactNode;
 };
 
@@ -10,14 +11,14 @@ export const OWNER_LINKS = [
   { href: '/owner', label: 'Owner Panel' }
 ] as const;
 
-export function OwnerShell({ ownerLabel, children }: OwnerShellProps) {
+export function OwnerShell({ ownerLabel, isOwner, children }: OwnerShellProps) {
   return (
     <main>
       <Nav showOwnerLink />
       <section className="mb-4 rounded-xl border border-amber-300/40 bg-amber-500/10 p-4">
         <p className="text-xs uppercase tracking-[0.2em] text-amber-100">Owner Control Plane</p>
-        <h1 className="mt-1 text-xl font-semibold">Platform Owner</h1>
-        <p className="text-sm text-amber-50/90">Yetkili hesap: {ownerLabel}</p>
+        <h1 className="mt-1 text-xl font-semibold">{isOwner ? 'Platform Owner' : 'Owner Panel'}</h1>
+        <p className="text-sm text-amber-50/90">{isOwner ? `Yetkili hesap: ${ownerLabel}` : `Hesap: ${ownerLabel}`}</p>
       </section>
       <section className="mb-4 flex flex-wrap gap-2">
         {OWNER_LINKS.map((link) => (
