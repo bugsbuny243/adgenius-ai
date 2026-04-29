@@ -14,14 +14,17 @@ export async function POST(request: Request) {
   const projectId = body.projectId?.trim();
   if (!projectId) return json({ ok: false, error: 'projectId zorunlu.' }, 400);
 
-  const { error } = await context.supabase
+  const { data, error } = await context.supabase
     .from('unity_game_projects')
     .update({ approval_status: 'approved', status: 'approved' })
     .eq('id', projectId)
     .eq('workspace_id', context.workspaceId)
-    .eq('user_id', context.userId);
+    .eq('user_id', context.userId)
+    .select('id')
+    .maybeSingle();
 
   if (error) return json({ ok: false, error: error.message }, 400);
+  if (!data?.id) return json({ ok: false, error: 'Proje bulunamadı.' }, 404);
 
-  return json({ ok: true });
+  return json({ ok: true, projectId: data.id });
 }

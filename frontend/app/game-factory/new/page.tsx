@@ -86,11 +86,13 @@ export default function NewGameFactoryPage() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ projectId })
       });
-      const data = (await response.json()) as { ok: boolean; error?: string };
-      if (!response.ok || !data.ok) {
+      const data = (await response.json()) as { ok: boolean; error?: string; projectId?: string };
+      if (!response.ok || !data.ok || !data.projectId) {
         throw new Error(data.error ?? 'Onay işlemi başarısız.');
       }
+      setProjectId(data.projectId);
       setStep(3);
+      router.push(`/game-factory/${data.projectId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Bir hata oluştu.');
     } finally {
