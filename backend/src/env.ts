@@ -37,8 +37,34 @@ function optional(name: string): string | null {
   return value && value.length > 0 ? value : null;
 }
 
+function requireAbsoluteUrl(value: string, envKey: string): void {
+  try {
+    const parsed = new URL(value);
+    if (!parsed.protocol.startsWith('http')) throw new Error('protocol');
+  } catch {
+    throw new Error(`Invalid backend env: ${envKey} must be a valid http(s) URL`);
+  }
+}
+
+function requireBase64Key(value: string, envKey: string): void {
+  const decoded = Buffer.from(value, 'base64');
+  if (decoded.length !== 32) {
+    throw new Error(`Invalid backend env: ${envKey} must decode to 32 bytes`);
+  }
+}
+
+function validateEnv(env: Record<RequiredKey, string>): void {
+  requireAbsoluteUrl(env.SUPABASE_URL, 'SUPABASE_URL');
+  requireAbsoluteUrl(env.GOOGLE_REDIRECT_URI, 'GOOGLE_REDIRECT_URI');
+  if (!/^[a-z0-9_.-]+$/i.test(env.UNITY_BUILD_TARGET_ID)) {
+    throw new Error('Invalid backend env: UNITY_BUILD_TARGET_ID contains unsupported characters');
+  }
+  requireBase64Key(env.KOSCHEI_CREDENTIALS_ENCRYPTION_KEY, 'KOSCHEI_CREDENTIALS_ENCRYPTION_KEY');
+}
+
 export function loadEnv(): BackendEnv {
   const env = Object.fromEntries(REQUIRED_ENV_KEYS.map((key) => [key, required(key)])) as Record<RequiredKey, string>;
+  validateEnv(env);
   const aiProvider = env.AI_PROVIDER.toLowerCase();
   const openai = optional('OPENAI_API_KEY');
   const groq = optional('GROQ_API_KEY');
