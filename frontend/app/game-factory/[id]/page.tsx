@@ -4,7 +4,6 @@ import { createSupabaseReadonlyServerClient } from '@/lib/supabase-server';
 import { deleteGameProject } from '@/app/game-factory/actions';
 import { StartBuildButton } from '@/app/game-factory/[id]/StartBuildButton';
 import { BuildListAutoRefresh } from '@/app/game-factory/[id]/BuildListAutoRefresh';
-import { getWorkspaceContextOrNull } from '@/lib/workspace';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,15 +77,13 @@ export default async function GameFactoryProjectPage({ params }: { params: Promi
   } = await supabase.auth.getUser();
 
   if (!user) redirect('/signin');
-  const workspace = await getWorkspaceContextOrNull();
-  if (!workspace) notFound();
 
   const [{ data: project }, { data: builds }] = await Promise.all([
     supabase
       .from('unity_game_projects')
       .select('id, app_name, package_name, status, game_brief, approval_status')
       .eq('id', id)
-      .eq('workspace_id', workspace.workspaceId)
+      .eq('user_id', user.id)
       .maybeSingle(),
     supabase
       .from('unity_build_jobs')

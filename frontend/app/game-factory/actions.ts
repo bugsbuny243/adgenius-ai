@@ -21,23 +21,11 @@ async function requireAuthenticatedUser() {
 
 async function requireOwnedProject(projectId: string) {
   const { supabase, user } = await requireAuthenticatedUser();
-  const { data: membership } = await supabase
-    .from('workspace_members')
-    .select('workspace_id')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (!membership?.workspace_id) {
-    throw new Error('Çalışma alanı bulunamadı.');
-  }
-
   const { data: project, error } = await supabase
     .from('unity_game_projects')
-    .select('id, workspace_id, user_id, package_name, release_track, google_play_integration_id, current_version_code, current_version_name')
+    .select('id, user_id, package_name, release_track, google_play_integration_id, current_version_code, current_version_name')
     .eq('id', projectId)
-    .eq('workspace_id', membership.workspace_id)
+    .eq('user_id', user.id)
     .maybeSingle();
 
   if (error) {
@@ -48,7 +36,7 @@ async function requireOwnedProject(projectId: string) {
     throw new Error('Proje bulunamadı.');
   }
 
-  return { supabase, user, project, workspaceId: membership.workspace_id };
+  return { supabase, user, project };
 }
 
 async function upsertReleaseJob(params: {
@@ -94,9 +82,9 @@ async function upsertReleaseJob(params: {
 }
 
 export async function deleteGameProject(projectId: string) {
-  const { supabase, workspaceId } = await requireOwnedProject(projectId);
+  const { supabase, user } = await requireAuthenticatedUser();
 
-  await supabase.from('unity_game_projects').delete().eq('id', projectId).eq('workspace_id', workspaceId);
+  await supabase.from('unity_game_projects').delete().eq('id', projectId).eq('user_id', user.id);
 
   revalidatePath('/game-factory');
   redirect('/game-factory');
@@ -187,7 +175,7 @@ export async function publishReleaseAction(projectId: string) {
 
 
 export async function setProjectGooglePlayIntegrationAction(projectId: string, formData: FormData) {
-  const { supabase, user, workspaceId } = await requireOwnedProject(projectId);
+  const { supabase, user } = await requireAuthenticatedUser();
   const integrationId = String(formData.get('google_play_integration_id') ?? '').trim();
 
   if (!integrationId) {
@@ -214,7 +202,7 @@ export async function setProjectGooglePlayIntegrationAction(projectId: string, f
     .from('unity_game_projects')
     .update({ google_play_integration_id: integration.id, release_track: integration.default_track ?? 'production' })
     .eq('id', projectId)
-    .eq('workspace_id', workspaceId);
+    .eq('user_id', user.id);
 
   if (error) {
     throw new Error(`Proje Google Play bağlantısı güncellenemedi: ${error.message}`);

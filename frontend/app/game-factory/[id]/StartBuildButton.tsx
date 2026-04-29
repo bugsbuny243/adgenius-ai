@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 
-export function StartBuildButton({ projectId }: { projectId: string }) {
+export function StartBuildButton({ projectId, workspaceId }: { projectId: string; workspaceId?: string | null }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
@@ -21,7 +21,11 @@ export function StartBuildButton({ projectId }: { projectId: string }) {
 
       const response = await fetch('/api/game-factory/build', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          ...(workspaceId ? { 'x-workspace-id': workspaceId } : {})
+        },
         body: JSON.stringify({ projectId })
       });
       const payload = (await response.json()) as { ok: boolean; error?: string };

@@ -47,19 +47,33 @@ export async function getApiAuthContext(request: Request): Promise<AuthContext |
     return unauthorized('Kullanıcı doğrulanamadı.');
   }
 
-  const { data: membership, error: membershipError } = await supabase
-    .from('workspace_members')
-    .select('workspace_id')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  const requestedWorkspaceId = request.headers.get('x-workspace-id')?.trim() ?? '';
 
-  if (membershipError || !membership?.workspace_id) {
+  const { data: memberships, error: membershipsError } = await supabase
+    .from('workspace_members')
+    .select('workspace_id, created_at')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: true });
+
+  if (membershipsError || !memberships?.length) {
     return unauthorized('Çalışma alanı bulunamadı.');
   }
 
-  return { supabase, userId: user.id, userEmail: user.email ?? null, workspaceId: membership.workspace_id };
+  const membershipWorkspaceIds = new Set(
+    memberships
+      .map((membership) => (typeof membership.workspace_id === 'string' ? membership.workspace_id.trim() : ''))
+      .filter(Boolean)
+  );
+
+  const workspaceId = requestedWorkspaceId && membershipWorkspaceIds.has(requestedWorkspaceId)
+    ? requestedWorkspaceId
+    : memberships[0]?.workspace_id;
+
+  if (!workspaceId) {
+    return unauthorized('Çalışma alanı bulunamadı.');
+  }
+
+  return { supabase, userId: user.id, userEmail: user.email ?? null, workspaceId };
 }
 
 export function json(body: unknown, status = 200) {

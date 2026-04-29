@@ -5,7 +5,6 @@ import { StartBuildButton } from '@/app/game-factory/[id]/StartBuildButton';
 import { BuildStatusAutoRefresh } from '@/app/game-factory/[id]/BuildStatusAutoRefresh';
 import { RefreshBuildsButton } from '@/app/game-factory/[id]/RefreshBuildsButton';
 import { BuildRowStatusAutoRefresh } from '@/app/game-factory/[id]/BuildRowStatusAutoRefresh';
-import { getWorkspaceContextOrNull } from '@/lib/workspace';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,15 +40,13 @@ export default async function GameFactoryBuildsPage({ params }: { params: Promis
     data: { user }
   } = await supabase.auth.getUser();
   if (!user) redirect('/signin');
-  const workspace = await getWorkspaceContextOrNull();
-  if (!workspace) notFound();
 
   const [{ data: project }, { data: builds }] = await Promise.all([
     supabase
       .from('unity_game_projects')
-      .select('id, app_name, package_name, approval_status')
+      .select('id, app_name, package_name, approval_status, workspace_id')
       .eq('id', id)
-      .eq('workspace_id', workspace.workspaceId)
+      .eq('user_id', user.id)
       .maybeSingle(),
     supabase.from('unity_build_jobs').select('*').eq('unity_game_project_id', id).order('created_at', { ascending: false })
   ]);
@@ -90,7 +87,7 @@ export default async function GameFactoryBuildsPage({ params }: { params: Promis
         </div>
       </header>
 
-      {project.approval_status === 'approved' ? <StartBuildButton projectId={id} /> : <p className="text-sm text-amber-300">Yeni build için proje onayı gerekiyor.</p>}
+      {project.approval_status === 'approved' ? <StartBuildButton projectId={id} workspaceId={project.workspace_id} /> : <p className="text-sm text-amber-300">Yeni build için proje onayı gerekiyor.</p>}
 
       <section className="overflow-x-auto rounded-xl border border-white/10">
         <table className="min-w-full text-sm">
