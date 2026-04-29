@@ -137,9 +137,6 @@ export async function POST(request: Request) {
   const context = await getApiAuthContext(request);
   if (context instanceof Response) return context;
 
-  const packageGateResponse = await requireActiveGameAgentPackage(context.supabase, context.userId, context.workspaceId);
-  if (packageGateResponse) return packageGateResponse;
-
   const payload = (await request.json().catch(() => null)) as { projectId?: string | null } | null;
   const projectId = String(payload?.projectId ?? '').trim();
   if (!projectId) return json({ ok: false, error: 'projectId zorunlu.' }, 400);
@@ -147,12 +144,25 @@ export async function POST(request: Request) {
   const serviceRole = getSupabaseServiceRoleClient();
   const { data: project } = await serviceRole
     .from('unity_game_projects')
-    .select('id, approval_status, app_name, name, package_name, game_brief')
+    .select('id, workspace_id, approval_status, app_name, name, package_name, game_brief')
     .eq('id', projectId)
-    .eq('workspace_id', context.workspaceId)
     .maybeSingle();
 
   if (!project) return json({ ok: false, error: 'Proje bulunamadı.' }, 404);
+  const projectWorkspaceId = String(project.workspace_id ?? '').trim();
+  if (!projectWorkspaceId) return json({ ok: false, error: 'Proje bulunamadı.' }, 404);
+
+  const { data: membership } = await serviceRole
+    .from('workspace_members')
+    .select('id')
+    .eq('user_id', context.userId)
+    .eq('workspace_id', projectWorkspaceId)
+    .maybeSingle();
+  if (!membership) return json({ ok: false, error: 'Proje bulunamadı.' }, 404);
+
+  const packageGateResponse = await requireActiveGameAgentPackage(context.supabase, context.userId, projectWorkspaceId);
+  if (packageGateResponse) return packageGateResponse;
+
   if (project.approval_status !== 'approved') return json({ ok: false, error: 'Proje onay bekliyor.' }, 403);
 
   const buildTargetId = process.env.UNITY_BUILD_TARGET_ID?.trim();
@@ -163,7 +173,7 @@ export async function POST(request: Request) {
     .from('unity_build_jobs')
     .insert({
       unity_game_project_id: projectId,
-      workspace_id: context.workspaceId,
+      workspace_id: projectWorkspaceId,
       user_id: context.userId,
       requested_by: context.userId,
       build_target: 'android',
@@ -225,7 +235,7 @@ export async function POST(request: Request) {
       .from('unity_game_projects')
       .update({ status: 'failed' })
       .eq('id', projectId)
-      .eq('workspace_id', context.workspaceId);
+      .eq('workspace_id', projectWorkspaceId);
 
     return json({ ok: false, error: 'Unity build başlatılamadı.' }, 502);
   }

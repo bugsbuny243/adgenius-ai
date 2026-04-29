@@ -152,13 +152,27 @@ export async function refreshProjectBuilds(auth: AuthContext, projectId: string)
 
   const { data: project } = await serviceRole
     .from('unity_game_projects')
-    .select('id, package_name')
+    .select('id, package_name, workspace_id')
     .eq('id', projectId)
-    .eq('workspace_id', auth.workspaceId)
-    .eq('user_id', auth.userId)
     .maybeSingle();
 
   if (!project) {
+    return { status: 404, body: { ok: false, error: 'Proje bulunamadı.' } };
+  }
+
+  const projectWorkspaceId = String(project.workspace_id ?? '').trim();
+  if (!projectWorkspaceId) {
+    return { status: 404, body: { ok: false, error: 'Proje bulunamadı.' } };
+  }
+
+  const { data: membership } = await serviceRole
+    .from('workspace_members')
+    .select('id')
+    .eq('user_id', auth.userId)
+    .eq('workspace_id', projectWorkspaceId)
+    .maybeSingle();
+
+  if (!membership) {
     return { status: 404, body: { ok: false, error: 'Proje bulunamadı.' } };
   }
 
@@ -166,7 +180,7 @@ export async function refreshProjectBuilds(auth: AuthContext, projectId: string)
     .from('unity_build_jobs')
     .select('id, unity_game_project_id, status, started_at, artifact_url, metadata, requested_by, workspace_id')
     .eq('unity_game_project_id', projectId)
-    .eq('workspace_id', auth.workspaceId)
+    .eq('workspace_id', projectWorkspaceId)
     .in('status', REFRESHABLE_STATUSES)
     .order('created_at', { ascending: false })
     .limit(20);
@@ -256,7 +270,7 @@ export async function refreshProjectBuilds(auth: AuthContext, projectId: string)
         await upsertArtifact({
           unityGameProjectId: job.unity_game_project_id,
           jobId: job.id,
-          workspaceId: auth.workspaceId,
+          workspaceId: projectWorkspaceId,
           userId: job.requested_by ?? auth.userId,
           fileUrl: artifactUrl,
           packageName: project.package_name
