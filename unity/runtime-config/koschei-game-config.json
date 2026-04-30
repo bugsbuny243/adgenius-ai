@@ -1,8 +1,0 @@
-{
-  "templateSlug": "runner_2d_mobile",
-  "appName": "Koschei Runner",
-  "companyName": "Koschei Game Factory",
-  "packageName": "com.koschei.generated.runner",
-  "targetPlatform": "android",
-  "buildOutputs": ["apk", "aab"]
-}
