@@ -31,3 +31,7 @@ Unity webhook callback URL:
 
 - `game_artifacts.build_job_id` is legacy.
 - Unity builds must use `game_artifacts.unity_build_job_id`.
+
+## Unity repository layout
+
+- Unity ile ilgili dosyalar düzenlenip `unity/` altına taşındı. Detaylar: `unity/README.md`.
