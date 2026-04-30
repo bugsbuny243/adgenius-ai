@@ -1,5 +1,12 @@
 # Koschei AI Command Center
 
+## Monorepo Structure
+
+- `backend/` → Mevcut API katmanı. Supabase/Railway ile deploy edilen backend servis kodu burada bulunur.
+- `unity-client/` → Yeni ve sıfırdan oluşturulacak Unity projesi için ayrılmış dizin.
+- `shared/` → (Opsiyonel) Backend ve Unity arasında paylaşılan içerikler: OpenAPI şemaları, ortak dokümanlar ve örnek payload'lar.
+- `docs/` → Kurulum, operasyon ve deploy dokümantasyonu.
+
 ## Railway production topology
 
 - Single Railway service: `frontend/` (Next.js).
