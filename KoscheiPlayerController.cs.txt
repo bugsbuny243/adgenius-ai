@@ -1,0 +1,64 @@
+using UnityEngine;
+
+[RequireComponent(typeof(Rigidbody2D), typeof(BoxCollider2D))]
+public class KoscheiPlayerController : MonoBehaviour
+{
+    [SerializeField] private float jumpImpulse = 8.2f;
+
+    private Rigidbody2D rb2D;
+    private KoscheiRunnerGame game;
+    private bool isGrounded = true;
+
+    public void Initialize(KoscheiRunnerGame runnerGame, float configuredJumpForce)
+    {
+        game = runnerGame;
+        jumpImpulse = configuredJumpForce > 0f ? configuredJumpForce : jumpImpulse;
+    }
+
+    private void Awake()
+    {
+        rb2D = GetComponent<Rigidbody2D>();
+    }
+
+    private void Update()
+    {
+        if (game == null || !game.IsRunning)
+        {
+            return;
+        }
+
+        if (isGrounded && JumpInputPressed())
+        {
+            rb2D.linearVelocity = new Vector2(rb2D.linearVelocity.x, 0f);
+            rb2D.AddForce(Vector2.up * jumpImpulse, ForceMode2D.Impulse);
+            isGrounded = false;
+        }
+    }
+
+    private static bool JumpInputPressed()
+    {
+        if (Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(0))
+        {
+            return true;
+        }
+
+        if (Input.touchCount > 0)
+        {
+            var touch = Input.GetTouch(0);
+            return touch.phase == TouchPhase.Began;
+        }
+
+        return false;
+    }
+
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        if (collision.gameObject.GetComponent<KoscheiObstacle>() != null)
+        {
+            game?.GameOver();
+            return;
+        }
+
+        isGrounded = true;
+    }
+}

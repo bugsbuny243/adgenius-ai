@@ -1,0 +1,111 @@
+using System;
+using System.IO;
+using System.Text.RegularExpressions;
+using UnityEditor;
+using UnityEditor.Build;
+using UnityEditor.Build.Reporting;
+using UnityEngine;
+
+public sealed class KoscheiBuildConfigPreprocessor : IPreprocessBuildWithReport
+{
+    private const string ConfigPath = "Assets/Koschei/Generated/koschei-build-config.json";
+    private const string RuntimeConfigPath = "Assets/Resources/koschei-build-config.json";
+    private const string MissingConfigMessage = "[Koschei] No build config found; using default runner settings.";
+    private static readonly Regex AndroidPackageNameRegex =
+        new Regex(@"^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$", RegexOptions.Compiled);
+
+    public int callbackOrder => 0;
+
+    public void OnPreprocessBuild(BuildReport report)
+    {
+        if (report.summary.platform != BuildTarget.Android)
+        {
+            return;
+        }
+
+        if (!File.Exists(ConfigPath))
+        {
+            Debug.Log(MissingConfigMessage);
+            return;
+        }
+
+        string rawConfig;
+        try
+        {
+            rawConfig = File.ReadAllText(ConfigPath);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[Koschei] Failed reading build config; using defaults. {ex.Message}");
+            return;
+        }
+
+        KoscheiBuildConfig config;
+        try
+        {
+            config = JsonUtility.FromJson<KoscheiBuildConfig>(rawConfig);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[Koschei] Invalid build config JSON; using defaults. {ex.Message}");
+            return;
+        }
+
+        if (config == null)
+        {
+            Debug.LogWarning("[Koschei] Empty build config JSON; using defaults.");
+            return;
+        }
+
+        CopyConfigToResources(rawConfig);
+        ApplyPlayerSettings(config);
+
+        Debug.Log("[Koschei] Build config applied");
+        Debug.Log($"app_name: {PlayerSettings.productName}");
+        Debug.Log($"package_name: {PlayerSettings.GetApplicationIdentifier(BuildTargetGroup.Android)}");
+    }
+
+    private static void ApplyPlayerSettings(KoscheiBuildConfig config)
+    {
+        if (!string.IsNullOrWhiteSpace(config.app_name))
+        {
+            PlayerSettings.productName = config.app_name.Trim();
+        }
+        else
+        {
+            Debug.LogWarning("[Koschei] app_name is missing; keeping existing PlayerSettings.productName.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(config.package_name) && AndroidPackageNameRegex.IsMatch(config.package_name))
+        {
+            PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.Android, config.package_name.Trim());
+        }
+        else if (!string.IsNullOrWhiteSpace(config.package_name))
+        {
+            Debug.LogWarning($"[Koschei] package_name is invalid: '{config.package_name}'. Keeping existing package identifier.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(config.version_name))
+        {
+            PlayerSettings.bundleVersion = config.version_name.Trim();
+        }
+
+        if (config.version_code > 0)
+        {
+            PlayerSettings.Android.bundleVersionCode = config.version_code;
+        }
+    }
+
+    private static void CopyConfigToResources(string rawConfig)
+    {
+        var runtimeDirectory = Path.GetDirectoryName(RuntimeConfigPath);
+        if (!string.IsNullOrEmpty(runtimeDirectory))
+        {
+            Directory.CreateDirectory(runtimeDirectory);
+        }
+
+        File.WriteAllText(RuntimeConfigPath, rawConfig);
+        AssetDatabase.ImportAsset(RuntimeConfigPath);
+        AssetDatabase.Refresh();
+    }
+}

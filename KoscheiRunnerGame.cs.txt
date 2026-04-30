@@ -1,0 +1,470 @@
+using System.IO;
+using UnityEngine;
+
+public class KoscheiRunnerGame : MonoBehaviour
+{
+    private const string JumpLabel = "Tap to Jump";
+
+    private const string GeneratedConfigPath = "Assets/Koschei/Generated/koschei-game-config.json";
+    private const string ResourcesConfigPath = "koschei-game-config";
+    private const string BuildResourcesConfigPath = "koschei-build-config";
+
+    private Camera gameCamera;
+    private Transform obstaclesRoot;
+    private KoscheiPlayerController playerController;
+
+    private float score;
+    private float spawnTimer;
+    private float nextSpawnDelay;
+    private bool gameOver;
+
+    private GUIStyle headerStyle;
+    private GUIStyle infoStyle;
+    private GUIStyle subtitleStyle;
+    private GUIStyle detailsStyle;
+    private GUIStyle centerStyle;
+    private GUIStyle scoreStyle;
+    private GUIStyle versionStyle;
+
+    private KoscheiGameConfig resolvedConfig;
+    private string headerLabel;
+    private string subtitleLabel;
+    private string buildDetailsLabel;
+    private string scoreLabel;
+    private string versionLabel;
+
+    public bool IsRunning => !gameOver;
+
+    private void Start()
+    {
+        Application.targetFrameRate = 60;
+        Physics2D.gravity = new Vector2(0f, -24f);
+
+        resolvedConfig = LoadConfig();
+        headerLabel = resolvedConfig.gameTitle;
+        subtitleLabel = string.Empty;
+        buildDetailsLabel = string.Empty;
+        scoreLabel = resolvedConfig.scoreLabel;
+        versionLabel = resolvedConfig.releaseVersion;
+        ApplyBuildPresentationConfig();
+
+        SetupCamera();
+        BuildWorld();
+        ResetRun();
+    }
+
+    private void Update()
+    {
+        if (gameOver)
+        {
+            if (JumpPressed())
+            {
+                RestartRun();
+            }
+
+            return;
+        }
+
+        score += Time.deltaTime * 10f * resolvedConfig.speedMultiplier;
+
+        spawnTimer += Time.deltaTime;
+        if (spawnTimer >= nextSpawnDelay)
+        {
+            spawnTimer = 0f;
+            nextSpawnDelay = Random.Range(1f, 1.8f) / resolvedConfig.speedMultiplier;
+            SpawnObstacle();
+        }
+    }
+
+    public void GameOver()
+    {
+        gameOver = true;
+    }
+
+    private void SetupCamera()
+    {
+        gameCamera = Camera.main;
+        if (gameCamera == null)
+        {
+            gameCamera = new GameObject("Main Camera").AddComponent<Camera>();
+            gameCamera.tag = "MainCamera";
+        }
+
+        gameCamera.orthographic = true;
+        gameCamera.orthographicSize = 8.5f;
+        gameCamera.transform.position = new Vector3(0f, 0f, -10f);
+        gameCamera.backgroundColor = new Color(0.07f, 0.1f, 0.2f);
+    }
+
+    private void BuildWorld()
+    {
+        obstaclesRoot = new GameObject("Obstacles").transform;
+
+        CreateRect("Ground", new Vector2(0f, -6.8f), new Vector2(8.8f, 1.2f), resolvedConfig.groundColor)
+            .AddComponent<BoxCollider2D>();
+
+        var player = CreateRect("Player", new Vector2(-2.4f, -5.7f), new Vector2(0.85f, 0.85f), resolvedConfig.playerColor);
+        player.AddComponent<BoxCollider2D>();
+
+        var rigidBody = player.AddComponent<Rigidbody2D>();
+        rigidBody.freezeRotation = true;
+        rigidBody.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+
+        playerController = player.AddComponent<KoscheiPlayerController>();
+        playerController.Initialize(this, resolvedConfig.jumpForce);
+    }
+
+    private void SpawnObstacle()
+    {
+        var obstacle = CreateRect(
+            "Obstacle",
+            new Vector2(5.6f, -5.8f),
+            new Vector2(Random.Range(0.55f, 0.9f), Random.Range(0.95f, 1.4f)),
+            resolvedConfig.obstacleColor);
+        obstacle.transform.SetParent(obstaclesRoot);
+        obstacle.AddComponent<BoxCollider2D>();
+
+        var obstacleLogic = obstacle.AddComponent<KoscheiObstacle>();
+        obstacleLogic.Configure(5.8f * resolvedConfig.speedMultiplier, -7f);
+    }
+
+    private GameObject CreateRect(string objectName, Vector2 position, Vector2 size, Color color)
+    {
+        var gameObject = new GameObject(objectName);
+        gameObject.transform.position = position;
+        gameObject.transform.localScale = new Vector3(size.x, size.y, 1f);
+
+        var renderer = gameObject.AddComponent<SpriteRenderer>();
+        renderer.sprite = SpriteFactory.Square;
+        renderer.color = color;
+
+        return gameObject;
+    }
+
+    private void RestartRun()
+    {
+        foreach (Transform obstacle in obstaclesRoot)
+        {
+            Destroy(obstacle.gameObject);
+        }
+
+        if (playerController != null)
+        {
+            playerController.transform.position = new Vector3(-2.4f, -5.7f, 0f);
+            var rb2D = playerController.GetComponent<Rigidbody2D>();
+            rb2D.linearVelocity = Vector2.zero;
+            rb2D.angularVelocity = 0f;
+        }
+
+        ResetRun();
+    }
+
+    private void ResetRun()
+    {
+        score = 0f;
+        gameOver = false;
+        spawnTimer = 0f;
+        nextSpawnDelay = 1.2f / resolvedConfig.speedMultiplier;
+    }
+
+    private void OnGUI()
+    {
+        EnsureGuiStyles();
+
+        GUI.Label(new Rect(0f, 16f, Screen.width, 40f), headerLabel, headerStyle);
+        GUI.Label(new Rect(0f, 56f, Screen.width, 34f), subtitleLabel, subtitleStyle);
+        GUI.Label(new Rect(0f, 88f, Screen.width, 30f), JumpLabel, infoStyle);
+        if (!string.IsNullOrWhiteSpace(buildDetailsLabel))
+        {
+            GUI.Label(new Rect(0f, 118f, Screen.width, 54f), buildDetailsLabel, detailsStyle);
+        }
+        GUI.Label(new Rect(12f, 12f, 320f, 40f), $"{scoreLabel}: {(int)score}", scoreStyle);
+        GUI.Label(new Rect(0f, Screen.height - 44f, Screen.width, 28f), versionLabel, versionStyle);
+
+        if (gameOver)
+        {
+            GUI.Label(
+                new Rect(0f, (Screen.height * 0.45f) - 45f, Screen.width, 90f),
+                "Game Over\nTap to Restart",
+                centerStyle);
+        }
+    }
+
+    private void EnsureGuiStyles()
+    {
+        if (headerStyle != null)
+        {
+            return;
+        }
+
+        headerStyle = new GUIStyle(GUI.skin.label)
+        {
+            alignment = TextAnchor.UpperCenter,
+            fontSize = 30,
+            fontStyle = FontStyle.Bold,
+            normal = { textColor = Color.white }
+        };
+
+        infoStyle = new GUIStyle(GUI.skin.label)
+        {
+            alignment = TextAnchor.UpperCenter,
+            fontSize = 20,
+            normal = { textColor = new Color(0.85f, 0.9f, 1f) }
+        };
+
+        subtitleStyle = new GUIStyle(GUI.skin.label)
+        {
+            alignment = TextAnchor.UpperCenter,
+            fontSize = 22,
+            fontStyle = FontStyle.Bold,
+            normal = { textColor = new Color(0.9f, 0.95f, 1f) }
+        };
+
+        detailsStyle = new GUIStyle(GUI.skin.label)
+        {
+            alignment = TextAnchor.UpperCenter,
+            fontSize = 16,
+            normal = { textColor = new Color(0.78f, 0.88f, 0.97f) }
+        };
+
+        scoreStyle = new GUIStyle(GUI.skin.label)
+        {
+            alignment = TextAnchor.UpperLeft,
+            fontSize = 22,
+            fontStyle = FontStyle.Bold,
+            normal = { textColor = Color.white }
+        };
+
+        centerStyle = new GUIStyle(GUI.skin.label)
+        {
+            alignment = TextAnchor.MiddleCenter,
+            fontSize = 36,
+            fontStyle = FontStyle.Bold,
+            normal = { textColor = new Color(1f, 0.8f, 0.8f) }
+        };
+
+        versionStyle = new GUIStyle(GUI.skin.label)
+        {
+            alignment = TextAnchor.LowerCenter,
+            fontSize = 16,
+            normal = { textColor = new Color(0.75f, 0.82f, 0.95f) }
+        };
+    }
+
+    private static KoscheiGameConfig LoadConfig()
+    {
+        var config = KoscheiGameConfig.Default();
+
+        string json = null;
+
+#if UNITY_EDITOR
+        if (File.Exists(GeneratedConfigPath))
+        {
+            json = File.ReadAllText(GeneratedConfigPath);
+        }
+#endif
+
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            var configAsset = Resources.Load<TextAsset>(ResourcesConfigPath);
+            if (configAsset != null)
+            {
+                json = configAsset.text;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return config;
+        }
+
+        KoscheiGameConfigRaw raw;
+        try
+        {
+            raw = JsonUtility.FromJson<KoscheiGameConfigRaw>(json);
+        }
+        catch
+        {
+            return config;
+        }
+
+        if (raw == null)
+        {
+            return config;
+        }
+
+        config.gameTitle = ResolveText(raw.gameTitle, config.gameTitle);
+        config.scoreLabel = ResolveText(raw.scoreLabel, config.scoreLabel);
+        config.releaseVersion = ResolveText(raw.releaseVersion, config.releaseVersion);
+        config.speedMultiplier = ResolvePositiveFloat(raw.speedMultiplier, config.speedMultiplier);
+        config.jumpForce = ResolvePositiveFloat(raw.jumpForce, config.jumpForce);
+        config.playerColor = ResolveColor(raw.playerColor, config.playerColor);
+        config.groundColor = ResolveColor(raw.groundColor, config.groundColor);
+        config.obstacleColor = ResolveColor(raw.obstacleColor, config.obstacleColor);
+
+        return config;
+    }
+
+    private void ApplyBuildPresentationConfig()
+    {
+        var buildConfig = LoadBuildConfig();
+        if (buildConfig == null)
+        {
+            subtitleLabel = "Arcade Runner";
+            return;
+        }
+
+        headerLabel = ResolveText(buildConfig.app_name, headerLabel);
+        subtitleLabel = ResolveText(buildConfig.short_description, buildConfig.game_type);
+        subtitleLabel = ResolveText(subtitleLabel, "Arcade Runner");
+        buildDetailsLabel = BuildDetailsText(buildConfig);
+    }
+
+    private static KoscheiBuildConfig LoadBuildConfig()
+    {
+        var configAsset = Resources.Load<TextAsset>(BuildResourcesConfigPath);
+        if (configAsset == null || string.IsNullOrWhiteSpace(configAsset.text))
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonUtility.FromJson<KoscheiBuildConfig>(configAsset.text);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string BuildDetailsText(KoscheiBuildConfig config)
+    {
+        var visualStyle = ResolveText(config.visual_style, null);
+        var controls = ResolveText(config.controls, null);
+        var features = config.features == null ? null : string.Join(", ", config.features);
+        features = ResolveText(features, null);
+
+        var detailLines = new System.Collections.Generic.List<string>();
+        if (!string.IsNullOrWhiteSpace(visualStyle))
+        {
+            detailLines.Add($"Style: {visualStyle}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(controls))
+        {
+            detailLines.Add($"Controls: {controls}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(features))
+        {
+            detailLines.Add($"Features: {features}");
+        }
+
+        return detailLines.Count == 0 ? string.Empty : string.Join("  •  ", detailLines);
+    }
+
+    private static string ResolveText(string input, string fallback)
+    {
+        return string.IsNullOrWhiteSpace(input) ? fallback : input;
+    }
+
+    private static float ResolvePositiveFloat(float input, float fallback)
+    {
+        return input > 0f ? input : fallback;
+    }
+
+    private static Color ResolveColor(string input, Color fallback)
+    {
+        if (!string.IsNullOrWhiteSpace(input) && ColorUtility.TryParseHtmlString(input, out var parsed))
+        {
+            return parsed;
+        }
+
+        return fallback;
+    }
+
+    [System.Serializable]
+    private class KoscheiGameConfigRaw
+    {
+        public string gameTitle;
+        public string playerColor;
+        public string groundColor;
+        public string obstacleColor;
+        public float speedMultiplier;
+        public float jumpForce;
+        public string scoreLabel;
+        public string releaseVersion;
+    }
+
+    private class KoscheiGameConfig
+    {
+        public string gameTitle;
+        public Color playerColor;
+        public Color groundColor;
+        public Color obstacleColor;
+        public float speedMultiplier;
+        public float jumpForce;
+        public string scoreLabel;
+        public string releaseVersion;
+
+        public static KoscheiGameConfig Default()
+        {
+            return new KoscheiGameConfig
+            {
+                gameTitle = "Koschei Game Factory",
+                playerColor = new Color(0.98f, 0.84f, 0.17f),
+                groundColor = new Color(0.16f, 0.56f, 0.25f),
+                obstacleColor = new Color(0.9f, 0.28f, 0.32f),
+                speedMultiplier = 1f,
+                jumpForce = 8.2f,
+                scoreLabel = "Score",
+                releaseVersion = "Koschei Runner 1.0"
+            };
+        }
+    }
+
+    private static bool JumpPressed()
+    {
+        if (Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(0))
+        {
+            return true;
+        }
+
+        if (Input.touchCount > 0)
+        {
+            var touch = Input.GetTouch(0);
+            return touch.phase == TouchPhase.Began;
+        }
+
+        return false;
+    }
+
+    private static class SpriteFactory
+    {
+        private static Sprite square;
+
+        public static Sprite Square
+        {
+            get
+            {
+                if (square != null)
+                {
+                    return square;
+                }
+
+                var texture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+                texture.SetPixel(0, 0, Color.white);
+                texture.Apply();
+
+                square = Sprite.Create(
+                    texture,
+                    new Rect(0f, 0f, 1f, 1f),
+                    new Vector2(0.5f, 0.5f),
+                    1f);
+                square.name = "KoscheiSquareSprite";
+                return square;
+            }
+        }
+    }
+}
