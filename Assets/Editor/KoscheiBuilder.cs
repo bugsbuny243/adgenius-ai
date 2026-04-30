@@ -9,17 +9,37 @@ public class KoscheiBuilder
     {
         var dict = manifest.ToDictionary();
         
-        if (dict.TryGetValue("bundleId", out object bundleObj))
+        // Bundle ID ayarla
+        if (dict.TryGetValue("bundleId", out object bundleObj) && bundleObj != null)
         {
-            PlayerSettings.applicationIdentifier = bundleObj.ToString();
+            string newBundleId = bundleObj.ToString();
+            PlayerSettings.applicationIdentifier = newBundleId;
+            Debug.Log($"Bundle ID dinamik olarak değiştirildi: {newBundleId}");
         }
-        
-        if (dict.TryGetValue("keystoreName", out object ksObj))
+        else
+        {
+            Debug.LogWarning("Manifest içinde 'bundleId' bulunamadı.");
+        }
+
+        // Keystore ayarla
+        if (dict.TryGetValue("keystoreName", out object ksObj) && ksObj != null)
         {
             PlayerSettings.Android.keystoreName = ksObj.ToString();
-            PlayerSettings.Android.keystorePass = dict.GetValue("keystorePass")?.ToString();
-            PlayerSettings.Android.keyaliasName = dict.GetValue("keyalias")?.ToString();
-            PlayerSettings.Android.keyaliasPass = dict.GetValue("keyaliasPass")?.ToString();
+            
+            if (dict.TryGetValue("keystorePass", out object ksPassObj) && ksPassObj != null)
+                PlayerSettings.Android.keystorePass = ksPassObj.ToString();
+                
+            if (dict.TryGetValue("keyalias", out object aliasObj) && aliasObj != null)
+                PlayerSettings.Android.keyaliasName = aliasObj.ToString();
+                
+            if (dict.TryGetValue("keyaliasPass", out object aliasPassObj) && aliasPassObj != null)
+                PlayerSettings.Android.keyaliasPass = aliasPassObj.ToString();
+                
+            Debug.Log($"Keystore dinamik olarak ayarlandı: {PlayerSettings.Android.keystoreName}");
+        }
+        else
+        {
+            Debug.LogWarning("Manifest içinde 'keystoreName' bulunamadı.");
         }
     }
     #endif
