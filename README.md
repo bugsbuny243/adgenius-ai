@@ -41,4 +41,4 @@ Unity webhook callback URL:
 
 ## Unity repository layout
 
-- Unity ile ilgili dosyalar düzenlenip `unity/` altına taşındı. Detaylar: `unity/README.md`.
+- Unity ile ilgili proje dosyaları tek bir klasörde toplandı: `unity-client/` (örn. `Assets/`, `ProjectSettings/`). Detaylar: `unity-client/README.md`.
