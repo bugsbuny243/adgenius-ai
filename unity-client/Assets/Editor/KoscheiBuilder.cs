@@ -19,8 +19,8 @@ public class KoscheiBuilder
         // Eğer kullanıcı sahne eklemeyi unuttuysa veya şablonsa, standart sahneyi zorla ekle
         if (scenes.Length == 0)
         {
-            Debug.Log("[Koschei Ajanı] Sahne bulunamadı, varsayılan SampleScene ekleniyor.");
-            scenes = new string[] { "Assets/Scenes/SampleScene.unity" };
+            Debug.Log("[Koschei Ajanı] Sahne bulunamadı, varsayılan Main sahnesi ekleniyor.");
+            scenes = new string[] { "Assets/Scenes/Main.unity" };
         }
 
         // 2. GOOGLE PLAY STANDARTLARI (Kutucuk işaretleme devri bitti!)
