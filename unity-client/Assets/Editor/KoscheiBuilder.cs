@@ -6,7 +6,7 @@ using System;
 public class KoscheiBuilder
 {
     // Koschei dışarıdan bu metodu tetikleyecek
-    public static void BuildGame()
+    public static void PreExport()
     {
         Debug.Log("[Koschei Ajanı] Sistem uyandı, derleme hazırlıkları başlıyor...");
 
