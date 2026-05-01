@@ -105,6 +105,60 @@ app.post('/api/start-build', (req, res) => {
   });
 });
 
+/**
+ * Starts Koschei autonomous Unity build flow (requested route).
+ * Expected body: { username: string, gameName: string }
+ */
+app.post('/api/koschei/start-build', (req, res) => {
+  const { username, gameName } = req.body || {};
+
+  if (
+    typeof username !== 'string' ||
+    typeof gameName !== 'string' ||
+    !username.trim() ||
+    !gameName.trim()
+  ) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'username ve gameName zorunludur.'
+    });
+  }
+
+  const usernameSlug = toSlug(username);
+  const gameNameSlug = toSlug(gameName);
+
+  if (!usernameSlug || !gameNameSlug) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'username ve gameName en az bir alfanümerik karakter içermelidir.'
+    });
+  }
+
+  const keystorePassword = generateSecureToken(24);
+  const keyAlias = `koschei-${usernameSlug}-${generateSecureToken(8)}`;
+  const bundleId = `com.koschei.${usernameSlug}.${gameNameSlug}`;
+
+  console.log('[Koschei] Unity build için kritik veriler üretildi:', {
+    username: username.trim(),
+    gameName: gameName.trim(),
+    keystorePassword,
+    keyAlias,
+    bundleId
+  });
+
+  return res.status(200).json({
+    status: 'success',
+    message: 'Koschei uyandı, Unity ajanına veriler hazırlandı',
+    data: {
+      username: username.trim(),
+      gameName: gameName.trim(),
+      keystorePassword,
+      keyAlias,
+      bundleId
+    }
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`[Koschei] Backend server is running on port ${PORT}`);
 });
