@@ -4,6 +4,7 @@ import { requireActiveGameAgentPackage } from '@/lib/game-agent-access';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase-service-role';
 import { getBuilds, triggerBuild, UnityApiError } from '@/lib/server/unity-cloud-build';
 import { randomBytes } from 'node:crypto';
+import { enforceRateLimit, gameFactoryBuildSchema } from '@/lib/api-security';
 
 type UnityPlatform = 'Android' | 'WebGL' | 'StandaloneWindows64';
 type UnityBuildTarget = 'koschei-android' | 'koschei-webgl' | 'koschei-windows64';
@@ -25,6 +26,9 @@ export async function POST(request: Request) {
   const packageGateResponse = await requireActiveGameAgentPackage(context.supabase, context.userId, context.workspaceId);
   if (packageGateResponse) return packageGateResponse;
 
+  const limitResponse = enforceRateLimit(request, '/api/game-factory/build');
+  if (limitResponse) return limitResponse;
+
   const payload = (await request.json().catch(() => null)) as {
     projectId?: string | null;
     project_id?: string | null;
@@ -33,11 +37,15 @@ export async function POST(request: Request) {
     username?: string | null;
     gameName?: string | null;
   } | null;
-  const projectId = String(payload?.projectId ?? payload?.project_id ?? '').trim();
-  if (!projectId) return json({ ok: false, error: 'projectId zorunlu.' }, 400);
-  const username = String(payload?.username ?? '').trim();
-  const gameName = String(payload?.gameName ?? '').trim();
-  if (!username || !gameName) return json({ ok: false, error: 'username ve gameName zorunlu.' }, 400);
+  const parsed = gameFactoryBuildSchema.safeParse({
+    projectId: payload?.projectId ?? payload?.project_id,
+    username: payload?.username,
+    gameName: payload?.gameName,
+    workspace_id: payload?.workspace_id ?? undefined,
+    user_id: payload?.user_id ?? undefined
+  });
+  if (!parsed.success) return json({ ok: false, error: 'Geçersiz istek gövdesi.' }, 400);
+  const { projectId, username, gameName } = parsed.data;
 
   const normalizedWorkspaceId = String(payload?.workspace_id ?? context.workspaceId).trim();
   const normalizedUserId = String(payload?.user_id ?? context.userId).trim();

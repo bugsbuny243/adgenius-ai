@@ -10,8 +10,8 @@ export type EncryptedCredentialsPayload = {
 };
 
 function resolveEncryptionKey(): Buffer {
-  const secret = process.env.KOSCHEI_CREDENTIALS_ENCRYPTION_KEY?.trim();
-  if (!secret) throw new Error('Missing KOSCHEI_CREDENTIALS_ENCRYPTION_KEY.');
+  const secret = process.env.ENCRYPTION_SECRET?.trim() ?? process.env.KOSCHEI_CREDENTIALS_ENCRYPTION_KEY?.trim();
+  if (!secret) throw new Error('Missing ENCRYPTION_SECRET.');
   return createHash('sha256').update(secret, 'utf8').digest();
 }
 

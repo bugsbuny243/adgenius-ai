@@ -1,5 +1,6 @@
 import { getApiAuthContext, json } from '@/app/api/game-factory/_auth';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase-service-role';
+import { enforceRateLimit, refreshSchema } from '@/lib/api-security';
 
 const UNITY_BASE_URL = 'https://build-api.cloud.unity3d.com/api/v1';
 
@@ -132,8 +133,13 @@ export async function POST(request: Request) {
   const context = await getApiAuthContext(request);
   if (context instanceof Response) return context;
 
+  const limitResponse = enforceRateLimit(request, '/api/game-factory/builds/refresh');
+  if (limitResponse) return limitResponse;
+
   const payload = (await request.json().catch(() => null)) as { projectId?: string | null } | null;
-  const projectId = String(payload?.projectId ?? '').trim();
+  const parsed = refreshSchema.safeParse({ projectId: payload?.projectId });
+  if (!parsed.success) return json({ ok: false, error: 'projectId zorunlu.' }, 400);
+  const { projectId } = parsed.data;
 
   const serviceRole = getSupabaseServiceRoleClient();
   const { data: jobs, error: jobsError } = await serviceRole
