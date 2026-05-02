@@ -17,8 +17,7 @@
     "next": "^16.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "lucide-react": "^0.469.0",
-    "googleapis": "^150.0.1"
+    "lucide-react": "^0.469.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
