@@ -26,6 +26,12 @@ export type UnityBuildResponse = {
   };
 };
 
+export type UnityBuildEnvVars = {
+  KOSCHEI_BUNDLE_ID: string;
+  KOSCHEI_KEYSTORE_PASS: string;
+  KOSCHEI_KEYALIAS: string;
+};
+
 type UnityBuildRaw = {
   build?: number;
   buildtargetid?: string;
@@ -113,13 +119,16 @@ export async function resolveBuildTargetId(nameOrId: string): Promise<string> {
   return match.buildtargetid;
 }
 
-export async function triggerBuild(buildTargetIdOrName: string): Promise<UnityBuildResponse> {
+export async function triggerBuild(
+  buildTargetIdOrName: string,
+  options?: { envVars?: UnityBuildEnvVars }
+): Promise<UnityBuildResponse> {
   const { orgId, projectId } = getConfig();
   const targetId = await resolveBuildTargetId(buildTargetIdOrName);
 
   const data = await unityRequest<UnityBuildRaw>(`/orgs/${orgId}/projects/${projectId}/buildtargets/${targetId}/builds`, {
     method: 'POST',
-    body: JSON.stringify({ clean: false, delay: 0 })
+    body: JSON.stringify({ clean: false, delay: 0, ...(options?.envVars ? { envVars: options.envVars } : {}) })
   });
 
   return mapBuild({ ...data, buildtargetid: data.buildtargetid ?? targetId });
