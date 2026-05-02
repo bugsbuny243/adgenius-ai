@@ -1,6 +1,6 @@
 import { getApiAuthContext, json } from '@/app/api/game-factory/_auth';
 import { requireActiveGameAgentPackage } from '@/lib/game-agent-access';
-import { generateGameBriefWithGroq } from '@/lib/ai-engine';
+import { type GameBrief, generateGameBriefWithGroq } from '@/lib/ai-engine';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase-service-role';
 
 type GenerateRequestBody = {
@@ -24,6 +24,16 @@ export async function POST(request: Request) {
     if (!projectId) return json({ ok: false, error: 'project_id zorunlu.' }, 400);
 
     const gameBrief = await generateGameBriefWithGroq(prompt);
+    const orchestrationMetadata: Pick<GameBrief, 'target_engine' | 'target_platforms'> = {
+      target_engine: gameBrief.target_engine,
+      target_platforms: gameBrief.target_platforms
+    };
+
+    console.info('[Koschei][GameFactory] Generated orchestration decision', {
+      projectId,
+      targetEngine: orchestrationMetadata.target_engine,
+      targetPlatforms: orchestrationMetadata.target_platforms
+    });
 
     const serviceRole = getSupabaseServiceRoleClient();
     const { error: insertError } = await serviceRole.from('game_briefs').insert({
@@ -32,7 +42,9 @@ export async function POST(request: Request) {
       unity_game_project_id: projectId,
       prompt,
       model: process.env.GROQ_MODEL?.trim() || null,
-      brief_json: gameBrief
+      brief_json: gameBrief,
+      target_platform: orchestrationMetadata.target_platforms.join(','),
+      metadata: orchestrationMetadata
     });
 
     if (insertError) {

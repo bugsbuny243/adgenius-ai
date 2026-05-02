@@ -24,6 +24,8 @@ type RunTextOptions = {
 };
 
 export type GameBrief = {
+  target_engine: 'Unity' | 'Godot';
+  target_platforms: Array<'Android' | 'WebGL' | 'Windows'>;
   gameplay_goals: string;
   visual_style: string;
   controls: string;
@@ -43,10 +45,12 @@ export type AiRunResult = {
 };
 
 const GAME_DESIGNER_SYSTEM_PROMPT = [
-  'Sen kıdemli bir oyun tasarımcısı (Game Designer) ve Unity uzmanısın.',
+  'Sen kıdemli bir Evrensel Oyun Mimarısın (Multi-Engine & Multi-Platform).',
   'Kullanıcıdan gelen tek cümlelik oyun fikrini analiz et ve SADECE geçerli bir JSON nesnesi döndür.',
-  'JSON anahtarları birebir şu şekilde olmalı: gameplay_goals, visual_style, controls, mechanics, store_short_description, store_full_description.',
-  'mechanics alanı Unity içerisinde kolayca kullanılabilecek teknik değerler taşımalı (ör. player_speed, gravity_scale, enemy_spawn_interval_seconds).',
+  'JSON anahtarları birebir şu şekilde olmalı: target_engine, target_platforms, gameplay_goals, visual_style, controls, mechanics, store_short_description, store_full_description.',
+  'target_engine sadece Unity veya Godot olabilir. Karmaşık/ağır 3D oyunlarda Unity, hafif 2D/Web odaklı oyunlarda Godot seç.',
+  'target_platforms bir dizi olmalı ve sadece Android, WebGL, Windows değerlerinden en az birini içermeli.',
+  'mechanics alanı seçilen oyun motorunda kolayca uygulanabilecek teknik değerler taşımalı (ör. player_speed, gravity_scale, enemy_spawn_interval_seconds).',
   'store_short_description kısa ve ASO odaklı olmalı, store_full_description daha detaylı ASO uyumlu bir metin olmalı.',
   'JSON dışı hiçbir metin, markdown veya kod bloğu yazma.'
 ].join(' ');
@@ -97,8 +101,19 @@ function extractJsonObject(raw: string): string {
 
 function parseGameBrief(raw: string): GameBrief {
   const parsed = JSON.parse(extractJsonObject(raw)) as Partial<GameBrief>;
+  const allowedEngines = new Set<GameBrief['target_engine']>(['Unity', 'Godot']);
+  const allowedPlatforms = new Set<GameBrief['target_platforms'][number]>(['Android', 'WebGL', 'Windows']);
+  const targetPlatforms = Array.isArray(parsed.target_platforms)
+    ? parsed.target_platforms.filter((platform): platform is GameBrief['target_platforms'][number] => (
+      typeof platform === 'string' && allowedPlatforms.has(platform as GameBrief['target_platforms'][number])
+    ))
+    : [];
+
   if (
     !parsed ||
+    typeof parsed.target_engine !== 'string' ||
+    !allowedEngines.has(parsed.target_engine as GameBrief['target_engine']) ||
+    targetPlatforms.length === 0 ||
     typeof parsed.gameplay_goals !== 'string' ||
     typeof parsed.visual_style !== 'string' ||
     typeof parsed.controls !== 'string' ||
@@ -112,6 +127,8 @@ function parseGameBrief(raw: string): GameBrief {
   }
 
   return {
+    target_engine: parsed.target_engine,
+    target_platforms: [...new Set(targetPlatforms)],
     gameplay_goals: parsed.gameplay_goals.trim(),
     visual_style: parsed.visual_style.trim(),
     controls: parsed.controls.trim(),
