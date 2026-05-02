@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { Nav } from '@/components/nav';
 import { createSupabaseReadonlyServerClient } from '@/lib/supabase-server';
 import { saveGooglePlayIntegrationAction } from '@/app/settings/integrations/google-play/actions';
+import { ConnectGooglePlayButton } from '@/components/settings/connect-google-play-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,6 +47,12 @@ export default async function GooglePlayIntegrationsPage({ searchParams }: PageP
             <p className="text-sm text-white/70">Koschei, oluşturulan AAB dosyasını sizin Play Console hesabınıza göndermek için bu bağlantıyı kullanır. Google şifrenizi istemeyiz.</p>
           </div>
           <Link href="/settings" className="rounded-lg border border-white/20 px-3 py-2 text-xs hover:border-neon">Ayarlara dön</Link>
+        </div>
+
+        <div className="rounded-xl border border-emerald-400/40 bg-emerald-500/10 p-4">
+          <h2 className="text-lg font-semibold">OAuth 2.0 ile bağlan</h2>
+          <p className="mb-3 text-sm text-white/70">Google Play Console hesabınızı doğrudan OAuth 2.0 akışı ile bağlayabilirsiniz.</p>
+          <ConnectGooglePlayButton />
         </div>
 
         <form action={saveGooglePlayIntegrationAction} className="grid gap-3 rounded-xl border border-white/10 bg-black/20 p-4 md:grid-cols-2">
