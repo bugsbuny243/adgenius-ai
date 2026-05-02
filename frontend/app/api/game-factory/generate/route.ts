@@ -8,6 +8,14 @@ type GenerateRequestBody = {
   project_id?: string | null;
 };
 
+type UnityBuildTarget = 'koschei-android' | 'koschei-webgl' | 'koschei-windows64';
+
+const BUILD_TARGET_BY_PLATFORM: Record<GameBrief['target_platforms'][number], UnityBuildTarget> = {
+  Android: 'koschei-android',
+  WebGL: 'koschei-webgl',
+  StandaloneWindows64: 'koschei-windows64'
+};
+
 export async function POST(request: Request) {
   try {
     const context = await getApiAuthContext(request);
@@ -28,11 +36,18 @@ export async function POST(request: Request) {
       target_engine: gameBrief.target_engine,
       target_platforms: gameBrief.target_platforms
     };
+    const primaryPlatform = orchestrationMetadata.target_platforms[0];
+    const selectedBuildTarget = BUILD_TARGET_BY_PLATFORM[primaryPlatform];
+
+    if (!selectedBuildTarget) {
+      return json({ ok: false, error: 'AI geçersiz platform döndürdü.' }, 400);
+    }
 
     console.info('[Koschei][GameFactory] Generated orchestration decision', {
       projectId,
       targetEngine: orchestrationMetadata.target_engine,
-      targetPlatforms: orchestrationMetadata.target_platforms
+      targetPlatforms: orchestrationMetadata.target_platforms,
+      selectedBuildTarget
     });
 
     const serviceRole = getSupabaseServiceRoleClient();
@@ -49,6 +64,31 @@ export async function POST(request: Request) {
 
     if (insertError) {
       return json({ ok: false, error: insertError.message }, 400);
+    }
+
+    const queuedAt = new Date().toISOString();
+    const { error: buildJobError } = await serviceRole.from('unity_build_jobs').insert({
+      unity_game_project_id: projectId,
+      workspace_id: context.workspaceId,
+      user_id: context.userId,
+      requested_by: context.userId,
+      build_target: selectedBuildTarget,
+      build_type: 'design-plan',
+      status: 'queued',
+      queued_at: queuedAt,
+      metadata: {
+        source: 'ai_generate',
+        targetPlatforms: orchestrationMetadata.target_platforms
+      }
+    });
+
+    if (buildJobError) {
+      console.error('[Koschei][GameFactory] Failed to queue unity_build_jobs record', {
+        projectId,
+        selectedBuildTarget,
+        message: buildJobError.message
+      });
+      return json({ ok: false, error: buildJobError.message }, 400);
     }
 
     return json({ ok: true, brief: gameBrief }, 200);
