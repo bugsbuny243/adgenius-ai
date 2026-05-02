@@ -5,8 +5,11 @@ import { isPlatformOwner } from '@/lib/owner-auth';
 export async function PATCH(request: Request) {
   const supabase = await createSupabaseActionServerClient();
   const {
-    data: { user, session }
+    data: { user }
   } = await supabase.auth.getUser();
+  const {
+    data: { session }
+  } = await supabase.auth.getSession();
 
   if (!isPlatformOwner(user)) {
     return Response.json({ error: 'Forbidden' }, { status: 403 });
