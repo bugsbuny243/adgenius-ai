@@ -1,165 +1,145 @@
-import { requirePlatformOwner } from '@/lib/owner-auth';
-import { createSupabaseReadonlyServerClient } from '@/lib/supabase-server';
-
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
-type BuildJob = {
-  id: string;
-  unity_game_project_id: string | null;
-  status: string | null;
-  created_at: string | null;
-  updated_at: string | null;
-};
-
-type Profile = {
-  id: string;
-  email: string | null;
-  full_name: string | null;
-  created_at: string | null;
-};
-
-type PackagePurchase = {
-  id: string;
-  user_id: string;
-  package_key: string;
-  amount: number;
-  currency: string;
-  status: string;
-  created_at: string | null;
-};
-
-const statusBadge = (status: string | null | undefined) => {
-  const normalized = (status ?? '').toLowerCase();
-  if (['success', 'completed', 'active', 'paid', 'approved'].includes(normalized)) {
-    return 'bg-emerald-500/15 text-emerald-300 ring-emerald-400/30';
-  }
-  if (['failed', 'error', 'cancelled', 'refunded', 'rejected'].includes(normalized)) {
-    return 'bg-rose-500/15 text-rose-300 ring-rose-400/30';
-  }
-  if (['pending', 'processing', 'queued'].includes(normalized)) {
-    return 'bg-amber-500/15 text-amber-300 ring-amber-400/30';
-  }
-  return 'bg-slate-500/15 text-slate-300 ring-slate-400/30';
-};
+import { createClient } from "@/utils/supabase/server";
 
 export default async function OwnerDashboardPage() {
-  await requirePlatformOwner();
-  const supabase = await createSupabaseReadonlyServerClient();
+  const supabase = await createClient();
 
-  const [buildJobsRes, profilesRes, purchasesRes] = await Promise.all([
-    supabase.from('unity_build_jobs').select('id,unity_game_project_id,status,created_at,updated_at').order('created_at', { ascending: false }).limit(15),
-    supabase.from('profiles').select('id,email,full_name,created_at').order('created_at', { ascending: false }).limit(12),
-    supabase.from('package_purchases').select('id,user_id,package_key,amount,currency,status,created_at').order('created_at', { ascending: false }).limit(15)
-  ]);
+  const [{ data: unityBuildJobs, error: unityBuildJobsError }, { data: profiles, error: profilesError }, { data: packagePurchases, error: packagePurchasesError }] =
+    await Promise.all([
+      supabase.from("unity_build_jobs").select("*").order("created_at", { ascending: false }),
+      supabase.from("profiles").select("*").order("created_at", { ascending: false }),
+      supabase.from("package_purchases").select("*").order("created_at", { ascending: false }),
+    ]);
 
-  const buildJobs = (buildJobsRes.data ?? []) as BuildJob[];
-  const profiles = (profilesRes.data ?? []) as Profile[];
-  const purchases = (purchasesRes.data ?? []) as PackagePurchase[];
+  const approvePurchase = async (formData: FormData) => {
+    "use server";
 
-  const pendingPurchases = purchases.filter((purchase) => purchase.status.toLowerCase() === 'pending').length;
-  const failedBuilds = buildJobs.filter((job) => (job.status ?? '').toLowerCase().includes('fail')).length;
+    const supabase = await createClient();
+    const purchaseId = String(formData.get("purchaseId"));
+
+    await supabase
+      .from("package_purchases")
+      .update({ status: "approved", approved_at: new Date().toISOString() })
+      .eq("id", purchaseId);
+  };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[16rem_1fr]">
-      <aside className="rounded-2xl border border-white/10 bg-slate-950/70 p-4 lg:sticky lg:top-6 lg:h-fit">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Owner Panel</p>
-        <h1 className="mt-2 text-xl font-semibold text-white">Dashboard</h1>
-        <nav className="mt-5 space-y-2 text-sm">
-          <a href="#overview" className="block rounded-lg border border-white/10 px-3 py-2 text-slate-200 hover:border-cyan-400/60 hover:text-white">Genel Durum</a>
-          <a href="#build-jobs" className="block rounded-lg border border-white/10 px-3 py-2 text-slate-200 hover:border-cyan-400/60 hover:text-white">Unity Build Jobs</a>
-          <a href="#profiles" className="block rounded-lg border border-white/10 px-3 py-2 text-slate-200 hover:border-cyan-400/60 hover:text-white">Profiles</a>
-          <a href="#purchases" className="block rounded-lg border border-white/10 px-3 py-2 text-slate-200 hover:border-cyan-400/60 hover:text-white">Package Purchases</a>
-        </nav>
-      </aside>
+    <main className="p-6 space-y-8">
+      <h1 className="text-3xl font-bold">Owner Dashboard</h1>
 
-      <section className="space-y-6">
-        <div id="overview" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <article className="rounded-2xl border border-white/10 bg-gradient-to-b from-slate-900 to-slate-950 p-4">
-            <p className="text-sm text-slate-400">Toplam Build Job</p>
-            <p className="mt-2 text-3xl font-bold text-white">{buildJobs.length}</p>
-          </article>
-          <article className="rounded-2xl border border-white/10 bg-gradient-to-b from-slate-900 to-slate-950 p-4">
-            <p className="text-sm text-slate-400">Failed Build</p>
-            <p className="mt-2 text-3xl font-bold text-rose-300">{failedBuilds}</p>
-          </article>
-          <article className="rounded-2xl border border-white/10 bg-gradient-to-b from-slate-900 to-slate-950 p-4">
-            <p className="text-sm text-slate-400">Toplam Profile</p>
-            <p className="mt-2 text-3xl font-bold text-white">{profiles.length}</p>
-          </article>
-          <article className="rounded-2xl border border-white/10 bg-gradient-to-b from-slate-900 to-slate-950 p-4">
-            <p className="text-sm text-slate-400">Pending Purchase</p>
-            <p className="mt-2 text-3xl font-bold text-amber-300">{pendingPurchases}</p>
-          </article>
-        </div>
-
-        <article id="build-jobs" className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-          <h2 className="text-lg font-semibold text-white">Unity Build Jobs</h2>
-          <div className="mt-4 overflow-x-auto">
+      <section className="space-y-3">
+        <h2 className="text-xl font-semibold">unity_build_jobs</h2>
+        {unityBuildJobsError ? (
+          <p className="text-red-500">Veri alınamadı: {unityBuildJobsError.message}</p>
+        ) : (
+          <div className="overflow-x-auto border rounded-lg">
             <table className="min-w-full text-sm">
-              <thead className="text-left text-slate-400">
-                <tr>
-                  <th className="px-2 py-2">Project</th>
-                  <th className="px-2 py-2">Status</th>
-                  <th className="px-2 py-2">Created</th>
+              <thead>
+                <tr className="bg-gray-100 text-left">
+                  {unityBuildJobs?.[0]
+                    ? Object.keys(unityBuildJobs[0]).map((key) => (
+                        <th key={key} className="px-3 py-2 border-b font-medium">
+                          {key}
+                        </th>
+                      ))
+                    : null}
                 </tr>
               </thead>
               <tbody>
-                {buildJobs.map((job) => (
-                  <tr key={job.id} className="border-t border-white/10 text-slate-200">
-                    <td className="px-2 py-3">{job.unity_game_project_id ?? '-'}</td>
-                    <td className="px-2 py-3">
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${statusBadge(job.status)}`}>{job.status ?? 'unknown'}</span>
-                    </td>
-                    <td className="px-2 py-3">{job.created_at ? new Date(job.created_at).toLocaleString('tr-TR') : '-'}</td>
+                {unityBuildJobs?.map((row, i) => (
+                  <tr key={String(row.id ?? i)} className="odd:bg-white even:bg-gray-50">
+                    {Object.values(row).map((value, idx) => (
+                      <td key={idx} className="px-3 py-2 border-b align-top">
+                        {value === null ? "-" : typeof value === "object" ? JSON.stringify(value) : String(value)}
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </article>
-
-        <article id="profiles" className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-          <h2 className="text-lg font-semibold text-white">Profiles</h2>
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {profiles.map((profile) => (
-              <div key={profile.id} className="rounded-xl border border-white/10 bg-slate-900/70 p-3">
-                <p className="font-medium text-white">{profile.full_name ?? profile.email ?? 'İsimsiz Kullanıcı'}</p>
-                <p className="mt-1 text-xs text-slate-400">{profile.email ?? '-'}</p>
-                <p className="mt-2 text-xs text-slate-500">ID: {profile.id}</p>
-              </div>
-            ))}
-          </div>
-        </article>
-
-        <article id="purchases" className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-          <h2 className="text-lg font-semibold text-white">Package Purchases</h2>
-          <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="text-left text-slate-400">
-                <tr>
-                  <th className="px-2 py-2">Package</th>
-                  <th className="px-2 py-2">User</th>
-                  <th className="px-2 py-2">Amount</th>
-                  <th className="px-2 py-2">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {purchases.map((purchase) => (
-                  <tr key={purchase.id} className="border-t border-white/10 text-slate-200">
-                    <td className="px-2 py-3">{purchase.package_key}</td>
-                    <td className="px-2 py-3">{purchase.user_id}</td>
-                    <td className="px-2 py-3">{purchase.amount} {purchase.currency}</td>
-                    <td className="px-2 py-3">
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${statusBadge(purchase.status)}`}>{purchase.status}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </article>
+        )}
       </section>
-    </div>
+
+      <section className="space-y-3">
+        <h2 className="text-xl font-semibold">profiles</h2>
+        {profilesError ? (
+          <p className="text-red-500">Veri alınamadı: {profilesError.message}</p>
+        ) : (
+          <div className="overflow-x-auto border rounded-lg">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="bg-gray-100 text-left">
+                  {profiles?.[0]
+                    ? Object.keys(profiles[0]).map((key) => (
+                        <th key={key} className="px-3 py-2 border-b font-medium">
+                          {key}
+                        </th>
+                      ))
+                    : null}
+                </tr>
+              </thead>
+              <tbody>
+                {profiles?.map((row, i) => (
+                  <tr key={String(row.id ?? i)} className="odd:bg-white even:bg-gray-50">
+                    {Object.values(row).map((value, idx) => (
+                      <td key={idx} className="px-3 py-2 border-b align-top">
+                        {value === null ? "-" : typeof value === "object" ? JSON.stringify(value) : String(value)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-xl font-semibold">package_purchases</h2>
+        {packagePurchasesError ? (
+          <p className="text-red-500">Veri alınamadı: {packagePurchasesError.message}</p>
+        ) : (
+          <div className="overflow-x-auto border rounded-lg">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="bg-gray-100 text-left">
+                  {packagePurchases?.[0]
+                    ? Object.keys(packagePurchases[0]).map((key) => (
+                        <th key={key} className="px-3 py-2 border-b font-medium">
+                          {key}
+                        </th>
+                      ))
+                    : null}
+                  <th className="px-3 py-2 border-b font-medium">actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {packagePurchases?.map((row, i) => (
+                  <tr key={String(row.id ?? i)} className="odd:bg-white even:bg-gray-50">
+                    {Object.values(row).map((value, idx) => (
+                      <td key={idx} className="px-3 py-2 border-b align-top">
+                        {value === null ? "-" : typeof value === "object" ? JSON.stringify(value) : String(value)}
+                      </td>
+                    ))}
+                    <td className="px-3 py-2 border-b">
+                      <form action={approvePurchase}>
+                        <input type="hidden" name="purchaseId" value={String(row.id)} />
+                        <button
+                          type="submit"
+                          className="rounded bg-green-600 px-3 py-1 text-white hover:bg-green-700"
+                          disabled={row.status === "approved"}
+                        >
+                          {row.status === "approved" ? "Onaylandı" : "Onayla"}
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </main>
   );
 }
