@@ -6,7 +6,7 @@ const PUBLIC_ROUTES = ['/', '/signin', '/signup', '/login',
   '/reset-password', '/update-password', '/confirm-email',
   '/about', '/contact', '/pricing', '/privacy', '/terms']
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const isPublic = PUBLIC_ROUTES.some(r =>
     pathname === r || pathname.startsWith('/api/')
