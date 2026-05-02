@@ -1,46 +1,80 @@
 import { requirePlatformOwner } from '@/lib/owner-auth';
-import { createSupabaseReadonlyServerClient } from '@/lib/supabase-server';
+import { fetchBackendForOwner } from '@/lib/backend-server';
+import { ApprovePurchaseButton } from '@/app/owner/dashboard/approve-purchase-button';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+type DashboardResponse = {
+  buildJobs?: Array<{ id: string; unity_game_project_id: string; status: 'pending' | 'success' | 'failed' | string; created_at: string | null; error_message: string | null }>;
+  packagePurchases?: Array<{ id: string; user_id: string; package_key: string; amount: number; currency: string; status: string; created_at: string | null }>;
+  profiles?: Array<{ id: string; email: string | null; created_at: string | null }>;
+  subscriptions?: Array<{ id: string; user_id: string; status: string; current_period_end: string | null }>;
+  googlePlayIntegrations?: Array<{ id: string; user_id: string; status: string; error_message: string | null; updated_at: string | null }>;
+};
 
 export default async function OwnerDashboardPage() {
   await requirePlatformOwner();
-  const supabase = await createSupabaseReadonlyServerClient();
+  const response = await fetchBackendForOwner('/owner/dashboard');
+  const data = (await response.json().catch(() => ({}))) as DashboardResponse;
 
-  const [profilesRes, activeBuildRes, revenueRes, activityRes] = await Promise.all([
-    supabase.from('profiles').select('id', { count: 'exact', head: true }),
-    supabase.from('unity_build_jobs').select('id', { count: 'exact', head: true }).in('status', ['queued', 'running', 'building']),
-    supabase.from('subscriptions').select('amount, plan_name, status'),
-    supabase.from('build_statuses').select('id,service,status,created_at').order('created_at', { ascending: false }).limit(10)
-  ]);
-
-  const totalRevenue = (revenueRes.data ?? []).reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+  const subscriptionsByUser = new Map<string, Array<{ id: string; status: string; current_period_end: string | null }>>();
+  for (const sub of data.subscriptions ?? []) {
+    const list = subscriptionsByUser.get(sub.user_id) ?? [];
+    list.push({ id: sub.id, status: sub.status, current_period_end: sub.current_period_end });
+    subscriptionsByUser.set(sub.user_id, list);
+  }
 
   return (
-    <section className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Metric title="Toplam Kullanıcı" value={profilesRes.count ?? 0} />
-        <Metric title="Aktif Unity Build" value={activeBuildRes.count ?? 0} />
-        <Metric title="Toplam Kazanç" value={`$${totalRevenue.toFixed(2)}`} />
-        <Metric title="Abonelik Kaydı" value={revenueRes.data?.length ?? 0} />
-      </div>
+    <section className="grid gap-4">
+      <article className="panel">
+        <h2 className="text-lg font-semibold">Build Monitor</h2>
+        <div className="mt-3 space-y-2 text-sm">
+          {(data.buildJobs ?? []).map((job) => (
+            <p key={job.id} className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+              {job.unity_game_project_id} • <span className="font-medium">{job.status}</span> • {new Date(job.created_at ?? '').toLocaleString('tr-TR')}
+            </p>
+          ))}
+        </div>
+      </article>
 
       <article className="panel">
-        <h2 className="text-lg font-semibold">Son 10 Aktivite</h2>
-        <div className="mt-4 space-y-2 text-sm">
-          {(activityRes.data ?? []).map((item) => (
-            <div key={item.id} className="rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2">
-              <p className="font-medium">{item.service} • {item.status}</p>
-              <p className="text-xs text-slate-400">{new Date(item.created_at ?? '').toLocaleString('tr-TR')}</p>
+        <h2 className="text-lg font-semibold">Satış Takibi (Onay Bekleyen)</h2>
+        <div className="mt-3 space-y-2 text-sm">
+          {(data.packagePurchases ?? []).filter((p) => p.status === 'pending').map((purchase) => (
+            <div key={purchase.id} className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <p>{purchase.package_key} • {purchase.amount} {purchase.currency}</p>
+              <p className="text-xs text-white/70">Kullanıcı: {purchase.user_id}</p>
+              <ApprovePurchaseButton purchaseId={purchase.id} />
+            </div>
+          ))}
+        </div>
+      </article>
+
+      <article className="panel">
+        <h2 className="text-lg font-semibold">Kullanıcı Yönetimi</h2>
+        <div className="mt-3 space-y-2 text-sm">
+          {(data.profiles ?? []).map((profile) => {
+            const subscriptions = subscriptionsByUser.get(profile.id) ?? [];
+            return (
+              <div key={profile.id} className="rounded-lg border border-white/10 bg-black/20 p-3">
+                <p className="font-medium">{profile.email ?? '-'} • {profile.id}</p>
+                <p className="text-xs text-white/70">Subscriptions: {subscriptions.length ? subscriptions.map((sub) => sub.status).join(', ') : 'yok'}</p>
+              </div>
+            );
+          })}
+        </div>
+      </article>
+
+      <article className="panel">
+        <h2 className="text-lg font-semibold">Google Play Status</h2>
+        <div className="mt-3 space-y-2 text-sm">
+          {(data.googlePlayIntegrations ?? []).map((integration) => (
+            <div key={integration.id} className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <p>Kullanıcı: {integration.user_id}</p>
+              <p>Durum: {integration.status}</p>
+              <p>Hata: {integration.error_message ?? '-'}</p>
             </div>
           ))}
         </div>
       </article>
     </section>
   );
-}
-
-function Metric({ title, value }: { title: string; value: string | number }) {
-  return <article className="panel"><p className="text-xs uppercase tracking-wider text-slate-400">{title}</p><p className="mt-2 text-2xl font-semibold">{value}</p></article>;
 }
