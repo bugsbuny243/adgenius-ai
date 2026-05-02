@@ -54,12 +54,12 @@ export async function middleware(request: NextRequest) {
   }
 
   if (!isPlatformOwner(user)) {
-    return NextResponse.rewrite(new URL('/not-found', request.url));
+    return NextResponse.redirect(new URL('/', request.url));
   }
 
   return response;
 }
 
 export const config = {
-  matcher: ['/owner/:path*', '/api/owner/:path*']
+  matcher: ['/owner/:path*', '/api/owner/:path*', '/owner-panel/:path*', '/api/owner-panel/:path*']
 };
