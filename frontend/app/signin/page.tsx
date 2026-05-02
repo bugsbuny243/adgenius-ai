@@ -44,7 +44,16 @@ function SignInContent() {
         return;
       }
 
-      window.location.assign('/dashboard');
+      let redirectTo = '/dashboard';
+      const redirectResponse = await fetch('/api/auth/redirect', { cache: 'no-store' });
+      if (redirectResponse.ok) {
+        const redirectPayload = await redirectResponse.json() as { redirectTo?: string };
+        if (typeof redirectPayload.redirectTo === 'string' && redirectPayload.redirectTo.startsWith('/')) {
+          redirectTo = redirectPayload.redirectTo;
+        }
+      }
+
+      window.location.assign(redirectTo);
     } catch {
       setErrorMessage('Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.');
     } finally {
