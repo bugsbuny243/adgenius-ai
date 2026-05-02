@@ -12,9 +12,11 @@ export function StartBuildButton({ projectId, workspaceId }: { projectId: string
   async function onClick() {
     setLoading(true);
     setError('');
+
     try {
       const supabase = createSupabaseBrowserClient();
       if (!supabase) throw new Error('Supabase yapılandırması eksik.');
+
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
       if (!token) throw new Error('Oturum bulunamadı.');
@@ -26,14 +28,20 @@ export function StartBuildButton({ projectId, workspaceId }: { projectId: string
           Authorization: `Bearer ${token}`,
           ...(workspaceId ? { 'x-workspace-id': workspaceId } : {})
         },
-        body: JSON.stringify({ projectId })
+        // İŞTE BURAYI DEĞİŞTİRDİK! username ve gameName eklendi.
+        body: JSON.stringify({ projectId, username: "admin", gameName: "koschei_oyun" })
       });
+
       const payload = (await response.json()) as { ok: boolean; error?: string };
+
       if (!response.ok || !payload.ok) throw new Error(payload.error ?? 'Build başlatılamadı.');
+
       router.push(`/game-factory/${projectId}/builds`);
       router.refresh();
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Bir hata oluştu.');
+
     } finally {
       setLoading(false);
     }
