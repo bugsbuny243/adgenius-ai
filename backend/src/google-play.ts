@@ -118,3 +118,69 @@ export class GooglePlayPublisherProvider {
     }
   }
 }
+
+export async function publishAutomated(input: {
+  packageName: string;
+  artifactUrl: string;
+  releaseNotes: string;
+  refreshToken: string;
+  track?: 'internal' | 'alpha' | 'beta' | 'production';
+}) {
+  const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
+  if (!clientId || !clientSecret) throw new Error('GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET eksik.');
+
+  const tokenResp = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: 'refresh_token',
+      refresh_token: input.refreshToken
+    })
+  });
+  if (!tokenResp.ok) throw new Error(`OAuth refresh başarısız: ${tokenResp.status} ${await tokenResp.text()}`);
+  const tokenData = (await tokenResp.json()) as { access_token?: string };
+  if (!tokenData.access_token) throw new Error('access_token alınamadı');
+
+  const artifactResp = await fetch(input.artifactUrl);
+  if (!artifactResp.ok) throw new Error(`Artifact indirilemedi: ${artifactResp.status}`);
+  const artifact = Buffer.from(await artifactResp.arrayBuffer());
+  const isBundle = input.artifactUrl.toLowerCase().endsWith('.aab');
+
+  const base = 'https://androidpublisher.googleapis.com/androidpublisher/v3';
+  const editResp = await fetch(`${base}/applications/${input.packageName}/edits`, {
+    method: 'POST', headers: { Authorization: `Bearer ${tokenData.access_token}` }
+  });
+  if (!editResp.ok) throw new Error(`Edit oluşturulamadı: ${editResp.status} ${await editResp.text()}`);
+  const edit = (await editResp.json()) as { id: string };
+
+  const uploadUrl = isBundle
+    ? `https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/${input.packageName}/edits/${edit.id}/bundles?uploadType=media`
+    : `https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/${input.packageName}/edits/${edit.id}/apks?uploadType=media`;
+
+  const uploadResp = await fetch(uploadUrl, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tokenData.access_token}`, 'Content-Type': 'application/octet-stream' },
+    body: new Uint8Array(artifact)
+  });
+  if (!uploadResp.ok) throw new Error(`Upload başarısız: ${uploadResp.status} ${await uploadResp.text()}`);
+  const upload = (await uploadResp.json()) as { versionCode?: number };
+  const versionCode = String(upload.versionCode ?? '');
+
+  const track = input.track ?? 'internal';
+  const trackResp = await fetch(`${base}/applications/${input.packageName}/edits/${edit.id}/tracks/${track}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${tokenData.access_token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ track, releases: [{ status: 'completed', versionCodes: [versionCode], releaseNotes: [{ language: 'en-US', text: input.releaseNotes || 'Automated release' }] }] })
+  });
+  if (!trackResp.ok) throw new Error(`Track güncellenemedi: ${trackResp.status} ${await trackResp.text()}`);
+
+  const commitResp = await fetch(`${base}/applications/${input.packageName}/edits/${edit.id}:commit`, {
+    method: 'POST', headers: { Authorization: `Bearer ${tokenData.access_token}` }
+  });
+  if (!commitResp.ok) throw new Error(`Commit başarısız: ${commitResp.status} ${await commitResp.text()}`);
+
+  return { ok: true, editId: edit.id, versionCode, track };
+}
