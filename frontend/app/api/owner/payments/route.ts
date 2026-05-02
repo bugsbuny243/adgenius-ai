@@ -1,11 +1,16 @@
 import { createSupabaseActionServerClient } from '@/lib/supabase-server';
 import { getBackendApiUrl } from '@/lib/backend-api';
+import { isPlatformOwner } from '@/lib/owner-auth';
 
 export async function PATCH(request: Request) {
   const supabase = await createSupabaseActionServerClient();
   const {
-    data: { session }
-  } = await supabase.auth.getSession();
+    data: { user, session }
+  } = await supabase.auth.getUser();
+
+  if (!isPlatformOwner(user)) {
+    return Response.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const response = await fetch(`${getBackendApiUrl()}/owner/payments`, {
     method: 'PATCH',
