@@ -38,7 +38,7 @@ export async function requirePlatformOwner() {
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect('/signin');
+    redirect('/login');
   }
 
   if (!isPlatformOwner(user)) {
