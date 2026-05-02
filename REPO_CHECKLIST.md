@@ -1,0 +1,402 @@
+# REPO_CHECKLIST
+
+## 1) Tüm klasörler (özet)
+
+- `.`
+- `backend`
+- `backend/scripts`
+- `backend/src`
+- `backend/workers/unity`
+- `backend/workers/unity/examples`
+- `docs`
+- `frontend`
+- `frontend/app`
+- `frontend/app/about`
+- `frontend/app/api/app-factory/generate`
+- `frontend/app/api/bootstrap`
+- `frontend/app/api/builds/[jobId]/refresh`
+- `frontend/app/api/builds/refresh`
+- `frontend/app/api/game-factory`
+- `frontend/app/api/game-factory/approve`
+- `frontend/app/api/game-factory/brief`
+- `frontend/app/api/game-factory/build`
+- `frontend/app/api/game-factory/build-status`
+- `frontend/app/api/game-factory/builds/refresh`
+- `frontend/app/api/game-factory/generate`
+- `frontend/app/api/health`
+- `frontend/app/api/owner/payments`
+- `frontend/app/api/pricing/game-agent-checkout`
+- `frontend/app/api/unity-build-callback`
+- `frontend/app/auth/callback`
+- `frontend/app/confirm-email`
+- `frontend/app/contact`
+- `frontend/app/cookies`
+- `frontend/app/dashboard`
+- `frontend/app/game-factory`
+- `frontend/app/game-factory/[id]`
+- `frontend/app/game-factory/[id]/builds`
+- `frontend/app/game-factory/[id]/release`
+- `frontend/app/game-factory/[id]/settings`
+- `frontend/app/game-factory/new`
+- `frontend/app/login`
+- `frontend/app/owner`
+- `frontend/app/owner/build-jobs`
+- `frontend/app/owner/components`
+- `frontend/app/owner/game-factory`
+- `frontend/app/owner/integrations`
+- `frontend/app/owner/logs`
+- `frontend/app/owner/payments`
+- `frontend/app/owner/release-jobs`
+- `frontend/app/owner/settings`
+- `frontend/app/owner/subscriptions`
+- `frontend/app/owner/system`
+- `frontend/app/owner/unity`
+- `frontend/app/owner/users`
+- `frontend/app/pricing`
+- `frontend/app/privacy`
+- `frontend/app/reset-password`
+- `frontend/app/settings`
+- `frontend/app/settings/integrations/google-play`
+- `frontend/app/signin`
+- `frontend/app/signup`
+- `frontend/app/terms`
+- `frontend/app/update-password`
+- `frontend/components`
+- `frontend/components/ads`
+- `frontend/components/game-factory`
+- `frontend/components/pricing`
+- `frontend/lib`
+- `frontend/lib/game-factory`
+- `frontend/lib/game-factory/providers`
+- `frontend/lib/server`
+- `frontend/public`
+- `frontend/scripts`
+- `github/workflows`
+- `shared`
+- `supabase`
+- `unity-client`
+- `unity-client/Assets`
+- `unity-client/Assets/Editor`
+- `unity-client/Assets/Scenes`
+- `unity-client/ProjectSettings`
+
+## 2) Tüm dosya isimleri
+
+- `.env.example`
+- `.gitignore`
+- `RAILWAY_DEPLOYMENT.md`
+- `README.md`
+- `REPO_AUDIT_2026-04-27.md`
+- `backend/.env.example`
+- `backend/index.js`
+- `backend/package-lock.json`
+- `backend/package.json`
+- `backend/scripts/check-supabase-schema.mjs`
+- `backend/scripts/validate-backend-env.mjs`
+- `backend/src/auth.ts`
+- `backend/src/credentials-encryption.ts`
+- `backend/src/env.ts`
+- `backend/src/google-play.ts`
+- `backend/src/index.ts`
+- `backend/src/unity-bridge.ts`
+- `backend/src/unity-repo-config.ts`
+- `backend/tsconfig.json`
+- `backend/workers/unity/README.md`
+- `backend/workers/unity/examples/build-job-payload.json`
+- `docs/README.md`
+- `frontend/.env.example`
+- `frontend/app/about/page.tsx`
+- `frontend/app/api/app-factory/generate/route.ts`
+- `frontend/app/api/bootstrap/route.ts`
+- `frontend/app/api/builds/[jobId]/refresh/route.ts`
+- `frontend/app/api/builds/refresh/route.ts`
+- `frontend/app/api/game-factory/_auth.ts`
+- `frontend/app/api/game-factory/_builds.ts`
+- `frontend/app/api/game-factory/approve/route.ts`
+- `frontend/app/api/game-factory/brief/route.ts`
+- `frontend/app/api/game-factory/build-status/route.ts`
+- `frontend/app/api/game-factory/build/route.ts`
+- `frontend/app/api/game-factory/builds/refresh/route.ts`
+- `frontend/app/api/game-factory/generate/route.ts`
+- `frontend/app/api/health/route.ts`
+- `frontend/app/api/owner/payments/route.ts`
+- `frontend/app/api/pricing/game-agent-checkout/route.ts`
+- `frontend/app/api/unity-build-callback/route.ts`
+- `frontend/app/auth/callback/route.ts`
+- `frontend/app/confirm-email/page.tsx`
+- `frontend/app/contact/page.tsx`
+- `frontend/app/cookies/page.tsx`
+- `frontend/app/dashboard/error.tsx`
+- `frontend/app/dashboard/loading.tsx`
+- `frontend/app/dashboard/page.tsx`
+- `frontend/app/error.tsx`
+- `frontend/app/game-factory/[id]/BuildListAutoRefresh.tsx`
+- `frontend/app/game-factory/[id]/BuildRowStatusAutoRefresh.tsx`
+- `frontend/app/game-factory/[id]/BuildStatusAutoRefresh.tsx`
+- `frontend/app/game-factory/[id]/BuildStatusPageAutoReload.tsx`
+- `frontend/app/game-factory/[id]/BuildStatusPoller.tsx`
+- `frontend/app/game-factory/[id]/RefreshBuildsButton.tsx`
+- `frontend/app/game-factory/[id]/StartBuildButton.tsx`
+- `frontend/app/game-factory/[id]/builds/page.tsx`
+- `frontend/app/game-factory/[id]/page.tsx`
+- `frontend/app/game-factory/[id]/release/page.tsx`
+- `frontend/app/game-factory/[id]/settings/page.tsx`
+- `frontend/app/game-factory/actions.ts`
+- `frontend/app/game-factory/layout.tsx`
+- `frontend/app/game-factory/new/page.tsx`
+- `frontend/app/game-factory/page.tsx`
+- `frontend/app/globals.css`
+- `frontend/app/layout.tsx`
+- `frontend/app/loading.tsx`
+- `frontend/app/login/page.tsx`
+- `frontend/app/not-found.tsx`
+- `frontend/app/owner/build-jobs/page.tsx`
+- `frontend/app/owner/components/owner-shell.tsx`
+- `frontend/app/owner/game-factory/page.tsx`
+- `frontend/app/owner/integrations/page.tsx`
+- `frontend/app/owner/layout.tsx`
+- `frontend/app/owner/logs/page.tsx`
+- `frontend/app/owner/page.tsx`
+- `frontend/app/owner/payments/page.tsx`
+- `frontend/app/owner/payments/payment-manager.tsx`
+- `frontend/app/owner/release-jobs/page.tsx`
+- `frontend/app/owner/settings/page.tsx`
+- `frontend/app/owner/subscriptions/page.tsx`
+- `frontend/app/owner/system/page.tsx`
+- `frontend/app/owner/unity/page.tsx`
+- `frontend/app/owner/users/page.tsx`
+- `frontend/app/page.tsx`
+- `frontend/app/pricing/page.tsx`
+- `frontend/app/privacy/page.tsx`
+- `frontend/app/reset-password/page.tsx`
+- `frontend/app/robots.ts`
+- `frontend/app/settings/integrations/google-play/actions.ts`
+- `frontend/app/settings/integrations/google-play/page.tsx`
+- `frontend/app/settings/layout.tsx`
+- `frontend/app/settings/page.tsx`
+- `frontend/app/signin/page.tsx`
+- `frontend/app/signup/page.tsx`
+- `frontend/app/sitemap.ts`
+- `frontend/app/terms/page.tsx`
+- `frontend/app/update-password/page.tsx`
+- `frontend/components/ads/AdSenseSlot.tsx`
+- `frontend/components/game-factory/publish-button.tsx`
+- `frontend/components/nav.tsx`
+- `frontend/components/pricing/game-agent-package-card.tsx`
+- `frontend/components/public-site-nav.tsx`
+- `frontend/eslint.config.mjs`
+- `frontend/lib/ai-engine.ts`
+- `frontend/lib/app-origin.ts`
+- `frontend/lib/backend-api.ts`
+- `frontend/lib/backend-server.ts`
+- `frontend/lib/credentials-encryption.ts`
+- `frontend/lib/env.ts`
+- `frontend/lib/game-agent-access.ts`
+- `frontend/lib/game-agent-plans.ts`
+- `frontend/lib/game-factory/providers/github-unity-repo-provider.ts`
+- `frontend/lib/game-factory/providers/google-play-publisher-provider.ts`
+- `frontend/lib/game-factory/providers/unity-cloud-build-provider.ts`
+- `frontend/lib/game-factory/types.ts`
+- `frontend/lib/game-factory/ui.ts`
+- `frontend/lib/lucide-react.tsx`
+- `frontend/lib/owner-auth.ts`
+- `frontend/lib/server/unity-cloud-build.ts`
+- `frontend/lib/supabase-browser.ts`
+- `frontend/lib/supabase-server.ts`
+- `frontend/lib/supabase-service-role.ts`
+- `frontend/lib/unity-bridge.ts`
+- `frontend/lib/unity-shared.ts`
+- `frontend/lib/workspace.ts`
+- `frontend/next-env.d.ts`
+- `frontend/next.config.ts`
+- `frontend/package-lock.json`
+- `frontend/package.json`
+- `frontend/postcss.config.mjs`
+- `frontend/proxy.ts`
+- `frontend/public/ads.txt`
+- `frontend/scripts/validate-runtime-env.mjs`
+- `frontend/tailwind.config.ts`
+- `frontend/tsconfig.json`
+- `github/workflows/generate-keystore.yml`
+- `shared/README.md`
+- `supabase/MIGRATION_CHECKLIST.md`
+- `supabase/README.md`
+- `supabase/SCHEMA_OVERVIEW.md`
+- `unity-client/Assets/.gitkeep`
+- `unity-client/Assets/Editor/KoscheiBuilder.cs`
+- `unity-client/Assets/Scenes.meta`
+- `unity-client/Assets/Scenes/Main.unity`
+- `unity-client/Assets/Scenes/Main.unity.meta`
+- `unity-client/Assets/dummy.txt`
+- `unity-client/ProjectSettings/.gitkeep`
+- `unity-client/ProjectSettings/EditorBuildSettings.asset`
+- `unity-client/ProjectSettings/ProjectVersion.txt`
+- `unity-client/README.md`
+
+## 3) Dosyaların görevleri (isim/konuma göre)
+
+- `.env.example` → Ortam değişkeni şablonu
+- `.gitignore` → Genel dosya
+- `RAILWAY_DEPLOYMENT.md` → Dokümantasyon
+- `README.md` → Dokümantasyon
+- `REPO_AUDIT_2026-04-27.md` → Dokümantasyon
+- `backend/.env.example` → Ortam değişkeni şablonu
+- `backend/index.js` → Genel dosya
+- `backend/package-lock.json` → Yapılandırma/bağımlılık dosyası
+- `backend/package.json` → Yapılandırma/bağımlılık dosyası
+- `backend/scripts/check-supabase-schema.mjs` → Backend doğrulama/yardımcı script
+- `backend/scripts/validate-backend-env.mjs` → Backend doğrulama/yardımcı script
+- `backend/src/auth.ts` → Express/Fastify backend iş mantığı
+- `backend/src/credentials-encryption.ts` → Express/Fastify backend iş mantığı
+- `backend/src/env.ts` → Express/Fastify backend iş mantığı
+- `backend/src/google-play.ts` → Express/Fastify backend iş mantığı
+- `backend/src/index.ts` → Express/Fastify backend iş mantığı
+- `backend/src/unity-bridge.ts` → Express/Fastify backend iş mantığı
+- `backend/src/unity-repo-config.ts` → Express/Fastify backend iş mantığı
+- `backend/tsconfig.json` → Yapılandırma/bağımlılık dosyası
+- `backend/workers/unity/README.md` → Dokümantasyon
+- `backend/workers/unity/examples/build-job-payload.json` → Arka plan worker dosyası
+- `docs/README.md` → Dokümantasyon
+- `frontend/.env.example` → Ortam değişkeni şablonu
+- `frontend/app/about/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/api/app-factory/generate/route.ts` → Next.js API route (backend endpoint)
+- `frontend/app/api/bootstrap/route.ts` → Next.js API route (backend endpoint)
+- `frontend/app/api/builds/[jobId]/refresh/route.ts` → Next.js API route (backend endpoint)
+- `frontend/app/api/builds/refresh/route.ts` → Next.js API route (backend endpoint)
+- `frontend/app/api/game-factory/_auth.ts` → Genel dosya
+- `frontend/app/api/game-factory/_builds.ts` → Genel dosya
+- `frontend/app/api/game-factory/approve/route.ts` → Next.js API route (backend endpoint)
+- `frontend/app/api/game-factory/brief/route.ts` → Next.js API route (backend endpoint)
+- `frontend/app/api/game-factory/build-status/route.ts` → Next.js API route (backend endpoint)
+- `frontend/app/api/game-factory/build/route.ts` → Next.js API route (backend endpoint)
+- `frontend/app/api/game-factory/builds/refresh/route.ts` → Next.js API route (backend endpoint)
+- `frontend/app/api/game-factory/generate/route.ts` → Next.js API route (backend endpoint)
+- `frontend/app/api/health/route.ts` → Next.js API route (backend endpoint)
+- `frontend/app/api/owner/payments/route.ts` → Next.js API route (backend endpoint)
+- `frontend/app/api/pricing/game-agent-checkout/route.ts` → Next.js API route (backend endpoint)
+- `frontend/app/api/unity-build-callback/route.ts` → Next.js API route (backend endpoint)
+- `frontend/app/auth/callback/route.ts` → Genel dosya
+- `frontend/app/confirm-email/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/contact/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/cookies/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/dashboard/error.tsx` → Next.js özel uygulama dosyası
+- `frontend/app/dashboard/loading.tsx` → Next.js özel uygulama dosyası
+- `frontend/app/dashboard/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/error.tsx` → Next.js özel uygulama dosyası
+- `frontend/app/game-factory/[id]/BuildListAutoRefresh.tsx` → Genel dosya
+- `frontend/app/game-factory/[id]/BuildRowStatusAutoRefresh.tsx` → Genel dosya
+- `frontend/app/game-factory/[id]/BuildStatusAutoRefresh.tsx` → Genel dosya
+- `frontend/app/game-factory/[id]/BuildStatusPageAutoReload.tsx` → Genel dosya
+- `frontend/app/game-factory/[id]/BuildStatusPoller.tsx` → Genel dosya
+- `frontend/app/game-factory/[id]/RefreshBuildsButton.tsx` → Genel dosya
+- `frontend/app/game-factory/[id]/StartBuildButton.tsx` → Genel dosya
+- `frontend/app/game-factory/[id]/builds/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/game-factory/[id]/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/game-factory/[id]/release/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/game-factory/[id]/settings/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/game-factory/actions.ts` → Genel dosya
+- `frontend/app/game-factory/layout.tsx` → Next.js özel uygulama dosyası
+- `frontend/app/game-factory/new/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/game-factory/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/globals.css` → Genel dosya
+- `frontend/app/layout.tsx` → Next.js özel uygulama dosyası
+- `frontend/app/loading.tsx` → Next.js özel uygulama dosyası
+- `frontend/app/login/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/not-found.tsx` → Next.js özel uygulama dosyası
+- `frontend/app/owner/build-jobs/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/owner/components/owner-shell.tsx` → Yeniden kullanılabilir UI bileşeni
+- `frontend/app/owner/game-factory/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/owner/integrations/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/owner/layout.tsx` → Next.js özel uygulama dosyası
+- `frontend/app/owner/logs/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/owner/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/owner/payments/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/owner/payments/payment-manager.tsx` → Genel dosya
+- `frontend/app/owner/release-jobs/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/owner/settings/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/owner/subscriptions/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/owner/system/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/owner/unity/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/owner/users/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/pricing/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/privacy/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/reset-password/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/robots.ts` → Genel dosya
+- `frontend/app/settings/integrations/google-play/actions.ts` → Genel dosya
+- `frontend/app/settings/integrations/google-play/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/settings/layout.tsx` → Next.js özel uygulama dosyası
+- `frontend/app/settings/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/signin/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/signup/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/sitemap.ts` → Genel dosya
+- `frontend/app/terms/page.tsx` → Next.js sayfa bileşeni
+- `frontend/app/update-password/page.tsx` → Next.js sayfa bileşeni
+- `frontend/components/ads/AdSenseSlot.tsx` → Yeniden kullanılabilir UI bileşeni
+- `frontend/components/game-factory/publish-button.tsx` → Yeniden kullanılabilir UI bileşeni
+- `frontend/components/nav.tsx` → Yeniden kullanılabilir UI bileşeni
+- `frontend/components/pricing/game-agent-package-card.tsx` → Yeniden kullanılabilir UI bileşeni
+- `frontend/components/public-site-nav.tsx` → Yeniden kullanılabilir UI bileşeni
+- `frontend/eslint.config.mjs` → Yapılandırma/bağımlılık dosyası
+- `frontend/lib/ai-engine.ts` → İş mantığı / yardımcı kütüphane
+- `frontend/lib/app-origin.ts` → İş mantığı / yardımcı kütüphane
+- `frontend/lib/backend-api.ts` → İş mantığı / yardımcı kütüphane
+- `frontend/lib/backend-server.ts` → İş mantığı / yardımcı kütüphane
+- `frontend/lib/credentials-encryption.ts` → İş mantığı / yardımcı kütüphane
+- `frontend/lib/env.ts` → İş mantığı / yardımcı kütüphane
+- `frontend/lib/game-agent-access.ts` → İş mantığı / yardımcı kütüphane
+- `frontend/lib/game-agent-plans.ts` → İş mantığı / yardımcı kütüphane
+- `frontend/lib/game-factory/providers/github-unity-repo-provider.ts` → İş mantığı / yardımcı kütüphane
+- `frontend/lib/game-factory/providers/google-play-publisher-provider.ts` → İş mantığı / yardımcı kütüphane
+- `frontend/lib/game-factory/providers/unity-cloud-build-provider.ts` → İş mantığı / yardımcı kütüphane
+- `frontend/lib/game-factory/types.ts` → İş mantığı / yardımcı kütüphane
+- `frontend/lib/game-factory/ui.ts` → İş mantığı / yardımcı kütüphane
+- `frontend/lib/lucide-react.tsx` → İş mantığı / yardımcı kütüphane
+- `frontend/lib/owner-auth.ts` → İş mantığı / yardımcı kütüphane
+- `frontend/lib/server/unity-cloud-build.ts` → İş mantığı / yardımcı kütüphane
+- `frontend/lib/supabase-browser.ts` → İş mantığı / yardımcı kütüphane
+- `frontend/lib/supabase-server.ts` → İş mantığı / yardımcı kütüphane
+- `frontend/lib/supabase-service-role.ts` → İş mantığı / yardımcı kütüphane
+- `frontend/lib/unity-bridge.ts` → İş mantığı / yardımcı kütüphane
+- `frontend/lib/unity-shared.ts` → İş mantığı / yardımcı kütüphane
+- `frontend/lib/workspace.ts` → İş mantığı / yardımcı kütüphane
+- `frontend/next-env.d.ts` → Genel dosya
+- `frontend/next.config.ts` → Yapılandırma/bağımlılık dosyası
+- `frontend/package-lock.json` → Yapılandırma/bağımlılık dosyası
+- `frontend/package.json` → Yapılandırma/bağımlılık dosyası
+- `frontend/postcss.config.mjs` → Yapılandırma/bağımlılık dosyası
+- `frontend/proxy.ts` → Genel dosya
+- `frontend/public/ads.txt` → Genel dosya
+- `frontend/scripts/validate-runtime-env.mjs` → Genel dosya
+- `frontend/tailwind.config.ts` → Yapılandırma/bağımlılık dosyası
+- `frontend/tsconfig.json` → Yapılandırma/bağımlılık dosyası
+- `github/workflows/generate-keystore.yml` → Genel dosya
+- `shared/README.md` → Dokümantasyon
+- `supabase/MIGRATION_CHECKLIST.md` → Dokümantasyon
+- `supabase/README.md` → Dokümantasyon
+- `supabase/SCHEMA_OVERVIEW.md` → Dokümantasyon
+- `unity-client/Assets/.gitkeep` → Genel dosya
+- `unity-client/Assets/Editor/KoscheiBuilder.cs` → Unity editör scripti
+- `unity-client/Assets/Scenes.meta` → Genel dosya
+- `unity-client/Assets/Scenes/Main.unity` → Unity sahnesi
+- `unity-client/Assets/Scenes/Main.unity.meta` → Genel dosya
+- `unity-client/Assets/dummy.txt` → Genel dosya
+- `unity-client/ProjectSettings/.gitkeep` → Genel dosya
+- `unity-client/ProjectSettings/EditorBuildSettings.asset` → Genel dosya
+- `unity-client/ProjectSettings/ProjectVersion.txt` → Genel dosya
+- `unity-client/README.md` → Dokümantasyon
+
+## 4) Satır sayısı
+
+- Not: `frontend/node_modules` ve `.git` hariç hesaplandı.
+- Toplam dosya: **150**
+- Toplam satır: **17503**
+
+## 5) Bağlantı mimarisi (net)
+
+- `frontend/app/api/**/route.ts` dosyaları, `frontend/lib/**` içindeki servis katmanını çağırır.
+- `frontend/lib/backend-api.ts` ve `frontend/lib/backend-server.ts`, frontend ile `backend/src/index.ts` API arasında köprü kurar.
+- `frontend/lib/supabase-*.ts` dosyaları Supabase erişimini merkezileştirir; auth akışları `frontend/app/auth/**` ve `settings` sayfalarına bağlanır.
+- `frontend/app/game-factory/**` ve `frontend/lib/game-factory/**`, oyun üretim/publish akışını orkestre eder.
+- `backend/src/unity-bridge.ts`, `backend/src/unity-repo-config.ts` ve `backend/workers/unity/**` Unity build pipeline entegrasyonunu yönetir.
+- `supabase/*.md` şema ve migration yönergelerini içerir; backend/frontend veri modeliyle paralel ilerler.
