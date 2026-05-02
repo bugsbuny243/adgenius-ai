@@ -2,6 +2,7 @@ import { getApiAuthContext, json } from '@/app/api/game-factory/_auth';
 import { requireActiveGameAgentPackage } from '@/lib/game-agent-access';
 import { type GameBrief, generateGameBriefWithGroq } from '@/lib/ai-engine';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase-service-role';
+import { enforceRateLimit, generateSchema } from '@/lib/api-security';
 
 type GenerateRequestBody = {
   prompt?: string | null;
@@ -24,12 +25,13 @@ export async function POST(request: Request) {
     const packageGateResponse = await requireActiveGameAgentPackage(context.supabase, context.userId, context.workspaceId);
     if (packageGateResponse) return packageGateResponse;
 
-    const payload = (await request.json().catch(() => null)) as GenerateRequestBody | null;
-    const prompt = String(payload?.prompt ?? '').trim();
-    const projectId = String(payload?.project_id ?? '').trim();
+    const limitResponse = enforceRateLimit(request, '/api/game-factory/generate');
+    if (limitResponse) return limitResponse;
 
-    if (!prompt) return json({ ok: false, error: 'prompt zorunlu.' }, 400);
-    if (!projectId) return json({ ok: false, error: 'project_id zorunlu.' }, 400);
+    const payload = (await request.json().catch(() => null)) as GenerateRequestBody | null;
+    const parsed = generateSchema.safeParse(payload ?? {});
+    if (!parsed.success) return json({ ok: false, error: 'Geçersiz istek gövdesi.' }, 400);
+    const { prompt, project_id: projectId } = parsed.data;
 
     const gameBrief = await generateGameBriefWithGroq(prompt);
     const orchestrationMetadata: Pick<GameBrief, 'target_engine' | 'target_platforms'> = {

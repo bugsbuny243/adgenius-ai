@@ -13,6 +13,27 @@ app.use(express.json({ limit: '2mb' }));
 const REFRESHABLE_STATUSES = ['queued', 'claimed', 'running', 'succeeded', 'failed', 'cancelled', 'started', 'success', 'failure'];
 const VALID_PAYMENT_STATUSES = ['approved', 'rejected', 'cancelled'] as const;
 
+const REQUEST_WINDOW_MS = 60_000;
+const MAX_REQUESTS_PER_IP = 20;
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+function enforceRateLimit(req: Request, res: express.Response, scope: string): boolean {
+  const ip = String(req.header('x-forwarded-for')?.split(',')[0]?.trim() || req.ip || 'unknown');
+  const key = `${scope}:${ip}`;
+  const now = Date.now();
+  const entry = rateBuckets.get(key);
+  if (!entry || entry.resetAt <= now) {
+    rateBuckets.set(key, { count: 1, resetAt: now + REQUEST_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= MAX_REQUESTS_PER_IP) {
+    res.status(429).json({ ok: false, error: 'Too many requests.' });
+    return false;
+  }
+  entry.count += 1;
+  return true;
+}
+
 async function isPlatformOwner(userId: string, userEmail: string | null): Promise<boolean> {
   const ownerUserId = process.env.OWNER_USER_ID?.trim();
   const ownerEmail = process.env.OWNER_EMAIL?.trim().toLowerCase();
@@ -88,6 +109,7 @@ function isValidPositiveInt(value: unknown): value is number {
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 app.post('/game-factory/generate', async (req, res) => {
+  if (!enforceRateLimit(req, res, '/game-factory/generate')) return;
   const auth = await requireAuth(req, res);
   if (!auth) return;
   if (!(await hasActiveGameAgentPackage(auth.userId, auth.workspaceId))) {
@@ -116,6 +138,7 @@ app.post('/game-factory/generate', async (req, res) => {
 });
 
 app.post('/game-factory/build', async (req, res) => {
+  if (!enforceRateLimit(req, res, '/game-factory/build')) return;
   const auth = await requireAuth(req, res);
   if (!auth) return;
   if (!(await hasActiveGameAgentPackage(auth.userId, auth.workspaceId))) {
@@ -178,6 +201,7 @@ app.post('/game-factory/build', async (req, res) => {
 });
 
 app.post('/game-factory/builds/refresh', async (req, res) => {
+  if (!enforceRateLimit(req, res, '/game-factory/builds/refresh')) return;
   const auth = await requireAuth(req, res);
   if (!auth) return;
   const projectId = String(req.body?.projectId ?? '').trim();
@@ -354,7 +378,9 @@ app.post('/unity-build-callback', express.text({ type: '*/*' }), async (req, res
   if (secret && signature) {
     const expected = createHmac('sha256', secret).update(rawBody).digest('hex');
     const provided = signature.replace(/^sha256=/, '');
-    if (!timingSafeEqual(Buffer.from(expected), Buffer.from(provided))) {
+    const expectedBuffer = Buffer.from(expected, 'hex');
+    const providedBuffer = Buffer.from(provided, 'hex');
+    if (expectedBuffer.length !== providedBuffer.length || !timingSafeEqual(expectedBuffer, providedBuffer)) {
       return void res.status(401).json({ ok: false, error: 'Invalid webhook signature.' });
     }
   } else if (secret) {
