@@ -2,9 +2,31 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { getPublicEnv } from '@/lib/env';
 
-const PROTECTED_ROUTES = ['/dashboard', '/game-factory', '/settings', '/owner'];
+const PROTECTED_ROUTES = ['/dashboard', '/game-factory', '/settings', '/owner', '/api/owner'];
+const OWNER_ROUTES = ['/owner', '/api/owner'];
 const AUTH_ROUTES = ['/signin', '/signup', '/login'];
 const SIGN_IN_ROUTE = '/signin';
+
+function normalizeValue(value?: string | null): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function isPlatformOwner(user: { id?: string | null; email?: string | null } | null): boolean {
+  if (!user) return false;
+
+  const ownerUserId = normalizeValue(process.env.OWNER_USER_ID);
+  const ownerEmail = normalizeValue(process.env.OWNER_EMAIL)?.toLowerCase();
+
+  const normalizedUserId = normalizeValue(user.id);
+  const normalizedEmail = normalizeValue(user.email)?.toLowerCase();
+
+  if (ownerUserId && normalizedUserId === ownerUserId) return true;
+  if (ownerEmail && normalizedEmail === ownerEmail) return true;
+
+  return false;
+}
 
 export async function proxy(request: NextRequest) {
   type CookieToSet = {
@@ -32,6 +54,7 @@ export async function proxy(request: NextRequest) {
   };
 
   const isProtectedRoute = PROTECTED_ROUTES.some((route) => request.nextUrl.pathname.startsWith(route));
+  const isOwnerRoute = OWNER_ROUTES.some((route) => request.nextUrl.pathname.startsWith(route));
   const isAuthRoute = AUTH_ROUTES.some((route) => request.nextUrl.pathname.startsWith(route));
   const isLoginRoute = request.nextUrl.pathname === '/login';
 
@@ -72,6 +95,10 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(buildSignInRedirect());
     }
 
+    if (isOwnerRoute && !isPlatformOwner(user)) {
+      return NextResponse.rewrite(new URL('/not-found', request.url));
+    }
+
     if (isAuthRoute && user) {
       const url = request.nextUrl.clone();
       url.pathname = '/dashboard';
@@ -97,6 +124,7 @@ export const config = {
     '/game-factory/:path*',
     '/settings/:path*',
     '/owner/:path*',
+    '/api/owner/:path*',
     '/login',
     '/signin',
     '/signup'
