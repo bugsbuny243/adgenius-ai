@@ -13,7 +13,7 @@ export const OWNER_LINKS = [
   { href: '/owner/payments', label: 'Ödemeler' },
   { href: '/owner/subscriptions', label: 'Abonelikler' },
   { href: '/owner/game-factory', label: 'Game Factory' },
-  { href: '/owner/build-jobs', label: 'Build İşleri' },
+  { href: '/owner/builds', label: 'Build Monitor' },
   { href: '/owner/release-jobs', label: 'Yayın İşleri' },
   { href: '/owner/integrations', label: 'Sistem Entegrasyonları' },
   { href: '/owner/settings', label: 'Ayarlar' },
