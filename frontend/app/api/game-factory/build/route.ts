@@ -5,6 +5,15 @@ import { getSupabaseServiceRoleClient } from '@/lib/supabase-service-role';
 import { getBuilds, triggerBuild, UnityApiError } from '@/lib/server/unity-cloud-build';
 import { randomBytes } from 'node:crypto';
 
+type UnityPlatform = 'Android' | 'WebGL' | 'StandaloneWindows64';
+type UnityBuildTarget = 'koschei-android' | 'koschei-webgl' | 'koschei-windows64';
+
+const BUILD_TARGET_BY_PLATFORM: Record<UnityPlatform, UnityBuildTarget> = {
+  Android: 'koschei-android',
+  WebGL: 'koschei-webgl',
+  StandaloneWindows64: 'koschei-windows64'
+};
+
 function isValidPositiveInt(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }
@@ -77,6 +86,31 @@ export async function POST(request: Request) {
     .eq('user_id', context.userId);
   if (projectUpdateError) return json({ ok: false, error: projectUpdateError.message }, 400);
 
+  const { data: latestBrief } = await serviceRole
+    .from('game_briefs')
+    .select('brief_json')
+    .eq('unity_game_project_id', projectId)
+    .eq('workspace_id', context.workspaceId)
+    .eq('user_id', context.userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const briefJson = latestBrief?.brief_json as { target_platforms?: unknown } | null;
+  const aiSelectedPlatforms = Array.isArray(briefJson?.target_platforms)
+    ? briefJson.target_platforms.filter((item): item is UnityPlatform => (
+      item === 'Android' || item === 'WebGL' || item === 'StandaloneWindows64'
+    ))
+    : [];
+  const primaryPlatform: UnityPlatform = aiSelectedPlatforms[0] ?? 'Android';
+  const selectedBuildTarget = BUILD_TARGET_BY_PLATFORM[primaryPlatform];
+
+  console.info('[Koschei][Build] Selected build target from AI brief', {
+    projectId,
+    aiSelectedPlatforms,
+    selectedBuildTarget
+  });
+
   const queuedAt = new Date().toISOString();
   const { data: queuedJob, error: queuedJobError } = await serviceRole
     .from('unity_build_jobs')
@@ -85,7 +119,7 @@ export async function POST(request: Request) {
       workspace_id: context.workspaceId,
       user_id: context.userId,
       requested_by: context.userId,
-      build_target: 'koschei-android',
+      build_target: selectedBuildTarget,
       build_type: 'release',
       status: 'queued',
       queued_at: queuedAt,

@@ -25,7 +25,7 @@ type RunTextOptions = {
 
 export type GameBrief = {
   target_engine: 'Unity' | 'Godot';
-  target_platforms: Array<'Android' | 'WebGL' | 'Windows'>;
+  target_platforms: Array<'Android' | 'WebGL' | 'StandaloneWindows64'>;
   gameplay_goals: string;
   visual_style: string;
   controls: string;
@@ -45,11 +45,11 @@ export type AiRunResult = {
 };
 
 const GAME_DESIGNER_SYSTEM_PROMPT = [
-  'Sen kıdemli bir Evrensel Oyun Mimarısın (Multi-Engine & Multi-Platform).',
+  'Sen kıdemli bir Unity Oyun Sistem Mimarısın (Multi-Platform).',
   'Kullanıcıdan gelen tek cümlelik oyun fikrini analiz et ve SADECE geçerli bir JSON nesnesi döndür.',
   'JSON anahtarları birebir şu şekilde olmalı: target_engine, target_platforms, gameplay_goals, visual_style, controls, mechanics, store_short_description, store_full_description.',
-  'target_engine sadece Unity veya Godot olabilir. Karmaşık/ağır 3D oyunlarda Unity, hafif 2D/Web odaklı oyunlarda Godot seç.',
-  'target_platforms bir dizi olmalı ve sadece Android, WebGL, Windows değerlerinden en az birini içermeli.',
+  'target_engine her zaman Unity olmalı. Başka motor seçme.',
+  'target_platforms bir dizi olmalı ve sadece Android, WebGL, StandaloneWindows64 değerlerinden en az birini içermeli.',
   'mechanics alanı seçilen oyun motorunda kolayca uygulanabilecek teknik değerler taşımalı (ör. player_speed, gravity_scale, enemy_spawn_interval_seconds).',
   'store_short_description kısa ve ASO odaklı olmalı, store_full_description daha detaylı ASO uyumlu bir metin olmalı.',
   'JSON dışı hiçbir metin, markdown veya kod bloğu yazma.'
@@ -101,8 +101,8 @@ function extractJsonObject(raw: string): string {
 
 function parseGameBrief(raw: string): GameBrief {
   const parsed = JSON.parse(extractJsonObject(raw)) as Partial<GameBrief>;
-  const allowedEngines = new Set<GameBrief['target_engine']>(['Unity', 'Godot']);
-  const allowedPlatforms = new Set<GameBrief['target_platforms'][number]>(['Android', 'WebGL', 'Windows']);
+  const allowedEngines = new Set<GameBrief['target_engine']>(['Unity']);
+  const allowedPlatforms = new Set<GameBrief['target_platforms'][number]>(['Android', 'WebGL', 'StandaloneWindows64']);
   const targetPlatforms = Array.isArray(parsed.target_platforms)
     ? parsed.target_platforms.filter((platform): platform is GameBrief['target_platforms'][number] => (
       typeof platform === 'string' && allowedPlatforms.has(platform as GameBrief['target_platforms'][number])
