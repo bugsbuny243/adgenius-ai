@@ -1,4 +1,3 @@
-import Groq from 'groq-sdk';
 import OpenAI from 'openai';
 import { getServerEnv } from '@/lib/env';
 
@@ -52,15 +51,37 @@ const GAME_DESIGNER_SYSTEM_PROMPT = [
   'JSON dışı hiçbir metin, markdown veya kod bloğu yazma.'
 ].join(' ');
 
-let cachedGroqClient: Groq | null = null;
+type GroqClient = {
+  chat: {
+    completions: {
+      create: (params: {
+        model: string;
+        temperature: number;
+        response_format: { type: 'json_object' };
+        messages: Array<{ role: 'system' | 'user'; content: string }>;
+      }) => Promise<{ choices: Array<{ message?: { content?: string | null } }> }>;
+    };
+  };
+};
 
-function getGroqClient(): Groq {
+let cachedGroqClient: GroqClient | null = null;
+
+async function getGroqClient(): Promise<GroqClient> {
   if (cachedGroqClient) return cachedGroqClient;
   const apiKey = process.env.GROQ_API_KEY?.trim();
   if (!apiKey) {
     throw new Error('missing_groq_key');
   }
-  cachedGroqClient = new Groq({ apiKey });
+
+  const req = (globalThis as { __non_webpack_require__?: (id: string) => unknown }).__non_webpack_require__
+    || (Function('return require')() as (id: string) => unknown);
+  const mod = req('groq-sdk') as { default?: new (options: { apiKey: string }) => GroqClient };
+  const GroqCtor = mod?.default;
+  if (!GroqCtor) {
+    throw new Error('missing_groq_sdk');
+  }
+
+  cachedGroqClient = new GroqCtor({ apiKey });
   return cachedGroqClient;
 }
 
@@ -111,7 +132,7 @@ export async function generateGameBriefWithGroq(prompt: string): Promise<GameBri
     throw new Error('missing_groq_model');
   }
 
-  const groq = getGroqClient();
+  const groq = await getGroqClient();
   const completion = await groq.chat.completions.create({
     model,
     temperature: 0.3,
