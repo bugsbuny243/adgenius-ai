@@ -8,6 +8,7 @@ type OwnerShellProps = {
 
 export const OWNER_LINKS = [
   { href: '/owner', label: 'Genel Bakış' },
+  { href: '/owner/dashboard', label: 'Dashboard' },
   { href: '/owner/users', label: 'Kullanıcılar' },
   { href: '/owner/payments', label: 'Ödemeler' },
   { href: '/owner/subscriptions', label: 'Abonelikler' },

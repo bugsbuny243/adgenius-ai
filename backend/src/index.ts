@@ -589,6 +589,52 @@ app.get('/owner/logs', async (req, res) => {
   res.json({ ok: true, events: data ?? [] });
 });
 
+app.get('/owner/dashboard', async (req, res) => {
+  const owner = await requireOwner(req, res);
+  if (!owner) return;
+
+  const [buildJobsRes, purchasesRes, profilesRes, subscriptionsRes, integrationsRes] = await Promise.all([
+    serviceRoleClient.from('unity_build_jobs').select('id, user_id, unity_game_project_id, status, created_at, error_message').order('created_at', { ascending: false }).limit(20),
+    serviceRoleClient.from('package_purchases').select('id, user_id, package_key, amount, currency, status, created_at').order('created_at', { ascending: false }).limit(50),
+    serviceRoleClient.from('profiles').select('id, email, created_at').order('created_at', { ascending: false }).limit(100),
+    serviceRoleClient.from('subscriptions').select('id, user_id, status, current_period_end, created_at').order('created_at', { ascending: false }).limit(200),
+    serviceRoleClient.from('user_integrations').select('id, user_id, provider, status, error_message, updated_at').eq('provider', 'google_play').order('updated_at', { ascending: false }).limit(100)
+  ]);
+
+  if (buildJobsRes.error || purchasesRes.error || profilesRes.error || subscriptionsRes.error || integrationsRes.error) {
+    return void res.status(400).json({
+      ok: false,
+      error: buildJobsRes.error?.message ?? purchasesRes.error?.message ?? profilesRes.error?.message ?? subscriptionsRes.error?.message ?? integrationsRes.error?.message ?? 'dashboard_query_failed'
+    });
+  }
+
+  res.json({
+    ok: true,
+    buildJobs: buildJobsRes.data ?? [],
+    packagePurchases: purchasesRes.data ?? [],
+    profiles: profilesRes.data ?? [],
+    subscriptions: subscriptionsRes.data ?? [],
+    googlePlayIntegrations: integrationsRes.data ?? []
+  });
+});
+
+app.patch('/owner/package-purchases/:purchaseId/approve', async (req, res) => {
+  const owner = await requireOwner(req, res);
+  if (!owner) return;
+
+  const purchaseId = String(req.params.purchaseId ?? '').trim();
+  if (!purchaseId) return void res.status(400).json({ ok: false, error: 'purchase_id_required' });
+
+  const nowIso = new Date().toISOString();
+  const { error } = await serviceRoleClient
+    .from('package_purchases')
+    .update({ status: 'approved', approved_at: nowIso, approved_by: owner.userId })
+    .eq('id', purchaseId);
+
+  if (error) return void res.status(400).json({ ok: false, error: error.message });
+  res.json({ ok: true });
+});
+
 const port = Number(process.env.PORT ?? 4000);
 app.listen(port, () => {
   console.log(`[backend] listening on :${port}`);
