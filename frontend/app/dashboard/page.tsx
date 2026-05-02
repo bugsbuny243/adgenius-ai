@@ -17,6 +17,17 @@ function toTurkishDate(value: string | null | undefined): string {
   return new Date(value).toLocaleDateString('tr-TR');
 }
 
+function statusTone(status: string | null | undefined): string {
+  const normalized = (status ?? '').toLowerCase();
+  if (normalized.includes('paid') || normalized.includes('active') || normalized.includes('completed')) {
+    return 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/30';
+  }
+  if (normalized.includes('pending') || normalized.includes('review')) {
+    return 'bg-amber-500/15 text-amber-300 ring-1 ring-amber-400/30';
+  }
+  return 'bg-rose-500/15 text-rose-300 ring-1 ring-rose-400/30';
+}
+
 export default async function DashboardPage() {
   const supabase = await createSupabaseReadonlyServerClient();
   const {
@@ -28,7 +39,7 @@ export default async function DashboardPage() {
   const workspace = await getWorkspaceContextOrNull();
   if (!workspace) redirect('/signin');
 
-  const [subscriptionRes, usageRes, projectsRes, paymentOrdersRes] = await Promise.all([
+  const [subscriptionRes, projectsRes, paymentOrdersRes] = await Promise.all([
     supabase
       .from('subscriptions')
       .select('plan_name, run_limit, status')
@@ -36,12 +47,6 @@ export default async function DashboardPage() {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabase
-      .from('usage_counters')
-      .select('*')
-      .eq('workspace_id', workspace.workspaceId)
-      .order('updated_at', { ascending: false })
-      .limit(20),
     supabase
       .from('game_projects')
       .select('id, name, status, created_at')
@@ -53,79 +58,97 @@ export default async function DashboardPage() {
       .select('id, plan_key, status, created_at')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
-      .limit(5)
+      .limit(6)
   ]);
 
   const subscription = subscriptionRes.data;
-  const usageItems = usageRes.data ?? [];
   const projects = projectsRes.data ?? [];
   const paymentOrders = paymentOrdersRes.data ?? [];
 
-  const planName = subscription?.plan_name ?? 'free';
-  const planTier = planName.toLowerCase() === 'free' ? 'free' : 'paid';
-  const usageSummary = usageItems.length;
+  const completedOrders = paymentOrders.filter((order) => (order.status ?? '').toLowerCase().includes('paid')).length;
+  const pendingOrders = paymentOrders.filter((order) => (order.status ?? '').toLowerCase().includes('pending')).length;
 
   return (
-    <main>
+    <main className="min-h-screen bg-slate-950 text-slate-100">
       <Nav />
 
-      <section className="panel mb-4">
-        <p className="text-xs uppercase tracking-wide text-lilac">Dashboard</p>
-        <h2 className="mt-1 text-xl font-semibold">{workspace.workspaceName}</h2>
-        <p className="text-sm text-white/70">Plan, kullanım ve oyun projeleri özetinizi buradan takip edin.</p>
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <MetricCard title="Plan" value={String(planName)} />
-          <MetricCard title="Plan tipi" value={planTier} />
-          <MetricCard title="Plan durumu" value={subscription?.status ?? 'active'} />
-          <MetricCard title="Kullanım kaydı" value={String(usageSummary)} />
-        </div>
-      </section>
-
-      <section className="panel mb-4">
-        <h3 className="text-lg font-semibold">Game Factory</h3>
-        <p className="mt-1 text-sm text-white/70">Yeni oyun üretim süreci başlatmak veya mevcut işleri yönetmek için Game Factory ekranına gidin.</p>
-        <Link href="/game-factory" className="mt-4 inline-flex rounded-xl bg-neon px-6 py-3 text-base font-semibold text-ink">
-          Game Factory&apos;ye Git
-        </Link>
-      </section>
-
-
-      <section className="panel mb-4">
-        <h3 className="text-lg font-semibold">Paket / Ödeme Durumu</h3>
-        <p className="mt-1 text-sm text-white/70">Shopier ödemeleri owner tarafından manuel onaylanır.</p>
-        <div className="mt-3 space-y-2 text-sm">
-          {paymentOrders.length === 0 ? <p className="text-white/60">Henüz paket ödeme talebi bulunmuyor.</p> : paymentOrders.map((order) => (
-            <p key={order.id} className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
-              {order.plan_key} • {order.status} • {toTurkishDate(order.created_at)}
-            </p>
-          ))}
-        </div>
-      </section>
-
-      <section className="panel">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Son oyun projeleri</h3>
-          <Link href="/game-factory" className="rounded-lg border border-white/20 px-3 py-1.5 text-sm hover:border-neon">
-            Tüm projeleri aç
-          </Link>
-        </div>
-
-        {projects.length === 0 ? (
-          <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/70">
-            Henüz oyun projesi yok.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {projects.map((project) => (
-              <article key={project.id} className="rounded-lg border border-white/10 bg-black/20 p-3 text-sm">
-                <p className="font-medium">{project.name}</p>
-                <p className="text-xs text-white/65">Durum: {project.status}</p>
-                <p className="text-xs text-white/65">Tarih: {toTurkishDate(project.created_at)}</p>
-              </article>
-            ))}
+      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/60 p-6 shadow-2xl shadow-black/30">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-indigo-300">Sipariş Paneli</p>
+              <h1 className="mt-2 text-2xl font-semibold sm:text-3xl">{workspace.workspaceName}</h1>
+              <p className="mt-2 text-sm text-slate-300">Siparişler, paket durumu ve üretim sürecini tek ekrandan takip edin.</p>
+            </div>
+            <Link
+              href="/game-factory"
+              className="inline-flex items-center justify-center rounded-xl bg-indigo-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-400"
+            >
+              Yeni Sipariş / Proje Oluştur
+            </Link>
           </div>
-        )}
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard title="Aktif Paket" value={String(subscription?.plan_name ?? 'free')} />
+            <MetricCard title="Paket Durumu" value={String(subscription?.status ?? 'active')} />
+            <MetricCard title="Onaylanan Sipariş" value={String(completedOrders)} />
+            <MetricCard title="Bekleyen Sipariş" value={String(pendingOrders)} />
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-6 xl:grid-cols-5">
+          <section className="xl:col-span-3 rounded-2xl border border-white/10 bg-slate-900/70 p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Son Siparişler</h2>
+              <span className="text-xs text-slate-400">Toplam: {paymentOrders.length}</span>
+            </div>
+
+            {paymentOrders.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-white/10 bg-slate-950/70 px-4 py-6 text-center text-sm text-slate-400">
+                Henüz sipariş kaydı bulunmuyor.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {paymentOrders.map((order) => (
+                  <article key={order.id} className="rounded-xl border border-white/10 bg-slate-950/60 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-medium text-slate-100">{order.plan_key}</p>
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusTone(order.status)}`}>
+                        {order.status ?? 'unknown'}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-xs text-slate-400">Sipariş tarihi: {toTurkishDate(order.created_at)}</p>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="xl:col-span-2 rounded-2xl border border-white/10 bg-slate-900/70 p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Üretimdeki Projeler</h2>
+              <Link href="/game-factory" className="text-xs text-indigo-300 hover:text-indigo-200">
+                Tümünü Gör
+              </Link>
+            </div>
+
+            {projects.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-white/10 bg-slate-950/70 px-4 py-6 text-center text-sm text-slate-400">
+                Henüz proje bulunmuyor.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {projects.map((project) => (
+                  <article key={project.id} className="rounded-xl border border-white/10 bg-slate-950/60 p-4">
+                    <p className="font-medium">{project.name}</p>
+                    <p className="mt-2 text-xs text-slate-400">Durum: {project.status}</p>
+                    <p className="text-xs text-slate-500">Oluşturulma: {toTurkishDate(project.created_at)}</p>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
       </section>
     </main>
   );
@@ -133,9 +156,9 @@ export default async function DashboardPage() {
 
 function MetricCard({ title, value }: { title: string; value: string }) {
   return (
-    <article className="rounded-xl border border-white/10 bg-black/20 p-3">
-      <h2 className="text-xs text-white/70">{title}</h2>
-      <p className="mt-1 text-xl font-semibold">{value}</p>
+    <article className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+      <h2 className="text-xs uppercase tracking-wide text-slate-400">{title}</h2>
+      <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
     </article>
   );
 }
