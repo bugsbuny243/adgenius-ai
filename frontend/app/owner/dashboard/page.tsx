@@ -1,7 +1,7 @@
-import { createClient } from "@/utils/supabase/server";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 export default async function OwnerDashboardPage() {
-  const supabase = await createClient();
+  const supabase = await createSupabaseServerClient();
 
   const [{ data: unityBuildJobs, error: unityBuildJobsError }, { data: profiles, error: profilesError }, { data: packagePurchases, error: packagePurchasesError }] =
     await Promise.all([
@@ -13,7 +13,7 @@ export default async function OwnerDashboardPage() {
   const approvePurchase = async (formData: FormData) => {
     "use server";
 
-    const supabase = await createClient();
+    const supabase = await createSupabaseServerClient();
     const purchaseId = String(formData.get("purchaseId"));
 
     await supabase
