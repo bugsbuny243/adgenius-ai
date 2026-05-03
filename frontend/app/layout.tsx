@@ -1,12 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Inter } from 'next/font/google';
 import './globals.css';
-
-const inter = Inter({
-  subsets: ['latin'],
-  display: 'swap'
-});
 
 export const metadata: Metadata = {
   title: 'Koschei AI Agent Workspace',
@@ -16,7 +10,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="tr" className="dark">
-      <body className={`${inter.className} flex min-h-screen flex-col bg-zinc-950 text-zinc-100 antialiased`}>
+      <body className="flex min-h-screen flex-col bg-zinc-950 text-zinc-100 antialiased">
         {/* Sayfa içerikleri artık özgürce tam ekran yayılabilir */}
         <div className="flex-1">
           {children}

@@ -47,10 +47,15 @@ export async function generateAndCommitCSharpCode(brief: string, fileName: strin
     Bana bu oyun için sadece ${fileName} isimli dosyanın C# kodunu yaz. 
     Lütfen markdown kod bloğu veya ekstra açıklama ekleme, sadece saf kod döndür.`;
     
-    let csharpCode = await runTextWithAiEngine(prompt);
+    const aiResult = await runTextWithAiEngine({
+      agentSlug: "yazilim",
+      agentMode: "script",
+      userInput: prompt,
+      systemPrompt: "Sen kıdemli bir Unity C# geliştiricisisin. Sadece derlenebilir C# kodu üret."
+    });
 
     // Markdown işaretleri gelirse temizle
-    csharpCode = csharpCode.replace(/```csharp/g, "").replace(/```/g, "").trim();
+    const csharpCode = aiResult.text.replace(/```csharp/g, "").replace(/```/g, "").trim();
 
     // 2. Kodu GitHub'ın anlayacağı formata (Base64) çevir
     const contentEncoded = Buffer.from(csharpCode).toString("base64");
