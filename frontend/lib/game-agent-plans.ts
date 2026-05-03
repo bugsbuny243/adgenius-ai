@@ -9,127 +9,88 @@ export type GameAgentPlan = {
   shopierUrl: string;
   summary: string;
   includes: string[];
-  excludes: string[];
   warnings: string[];
 };
 
 export const GAME_AGENT_PLANS: GameAgentPlan[] = [
   {
     planKey: 'starter',
-    name: 'Indie (Starter)',
+    name: 'INDIE',
     priceLabel: '4.999 TL',
     amountTry: 4999,
     currency: 'TRY',
     shopierUrl: 'https://www.shopier.com/TradeVisual/46531862',
-    summary: 'Basit prototip testleri için.',
+    summary: 'Google Play çıkışına hazır bağımsız mobil oyun paketi.',
     includes: [
-      '1 basit Android oyun fikri brief’i',
+      'Google Play yayın hazırlığı ve teknik checklist',
+      'Mağaza kabul desteği (listing + policy uyum odaklı yönlendirme)',
+      'Otonom sanat üretimi (2D/konsept asset akışı)',
       '1 oluşturulmuş Unity proje taslağı',
-      'Temel 2D runner/casual oyun yapısı',
-      'Proje detay sayfası',
-      'Shopier ödeme sonrası owner onaylı erişim'
-    ],
-    excludes: [
-      'Google Play yayınının garanti edilmesi',
-      'Karmaşık multiplayer/MMO oyunlar',
-      'İleri seviye özel sanat üretimi',
-      'Sınırsız revizyon',
-      'Gelir garantisi',
-      'Mağaza kabul garantisi'
+      'Shopier (TradeVisual) ödeme sonrası owner onaylı erişim'
     ],
     warnings: [
       'Ödeme sonrası paket erişimi owner tarafından manuel onaylanır.',
-      'Google Play yayın onayı Google’ın inceleme sürecine bağlıdır.',
-      'Koschei oyun üretim ve build hazırlık sürecini otomatikleştirir; mağaza kabulü veya gelir garantisi vermez.'
+      'Google Play yayın onayı Google’ın inceleme sürecine bağlıdır.'
     ]
   },
   {
     planKey: 'pro',
-    name: 'Pro',
+    name: 'PRO',
     priceLabel: '9.999 TL',
     amountTry: 9999,
     currency: 'TRY',
     shopierUrl: 'https://www.shopier.com/TradeVisual/46531900',
-    summary: 'Daha tamamlanmış mobil oyun paketi isteyen kullanıcılar için.',
+    summary: 'Monetizasyon ve ölçeklenebilir build mimarisi ile üst düzey mobil paket.',
     includes: [
-      'Daha detaylı oyun brief’i',
-      'Oluşturulmuş Unity proje taslağı',
-      'Android build hazırlığı',
-      'Temel mağaza metin taslağı',
-      'Temel monetizasyon/reklam yerleşim notları',
-      'Shopier ödeme sonrası owner onaylı erişim'
-    ],
-    excludes: [
-      'Google Play onay garantisi',
-      'İleri seviye online multiplayer',
-      'Özel backend sunucuları',
-      'Lisanslı üçüncü taraf asset maliyetleri',
-      'Sınırsız revizyon',
-      'Gelir garantisi'
+      'Monetizasyon entegrasyonu (AdMob / Unity Ads)',
+      '3. taraf kütüphane ve bağımlılık yönetimi',
+      'Google Play onay hedefli build mimarisi',
+      'Android build + mağaza metin taslağı',
+      'Shopier (TradeVisual) ödeme sonrası owner onaylı erişim'
     ],
     warnings: [
-      'Karmaşık online/multiplayer oyunlar bu paketlere dahil değildir.',
-      'Google Play yayın onayı Google’ın inceleme sürecine bağlıdır.',
-      'Koschei mağaza kabulü veya gelir garantisi vermez.'
+      'Ödeme sonrası paket erişimi owner tarafından manuel onaylanır.',
+      'Google Play yayın onayı Google’ın inceleme sürecine bağlıdır.'
     ]
   },
   {
     planKey: 'studio',
-    name: 'Studio AI',
+    name: 'STUDIO AI',
     priceLabel: '19.999 TL',
     amountTry: 19999,
     currency: 'TRY',
     shopierUrl: 'https://www.shopier.com/TradeVisual/46531961',
-    summary: 'Daha ciddi lansman hazırlıkları için.',
+    summary: 'MMO ölçeğine yakın içerik ve canlı operasyon hazırlığı için premium paket.',
     includes: [
-      'Daha güçlü oyun konsepti/brief',
-      'Oluşturulmuş Unity proje taslağı',
-      'Android AAB build flow hazırlığı',
-      'Store listing taslağı',
-      'Release notes taslağı',
-      'Owner incelemeli yayın hazırlığı',
-      'Owner tarafından öncelikli manuel inceleme'
-    ],
-    excludes: [
-      'Google Play onay garantisi',
-      'Gelir garantisi',
-      'PUBG/DarkOrbit seviyesinde MMO üretimi',
-      'Ayrı anlaşma olmadan özel 3D asset',
-      'Ayrı anlaşma olmadan uzun dönem live ops/backend',
-      'Kullanıcı adına hukuki/hesap sorumluluğu'
+      'MMO (DarkOrbit) seviyesinde evren kurgusu',
+      'Meshy AI ile özel 3D asset üretim hattı',
+      'Live Ops backend destek planı',
+      'Android AAB release hazırlığı + release notes',
+      'Shopier (TradeVisual) ödeme sonrası owner öncelikli erişim'
     ],
     warnings: [
       'Yayın ve build süreçleri owner değerlendirmesine tabi olabilir.',
-      'Google Play mağaza kabulü veya gelir garantisi verilmez.',
-      'Her paket Game Agent içindir; diğer ajanlar ileride farklı fiyatlandırılacaktır.'
+      'Paket Game Agent kapsamındadır; ileri özelleştirmeler ayrıca planlanabilir.'
     ]
   },
   {
     planKey: 'multiplayer',
-    name: 'Multiplayer',
+    name: 'MULTIPLAYER',
     priceLabel: '39.999 TL',
     amountTry: 39999,
     currency: 'TRY',
     shopierUrl: 'https://www.shopier.com/TradeVisual/46836097',
-    summary: 'Çok oyunculu oyun altyapısı ve planlama ihtiyaçları için.',
+    summary: 'Üst düzey çevrimiçi mimari, dedicated server operasyonu ve VIP destek paketi.',
     includes: [
-      'Lobi ve eşleştirme (lobby & matchmaking) kurgusu',
-      'Senkronizasyon ve replikasyon (sync & replication) taslağı',
-      'Adanmış sunucu (dedicated server) altyapı planı',
-      'Owner tarafından öncelikli manuel inceleme'
-    ],
-    excludes: [
-      'Google Play onay garantisi',
-      'Gelir garantisi',
-      'Sınırsız revizyon',
-      'Ayrı anlaşma olmadan özel 3D asset',
-      'Ayrı anlaşma olmadan uzun dönem live ops/backend',
-      'Kullanıcı adına hukuki/hesap sorumluluğu'
+      'Sınırsız senkronizasyon ve replikasyon mimarisi',
+      'Dedicated Server (Railway) kurulum + yönetim akışı',
+      'VIP 7/24 teknik ve hukuki danışmanlık koordinasyonu',
+      'Lobi/eşleştirme + ölçeklenebilir netcode şablonları',
+      'Shopier (TradeVisual) ödeme sonrası owner öncelikli erişim'
     ],
     warnings: [
-      'Multiplayer kapsamı proje detayına göre değişebilir ve owner değerlendirmesine tabidir.',
-      'Google Play mağaza kabulü veya gelir garantisi verilmez.',
-      'Her paket Game Agent içindir; diğer ajanlar ileride farklı fiyatlandırılacaktır.'
+      'Multiplayer kapsamı proje detayına göre owner tarafından yapılandırılır.',
+      'Operasyonel hukuki süreçler danışmanlık koordinasyonu ile yürütülür.'
     ]
   }
 ];
@@ -141,7 +102,6 @@ export const GAME_AGENT_PLAN_MAP = Object.fromEntries(
 export const GAME_AGENT_PUBLIC_NOTICES = [
   'Ödeme sonrası paket erişimi owner tarafından manuel onaylanır.',
   'Google Play yayın onayı Google’ın inceleme sürecine bağlıdır.',
-  'Koschei oyun üretim ve build hazırlık sürecini otomatikleştirir; mağaza kabulü veya gelir garantisi vermez.',
-  'Karmaşık online/multiplayer oyunlar bu paketlere dahil değildir.',
+  'Paketlerin tamamı üst düzey çözüm kapsamı hedefiyle tasarlanmıştır.',
   'Her paket Game Agent içindir; diğer ajanlar ileride farklı fiyatlandırılacaktır.'
 ] as const;
