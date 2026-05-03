@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { Inter } from 'next/font/google';
 import './globals.css';
+
+const inter = Inter({ subsets: ['latin'], display: 'swap' });
 
 export const metadata: Metadata = {
   title: 'Koschei AI Agent Workspace',
@@ -10,7 +13,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="tr">
-      <body>
+      <body className={inter.className}>
         <div className="mx-auto min-h-screen max-w-6xl px-6 py-10">
           {children}
           <footer className="mt-12 space-y-4 border-t border-white/10 pt-6 text-sm text-white/70">
