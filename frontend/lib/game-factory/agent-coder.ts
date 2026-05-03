@@ -45,15 +45,10 @@ export async function generateAndCommitCSharpCode(brief: string, fileName: strin
     const prompt = `Sen kıdemli bir Unity C# geliştiricisisin. 
     Müşterinin oyun fikri: "${brief}". 
     Bana bu oyun için sadece ${fileName} isimli dosyanın C# kodunu yaz. 
-    Lütfen Markdown (\`\`\`csharp) veya ekstra açıklama ekleme, sadece saf kod döndür.`;
-
-    const aiResult = await runTextWithAiEngine({
-      agentSlug: "yazilim",
-      agentMode: "script",
-      userInput: prompt,
-      systemPrompt: null,
-    });
-
+    Lütfen markdown kod bloğu veya ekstra açıklama ekleme, sadece saf kod döndür.`;
+    
+    let csharpCode = await runTextWithAiEngine(prompt);
+    
     // Markdown işaretleri gelirse temizle
     const csharpCode = aiResult.text.replace(/```csharp/g, "").replace(/```/g, "").trim();
 
