@@ -27,13 +27,12 @@ export function Nav({ showOwnerLink = false }: NavProps) {
   }
 
   return (
-    <aside className="w-full rounded-2xl border border-white/5 bg-zinc-900/40 p-4 shadow-[0_0_30px_-10px_rgba(139,92,246,0.2)] backdrop-blur-xl lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:w-72 lg:self-start">
-      <div className="mb-6 border-b border-white/5 pb-4">
-        <p className="text-[10px] uppercase tracking-[0.24em] text-violet-300">Koschei Control</p>
-        <h1 className="mt-2 bg-gradient-to-r from-white to-zinc-500 bg-clip-text text-2xl font-semibold tracking-tight text-transparent">Cyber Console</h1>
+    <aside className="w-full rounded-sm border border-white/10 bg-white/5 p-3 backdrop-blur-md lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:w-24 lg:self-start">
+      <div className="mb-4 border-b border-white/10 pb-3 text-center">
+        <p className="text-[9px] uppercase tracking-[0.24em] text-neon/80">CTRL</p>
       </div>
 
-      <nav className="space-y-1.5">
+      <nav className="space-y-2">
         {userLinks.map((link) => {
           const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
           const Icon = link.icon;
@@ -41,25 +40,24 @@ export function Nav({ showOwnerLink = false }: NavProps) {
             <Link
               key={link.href}
               href={link.href}
-              className={`group relative flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition ${active ? 'border-white/10 bg-white/5 text-zinc-100' : 'border-transparent text-zinc-400 hover:border-white/10 hover:bg-white/[0.03] hover:text-zinc-200'}`}
+              title={link.label}
+              className={`group relative flex items-center justify-center rounded-sm border px-2 py-3 transition ${active ? 'border-neon/40 bg-neon/10 text-neon shadow-neon-cyan' : 'border-transparent text-zinc-400 hover:border-cyberPink/35 hover:bg-cyberPink/10 hover:text-cyberPink hover:shadow-neon-pink'}`}
             >
-              <span className={`absolute inset-y-1 left-0 w-0.5 rounded-full ${active ? 'bg-violet-400' : 'bg-transparent group-hover:bg-white/30'}`} />
               <Icon className="h-4 w-4" />
-              <span>{link.label}</span>
             </Link>
           );
         })}
       </nav>
 
-      {showOwnerLink ? <p className="mt-4 text-xs text-zinc-500">Owner links are available in owner pages.</p> : null}
+      {showOwnerLink ? <p className="mt-4 text-center text-[10px] text-zinc-500">owner</p> : null}
 
       <button
         type="button"
         onClick={handleSignOut}
-        className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl border border-violet-500/30 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 px-4 py-2.5 text-sm font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_0_22px_-8px_rgba(139,92,246,0.8)] transition hover:brightness-110"
+        className="mt-5 flex w-full items-center justify-center rounded-sm border border-neon/30 bg-neon/10 px-2 py-3 text-neon transition hover:shadow-neon-cyan"
+        title="Sign out"
       >
         <LogOut className="h-4 w-4" />
-        Sign out
       </button>
     </aside>
   );
