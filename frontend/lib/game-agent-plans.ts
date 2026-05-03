@@ -1,4 +1,4 @@
-export type GameAgentPlanKey = 'starter' | 'pro' | 'studio';
+export type GameAgentPlanKey = 'starter' | 'pro' | 'studio' | 'multiplayer';
 
 export type GameAgentPlan = {
   planKey: GameAgentPlanKey;
@@ -16,9 +16,9 @@ export type GameAgentPlan = {
 export const GAME_AGENT_PLANS: GameAgentPlan[] = [
   {
     planKey: 'starter',
-    name: 'Starter',
-    priceLabel: '499 TL',
-    amountTry: 499,
+    name: 'Indie (Starter)',
+    priceLabel: '4.999 TL',
+    amountTry: 4999,
     currency: 'TRY',
     shopierUrl: 'https://www.shopier.com/TradeVisual/46531862',
     summary: 'Basit prototip testleri için.',
@@ -46,8 +46,8 @@ export const GAME_AGENT_PLANS: GameAgentPlan[] = [
   {
     planKey: 'pro',
     name: 'Pro',
-    priceLabel: '1.999 TL',
-    amountTry: 1999,
+    priceLabel: '9.999 TL',
+    amountTry: 9999,
     currency: 'TRY',
     shopierUrl: 'https://www.shopier.com/TradeVisual/46531900',
     summary: 'Daha tamamlanmış mobil oyun paketi isteyen kullanıcılar için.',
@@ -75,9 +75,9 @@ export const GAME_AGENT_PLANS: GameAgentPlan[] = [
   },
   {
     planKey: 'studio',
-    name: 'Studio',
-    priceLabel: '6.999 TL',
-    amountTry: 6999,
+    name: 'Studio AI',
+    priceLabel: '19.999 TL',
+    amountTry: 19999,
     currency: 'TRY',
     shopierUrl: 'https://www.shopier.com/TradeVisual/46531961',
     summary: 'Daha ciddi lansman hazırlıkları için.',
@@ -100,6 +100,34 @@ export const GAME_AGENT_PLANS: GameAgentPlan[] = [
     ],
     warnings: [
       'Yayın ve build süreçleri owner değerlendirmesine tabi olabilir.',
+      'Google Play mağaza kabulü veya gelir garantisi verilmez.',
+      'Her paket Game Agent içindir; diğer ajanlar ileride farklı fiyatlandırılacaktır.'
+    ]
+  },
+  {
+    planKey: 'multiplayer',
+    name: 'Multiplayer',
+    priceLabel: '39.999 TL',
+    amountTry: 39999,
+    currency: 'TRY',
+    shopierUrl: 'https://www.shopier.com/TradeVisual/46836097',
+    summary: 'Çok oyunculu oyun altyapısı ve planlama ihtiyaçları için.',
+    includes: [
+      'Lobi ve eşleştirme (lobby & matchmaking) kurgusu',
+      'Senkronizasyon ve replikasyon (sync & replication) taslağı',
+      'Adanmış sunucu (dedicated server) altyapı planı',
+      'Owner tarafından öncelikli manuel inceleme'
+    ],
+    excludes: [
+      'Google Play onay garantisi',
+      'Gelir garantisi',
+      'Sınırsız revizyon',
+      'Ayrı anlaşma olmadan özel 3D asset',
+      'Ayrı anlaşma olmadan uzun dönem live ops/backend',
+      'Kullanıcı adına hukuki/hesap sorumluluğu'
+    ],
+    warnings: [
+      'Multiplayer kapsamı proje detayına göre değişebilir ve owner değerlendirmesine tabidir.',
       'Google Play mağaza kabulü veya gelir garantisi verilmez.',
       'Her paket Game Agent içindir; diğer ajanlar ileride farklı fiyatlandırılacaktır.'
     ]
