@@ -37,8 +37,14 @@ export default async function OwnerDashboardPage() {
     const [{ data: unityBuildJobs, error: unityBuildJobsError }, { data: profiles, error: profilesError }, { data: packagePurchases, error: packagePurchasesError }] =
       await Promise.all([
         supabase.from(DASHBOARD_TABLES.unityBuildJobs).select("*").order("created_at", { ascending: false }),
-        supabase.from(DASHBOARD_TABLES.profiles).select("*").order("created_at", { ascending: false }),
-        supabase.from(DASHBOARD_TABLES.packagePurchases).select("*").order("created_at", { ascending: false }),
+        supabase
+          .from(DASHBOARD_TABLES.profiles)
+          .select("id, full_name, email, subscription_status, active_package_name, created_at")
+          .order("created_at", { ascending: false }),
+        supabase
+          .from(DASHBOARD_TABLES.packagePurchases)
+          .select("*, profiles(email, full_name)")
+          .order("created_at", { ascending: false }),
       ]);
 
     const approvePurchase = async (formData: FormData) => {
@@ -48,13 +54,38 @@ export default async function OwnerDashboardPage() {
         const supabase = await createSupabaseServerClient();
         const purchaseId = String(formData.get("purchaseId"));
 
+        const nowIso = new Date().toISOString();
+        const { data: purchase, error: purchaseError } = await supabase
+          .from(DASHBOARD_TABLES.packagePurchases)
+          .select("id, user_id, package_key")
+          .eq("id", purchaseId)
+          .single();
+
+        if (purchaseError) {
+          console.error("[OwnerDashboard][approvePurchase] Purchase lookup error", purchaseError);
+          return;
+        }
+
         const { error } = await supabase
           .from(DASHBOARD_TABLES.packagePurchases)
-          .update({ status: "approved", approved_at: new Date().toISOString() })
+          .update({ status: "approved", approved_at: nowIso })
           .eq("id", purchaseId);
 
         if (error) {
           console.error("[OwnerDashboard][approvePurchase] Supabase update error", error);
+          return;
+        }
+
+        const { error: profileUpdateError } = await supabase
+          .from(DASHBOARD_TABLES.profiles)
+          .update({
+            subscription_status: "active",
+            active_package_name: purchase.package_key,
+          })
+          .eq("id", purchase.user_id);
+
+        if (profileUpdateError) {
+          console.error("[OwnerDashboard][approvePurchase] Profile update error", profileUpdateError);
         }
       } catch (error) {
         console.error("[OwnerDashboard][approvePurchase] Unexpected server action error", error);
@@ -109,23 +140,19 @@ export default async function OwnerDashboardPage() {
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="bg-gray-100 text-left">
-                    {profiles?.[0]
-                      ? Object.keys(profiles[0]).map((key) => (
-                          <th key={key} className="px-3 py-2 border-b font-medium">
-                            {key}
-                          </th>
-                        ))
-                      : null}
+                    <th className="px-3 py-2 border-b font-medium">full_name</th>
+                    <th className="px-3 py-2 border-b font-medium">email</th>
+                    <th className="px-3 py-2 border-b font-medium">subscription_status</th>
+                    <th className="px-3 py-2 border-b font-medium">active_package_name</th>
                   </tr>
                 </thead>
                 <tbody>
                   {profiles?.map((row, i) => (
                     <tr key={String(row.id ?? i)} className="odd:bg-white even:bg-gray-50">
-                      {Object.values(row).map((value, idx) => (
-                        <td key={idx} className="px-3 py-2 border-b align-top">
-                          {value === null ? "-" : typeof value === "object" ? JSON.stringify(value) : String(value)}
-                        </td>
-                      ))}
+                      <td className="px-3 py-2 border-b align-top">{row.full_name ?? "-"}</td>
+                      <td className="px-3 py-2 border-b align-top">{row.email ?? "-"}</td>
+                      <td className="px-3 py-2 border-b align-top">{row.subscription_status ?? "-"}</td>
+                      <td className="px-3 py-2 border-b align-top">{row.active_package_name ?? "-"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -143,24 +170,24 @@ export default async function OwnerDashboardPage() {
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="bg-gray-100 text-left">
-                    {packagePurchases?.[0]
-                      ? Object.keys(packagePurchases[0]).map((key) => (
-                          <th key={key} className="px-3 py-2 border-b font-medium">
-                            {key}
-                          </th>
-                        ))
-                      : null}
+                    <th className="px-3 py-2 border-b font-medium">Müşteri Maili</th>
+                    <th className="px-3 py-2 border-b font-medium">Paket Adı</th>
+                    <th className="px-3 py-2 border-b font-medium">Ödenen Tutar</th>
+                    <th className="px-3 py-2 border-b font-medium">Satın Alma Tarihi</th>
+                    <th className="px-3 py-2 border-b font-medium">Onay Durumu</th>
                     <th className="px-3 py-2 border-b font-medium">actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {packagePurchases?.map((row, i) => (
                     <tr key={String(row.id ?? i)} className="odd:bg-white even:bg-gray-50">
-                      {Object.values(row).map((value, idx) => (
-                        <td key={idx} className="px-3 py-2 border-b align-top">
-                          {value === null ? "-" : typeof value === "object" ? JSON.stringify(value) : String(value)}
-                        </td>
-                      ))}
+                      <td className="px-3 py-2 border-b align-top">{row.profiles?.email ?? "-"}</td>
+                      <td className="px-3 py-2 border-b align-top">{row.package_key ?? row.package_name ?? "-"}</td>
+                      <td className="px-3 py-2 border-b align-top">
+                        {row.amount != null ? `${row.amount} ${row.currency ?? ""}`.trim() : "-"}
+                      </td>
+                      <td className="px-3 py-2 border-b align-top">{row.created_at ?? "-"}</td>
+                      <td className="px-3 py-2 border-b align-top">{row.status ?? "-"}</td>
                       <td className="px-3 py-2 border-b">
                         <form action={approvePurchase}>
                           <input type="hidden" name="purchaseId" value={String(row.id)} />
