@@ -118,7 +118,8 @@ export async function POST(request: Request) {
   const { error: profileError } = await supabase.from('profiles').upsert({
     id: user.id,
     email: user.email,
-    full_name: baseName
+    full_name: baseName,
+    active_package_name: 'free'
   });
 
   if (profileError) {
