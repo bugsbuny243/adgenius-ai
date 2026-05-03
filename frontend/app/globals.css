@@ -7,11 +7,11 @@
 }
 
 body {
-  @apply bg-ink text-zinc-200 antialiased;
+  @apply bg-zinc-950 text-zinc-100 antialiased;
 }
 
 .panel {
-  @apply rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur;
+  @apply rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-md;
 }
 
 @keyframes gradient-shift {

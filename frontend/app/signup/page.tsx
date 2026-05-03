@@ -61,7 +61,7 @@ export default function SignupPage() {
   return (
     <main className="mx-auto max-w-xl panel">
       <h1 className="mb-2 text-3xl font-semibold">Koschei AI Kayıt</h1>
-      <p className="mb-6 text-sm text-white/70">Yeni hesabını oluştur ve agentlarını hemen kullanmaya başla.</p>
+      <p className="mb-6 text-sm text-zinc-400">Yeni hesabını oluştur ve agentlarını hemen kullanmaya başla.</p>
 
       <form className="space-y-4" onSubmit={handleSubmit}>
         <label className="block text-sm">
@@ -71,7 +71,7 @@ export default function SignupPage() {
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            className="mt-2 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 outline-none focus:border-neon"
+            className="mt-2 w-full rounded-lg border border-white/20 bg-zinc-900/70 px-3 py-2 outline-none focus:border-violet-500"
             placeholder="ornek@koschei.ai"
           />
         </label>
@@ -84,7 +84,7 @@ export default function SignupPage() {
             minLength={6}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            className="mt-2 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 outline-none focus:border-neon"
+            className="mt-2 w-full rounded-lg border border-white/20 bg-zinc-900/70 px-3 py-2 outline-none focus:border-violet-500"
             placeholder="En az 6 karakter"
           />
         </label>
@@ -92,7 +92,7 @@ export default function SignupPage() {
         <button
           disabled={loading}
           type="submit"
-          className="w-full rounded-lg bg-neon px-4 py-2 font-semibold text-ink disabled:opacity-50"
+          className="w-full rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 font-semibold text-white transition hover:scale-105 disabled:opacity-50"
         >
           {loading ? 'Kayıt oluşturuluyor...' : 'Kayıt ol'}
         </button>
@@ -100,9 +100,9 @@ export default function SignupPage() {
 
       {errorMessage ? <p className="mt-4 text-sm text-red-300">{errorMessage}</p> : null}
 
-      <p className="mt-6 text-sm text-white/80">
+      <p className="mt-6 text-sm text-zinc-300">
         Zaten hesabın var mı?{' '}
-        <Link href="/signin" className="text-lilac underline underline-offset-4 hover:text-neon">
+        <Link href="/signin" className="text-violet-300 underline underline-offset-4 hover:text-violet-200">
           Giriş yap
         </Link>
       </p>

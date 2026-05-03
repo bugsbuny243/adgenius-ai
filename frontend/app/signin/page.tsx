@@ -66,7 +66,7 @@ function SignInContent() {
   return (
     <main className="mx-auto max-w-xl panel">
       <h1 className="mb-2 text-3xl font-semibold">Koschei AI Giriş</h1>
-      <p className="mb-6 text-sm text-white/70">E-posta ve şifren ile hesabına güvenle giriş yap.</p>
+      <p className="mb-6 text-sm text-zinc-400">E-posta ve şifren ile hesabına güvenle giriş yap.</p>
 
       <form className="space-y-4" onSubmit={handleSubmit}>
         <label className="block text-sm">
@@ -76,7 +76,7 @@ function SignInContent() {
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            className="mt-2 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 outline-none focus:border-neon"
+            className="mt-2 w-full rounded-lg border border-white/20 bg-zinc-900/70 px-3 py-2 outline-none focus:border-violet-500"
             placeholder="ornek@koschei.ai"
           />
         </label>
@@ -89,7 +89,7 @@ function SignInContent() {
             minLength={6}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            className="mt-2 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 outline-none focus:border-neon"
+            className="mt-2 w-full rounded-lg border border-white/20 bg-zinc-900/70 px-3 py-2 outline-none focus:border-violet-500"
             placeholder="••••••••"
           />
         </label>
@@ -97,24 +97,33 @@ function SignInContent() {
         <button
           disabled={loading}
           type="submit"
-          className="w-full rounded-lg bg-neon px-4 py-2 font-semibold text-ink disabled:opacity-50"
+          className="w-full rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 font-semibold text-white transition hover:scale-105 disabled:opacity-50"
         >
           {loading ? 'Giriş yapılıyor...' : 'Giriş yap'}
         </button>
       </form>
 
+
+      <button
+        type="button"
+        className="mt-4 inline-flex w-full items-center justify-center gap-3 rounded-full border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-800 transition hover:scale-105"
+      >
+        <span className="grid h-5 w-5 place-items-center rounded-full bg-white text-[11px] font-bold text-blue-500">G</span>
+        Google ile giriş yap
+      </button>
+
       {errorMessage ? <p className="mt-4 text-sm text-red-300">{errorMessage}</p> : null}
       {urlError ? <p className="mt-2 text-sm text-red-300">Hata: {urlError}</p> : null}
 
-      <div className="mt-6 space-y-2 text-sm text-white/80">
+      <div className="mt-6 space-y-2 text-sm text-zinc-300">
         <p>
           Hesabın yok mu?{' '}
-          <Link href="/signup" className="text-lilac underline underline-offset-4 hover:text-neon">
+          <Link href="/signup" className="text-violet-300 underline underline-offset-4 hover:text-violet-200">
             Kayıt ol
           </Link>
         </p>
         <p>
-          <Link href="/reset-password" className="text-lilac underline underline-offset-4 hover:text-neon">
+          <Link href="/reset-password" className="text-violet-300 underline underline-offset-4 hover:text-violet-200">
             Şifreni mi unuttun?
           </Link>
         </p>
