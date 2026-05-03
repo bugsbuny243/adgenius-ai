@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { runTextWithAiEngine } from '@/lib/ai-engine';
 import { generateMultiplayerBlueprint, matchmakingSchemaSql } from '@/lib/game-factory/multiplayer-agent';
-import { requestMeshyModel, pushGeneratedModelToUnity } from '@/lib/game-factory/art-agent';
+import { requestPrimaryAssetModel, pushGeneratedModelToUnity } from '@/lib/game-factory/art-agent';
 
 function sanitizeCSharpOutput(raw: string): string {
   const cleaned = raw.replace(/```csharp|```cs|```/gi, '').trim();
@@ -57,8 +57,8 @@ export async function POST(request: Request) {
         userInput: `Paket: ${planKey} | C# derinliği: ${selectedProfile.csharpDepth} | Fikir: ${gameIdea}`,
         systemPrompt: `Yalnızca derlenebilir C# kodu üret. ${selectedProfile.systemHint}`,
       }),
-      Promise.resolve(generateMultiplayerBlueprint(gameName, selectedProfile.netcodeComplexity)),
-      requestMeshyModel(body.brief ?? gameIdea),
+      Promise.resolve(generateMultiplayerBlueprint(gameName, 'netcode')),
+      requestPrimaryAssetModel(body.brief ?? gameIdea),
     ]);
 
     const csharpCode = sanitizeCSharpOutput(csharpResult.text);
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
       generated: {
         csharpCode,
         multiplayer: multiplayerResult,
-        meshy: artResult,
+        primaryAssetGenerator: artResult,
         matchmaking: {
           engine: 'supabase-realtime',
           table: 'matchmaking_queue',
