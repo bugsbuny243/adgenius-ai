@@ -32,9 +32,9 @@ export function GameAgentPackageCard({ plan }: Props) {
   }
 
   return (
-    <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
+    <article className="rounded-3xl border border-white/10 bg-zinc-900/50 p-6 shadow-2xl shadow-black/50 backdrop-blur-xl">
       <p className="text-xs uppercase tracking-wide text-violet-300">Game Agent Paketi</p>
-      <h3 className="mt-1 text-2xl font-bold tracking-tight">{plan.name}</h3>
+      <h3 className="mt-1 text-2xl font-semibold tracking-tight text-zinc-100">{plan.name}</h3>
       <p className="mt-1 text-sm text-zinc-400">{plan.summary}</p>
       <p className="mt-2 text-xl font-bold text-violet-300">{plan.priceLabel}</p>
       <h4 className="mt-4 text-sm font-semibold text-zinc-100">Dahil:</h4>
@@ -45,7 +45,7 @@ export function GameAgentPackageCard({ plan }: Props) {
         type="button"
         onClick={handleCheckout}
         disabled={isLoading}
-        className="mt-6 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-6 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition-transform hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isLoading ? 'Yönlendiriliyor...' : 'Shopier ile öde'}
       </button>

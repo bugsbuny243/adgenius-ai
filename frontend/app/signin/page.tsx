@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { FormEvent, Suspense, useState } from 'react';
+import { Lock, Mail } from 'lucide-react';
 import { createSupabaseBrowserClient, getMissingPublicSupabaseConfig } from '@/lib/supabase-browser';
 
 function SignInContent() {
@@ -47,7 +48,7 @@ function SignInContent() {
       let redirectTo = '/dashboard';
       const redirectResponse = await fetch('/api/auth/redirect', { cache: 'no-store' });
       if (redirectResponse.ok) {
-        const redirectPayload = await redirectResponse.json() as { redirectTo?: string };
+        const redirectPayload = (await redirectResponse.json()) as { redirectTo?: string };
         if (typeof redirectPayload.redirectTo === 'string' && redirectPayload.redirectTo.startsWith('/')) {
           redirectTo = redirectPayload.redirectTo;
         }
@@ -64,77 +65,49 @@ function SignInContent() {
   const urlError = searchParams.get('error');
 
   return (
-    <main className="mx-auto max-w-xl panel">
-      <h1 className="mb-2 text-3xl font-semibold">Koschei AI Giriş</h1>
-      <p className="mb-6 text-sm text-zinc-400">E-posta ve şifren ile hesabına güvenle giriş yap.</p>
+    <main className="mx-auto flex min-h-screen w-full max-w-5xl items-center justify-center px-4 py-10">
+      <section className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-900/50 p-8 shadow-2xl shadow-black/50 backdrop-blur-xl">
+        <p className="text-xs uppercase tracking-[0.2em] text-violet-300">Welcome Back</p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-zinc-100">Koschei AI Giriş</h1>
+        <p className="mt-2 text-sm text-zinc-400">E-posta ve şifren ile hesabına güvenle giriş yap.</p>
 
-      <form className="space-y-4" onSubmit={handleSubmit}>
-        <label className="block text-sm">
-          E-posta
-          <input
-            required
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            className="mt-2 w-full rounded-lg border border-white/20 bg-zinc-900/70 px-3 py-2 outline-none focus:border-violet-500"
-            placeholder="ornek@koschei.ai"
-          />
-        </label>
+        <form className="mt-7 space-y-4" onSubmit={handleSubmit}>
+          <label className="block text-sm text-zinc-400">
+            E-posta
+            <div className="relative mt-2">
+              <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+              <input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="w-full rounded-lg border border-zinc-800 bg-zinc-950 py-2 pl-10 pr-3 text-sm text-zinc-100 transition-all outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/50" placeholder="ornek@koschei.ai" />
+            </div>
+          </label>
 
-        <label className="block text-sm">
-          Şifre
-          <input
-            required
-            type="password"
-            minLength={6}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="mt-2 w-full rounded-lg border border-white/20 bg-zinc-900/70 px-3 py-2 outline-none focus:border-violet-500"
-            placeholder="••••••••"
-          />
-        </label>
+          <label className="block text-sm text-zinc-400">
+            Şifre
+            <div className="relative mt-2">
+              <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+              <input required type="password" minLength={6} value={password} onChange={(event) => setPassword(event.target.value)} className="w-full rounded-lg border border-zinc-800 bg-zinc-950 py-2 pl-10 pr-3 text-sm text-zinc-100 transition-all outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/50" placeholder="••••••••" />
+            </div>
+          </label>
 
-        <button
-          disabled={loading}
-          type="submit"
-          className="w-full rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 font-semibold text-white transition hover:scale-105 disabled:opacity-50"
-        >
-          {loading ? 'Giriş yapılıyor...' : 'Giriş yap'}
-        </button>
-      </form>
+          <button disabled={loading} type="submit" className="w-full rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 font-semibold text-white transition-transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50">
+            {loading ? 'Giriş yapılıyor...' : 'Giriş yap'}
+          </button>
+        </form>
 
+        {errorMessage ? <p className="mt-4 text-sm text-red-300">{errorMessage}</p> : null}
+        {urlError ? <p className="mt-2 text-sm text-red-300">Hata: {urlError}</p> : null}
 
-      <button
-        type="button"
-        className="mt-4 inline-flex w-full items-center justify-center gap-3 rounded-full border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-800 transition hover:scale-105"
-      >
-        <span className="grid h-5 w-5 place-items-center rounded-full bg-white text-[11px] font-bold text-blue-500">G</span>
-        Google ile giriş yap
-      </button>
-
-      {errorMessage ? <p className="mt-4 text-sm text-red-300">{errorMessage}</p> : null}
-      {urlError ? <p className="mt-2 text-sm text-red-300">Hata: {urlError}</p> : null}
-
-      <div className="mt-6 space-y-2 text-sm text-zinc-300">
-        <p>
-          Hesabın yok mu?{' '}
-          <Link href="/signup" className="text-violet-300 underline underline-offset-4 hover:text-violet-200">
-            Kayıt ol
-          </Link>
-        </p>
-        <p>
-          <Link href="/reset-password" className="text-violet-300 underline underline-offset-4 hover:text-violet-200">
-            Şifreni mi unuttun?
-          </Link>
-        </p>
-      </div>
+        <div className="mt-6 space-y-2 text-sm text-zinc-400">
+          <p>Hesabın yok mu? <Link href="/signup" className="text-violet-300 transition-transform hover:scale-[1.02] hover:text-violet-200">Kayıt ol</Link></p>
+          <p><Link href="/reset-password" className="text-violet-300 transition-transform hover:scale-[1.02] hover:text-violet-200">Şifreni mi unuttun?</Link></p>
+        </div>
+      </section>
     </main>
   );
 }
 
 export default function SignInPage() {
   return (
-    <Suspense fallback={<main className="mx-auto max-w-xl panel" />}>
+    <Suspense fallback={<main className="mx-auto max-w-xl" />}>
       <SignInContent />
     </Suspense>
   );
