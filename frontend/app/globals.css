@@ -7,23 +7,46 @@
 }
 
 body {
-  @apply bg-zinc-950 text-zinc-100 antialiased;
+  @apply bg-ink text-zinc-100 antialiased;
 }
 
 .panel {
-  @apply rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-md;
+  @apply rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm;
 }
 
-@keyframes gradient-shift {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
+.grid-overlay {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 42px 42px;
+}
+
+.scanline-overlay {
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(102, 227, 255, 0.03) 0px,
+    rgba(102, 227, 255, 0.03) 1px,
+    transparent 2px,
+    transparent 4px
+  );
+}
+
+.noise-overlay {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.055) 0.7px, transparent 0.7px);
+  background-size: 3px 3px;
+}
+
+@keyframes terminal-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
   }
-  50% {
-    transform: translate3d(20px, -12px, 0) scale(1.08);
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-.gradient-shift {
-  animation: gradient-shift 9s ease-in-out infinite;
+.terminal-line {
+  opacity: 0;
+  animation: terminal-in 380ms ease forwards;
 }
