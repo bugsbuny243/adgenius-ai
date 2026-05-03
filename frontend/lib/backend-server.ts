@@ -1,5 +1,5 @@
 import { createSupabaseServerClient } from '@/lib/supabase-server';
-import { getBackendApiUrl } from '@/lib/backend-api';
+import { fetchWithTimeout, getBackendApiUrl } from '@/lib/backend-api';
 
 export async function fetchBackendForOwner(path: string): Promise<Response> {
   const supabase = await createSupabaseServerClient();
@@ -12,7 +12,9 @@ export async function fetchBackendForOwner(path: string): Promise<Response> {
     headers.Authorization = `Bearer ${session.access_token}`;
   }
 
-  return fetch(`${getBackendApiUrl()}${path}`, {
+  const url = `${getBackendApiUrl()}${path}`;
+
+  return fetchWithTimeout(url, {
     method: 'GET',
     headers,
     cache: 'no-store'
