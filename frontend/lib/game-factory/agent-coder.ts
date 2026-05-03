@@ -13,7 +13,7 @@ export async function generateAndCommitCSharpCode(brief: string, fileName: strin
     const prompt = `Sen kıdemli bir Unity C# geliştiricisisin. 
     Müşterinin oyun fikri: "${brief}". 
     Bana bu oyun için sadece ${fileName} isimli dosyanın C# kodunu yaz. 
-    Lütfen Markdown (```csharp) veya ekstra açıklama ekleme, sadece saf kod döndür.`;
+    Lütfen markdown kod bloğu veya ekstra açıklama ekleme, sadece saf kod döndür.`;
     
     let csharpCode = await runTextWithAiEngine(prompt);
     
@@ -42,4 +42,3 @@ export async function generateAndCommitCSharpCode(brief: string, fileName: strin
     return { success: false, error };
   }
 }
-
