@@ -17,7 +17,7 @@ export function PublicSiteNav() {
         <Link
           key={link.href}
           href={link.href}
-          className="rounded-xl border border-white/10 px-3 py-2 transition hover:border-neon hover:text-neon"
+          className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-zinc-300 transition hover:scale-105 hover:border-violet-400/60 hover:text-violet-300"
         >
           {link.label}
         </Link>

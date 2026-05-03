@@ -7,9 +7,9 @@
 }
 
 body {
-  @apply bg-ink text-white antialiased;
+  @apply bg-zinc-950 text-zinc-100 antialiased;
 }
 
 .panel {
-  @apply rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur;
+  @apply rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-md;
 }
