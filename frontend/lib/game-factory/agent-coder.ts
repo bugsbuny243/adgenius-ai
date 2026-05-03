@@ -48,9 +48,9 @@ export async function generateAndCommitCSharpCode(brief: string, fileName: strin
     Lütfen markdown kod bloğu veya ekstra açıklama ekleme, sadece saf kod döndür.`;
     
     let csharpCode = await runTextWithAiEngine(prompt);
-    
+
     // Markdown işaretleri gelirse temizle
-    const csharpCode = aiResult.text.replace(/```csharp/g, "").replace(/```/g, "").trim();
+    csharpCode = csharpCode.replace(/```csharp/g, "").replace(/```/g, "").trim();
 
     // 2. Kodu GitHub'ın anlayacağı formata (Base64) çevir
     const contentEncoded = Buffer.from(csharpCode).toString("base64");
