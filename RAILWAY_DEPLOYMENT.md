@@ -1,10 +1,24 @@
-# Railway Deployment (Single Service)
+# Railway Deployment
 
-## Service
+## Core Service (required)
 
-- Deploy only `frontend` as one Railway Next.js service.
+- Deploy `frontend` as Railway Next.js service.
 - Set Railway Root Directory to `/frontend`.
 - Use public domain: `https://tradepigloball.co`.
+
+## Multiplayer Service (optional, Multiplayer paketi için)
+
+- Unity Linux Dedicated Server build çıktılarını `unity-client/Builds/LinuxDedicatedServer` altında üretin.
+- `unity-client/server/Dockerfile` ile dedicated server'ı container olarak paketleyin.
+- Railway içinde yeni service adı önerisi: `unity-dedicated-server`.
+- Otonom deploy komutu:
+
+```bash
+cd unity-client/server
+RAILWAY_TOKEN=*** RAILWAY_PROJECT_ID=*** ./deploy-railway.sh
+```
+
+Bu script Railway projesine bağlanır, service yoksa oluşturur ve Docker deploy başlatır.
 
 ## Environment
 
@@ -24,6 +38,10 @@ Server-only env (used by `app/api/**`):
 - `GROQ_API_KEY`
 - `GOOGLE_CLIENT_SECRET`
 - `GITHUB_UNITY_REPO_TOKEN`
+
+Multiplayer service env:
+- `UNITY_SERVER_PORT` (default `7777`)
+- `PORT` (Railway runtime port)
 
 ## Notes
 

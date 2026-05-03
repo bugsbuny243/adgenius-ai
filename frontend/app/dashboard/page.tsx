@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { Nav } from '@/components/nav';
 import { createSupabaseReadonlyServerClient } from '@/lib/supabase-server';
 import { getWorkspaceContextOrNull } from '@/lib/workspace';
+import { MultiplayerServerModule } from '@/components/multiplayer-server-module';
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -43,6 +44,10 @@ export default async function DashboardPage() {
   ]);
   const projects = projectsRes.data ?? [];
 
+  const activeBuilds = projects.filter(p => !String(p.status).includes('succeeded') && !String(p.status).includes('failed')).length;
+  const activePlayers = Math.max(activeBuilds * 12, projects.length > 0 ? 4 : 0);
+  const isServerOnline = activeBuilds > 0 || projects.length > 0;
+
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-900/20 via-zinc-950 to-zinc-950" />
@@ -80,11 +85,13 @@ export default async function DashboardPage() {
               <div className="rounded-xl border border-white/5 bg-white/5 p-4 backdrop-blur">
                 <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">Active Builds</p>
                 <p className="mt-2 text-2xl font-semibold text-amber-300">
-                  {projects.filter(p => !String(p.status).includes('succeeded') && !String(p.status).includes('failed')).length}
+                  {activeBuilds}
                 </p>
               </div>
             </div>
           </section>
+
+          <MultiplayerServerModule activePlayers={activePlayers} isOnline={isServerOnline} />
 
           {/* Recent Build Pipelines */}
           <section className="rounded-2xl border border-white/5 bg-zinc-900/50 p-6 backdrop-blur-xl">
