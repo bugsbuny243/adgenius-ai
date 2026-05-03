@@ -1,4 +1,4 @@
-import { Ghost } from 'lucide-react';
+import { ArrowUpRight, Ghost } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
@@ -30,43 +30,45 @@ export default async function DashboardPage() {
   const projects = projectsRes.data ?? [];
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-zinc-100">
-      <section className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 lg:flex-row">
+    <main className="min-h-screen bg-black text-zinc-100">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-900/20 via-black to-black" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:52px_52px] opacity-20" />
+
+      <section className="relative mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 lg:flex-row">
         <Nav />
         <div className="flex-1 space-y-6">
-          <section className="rounded-3xl border border-white/10 bg-zinc-900/50 p-6 shadow-2xl shadow-black/50 backdrop-blur-xl">
-            <p className="text-xs uppercase tracking-[0.2em] text-violet-300">Unity Build Mission Control</p>
-            <h2 className="mt-2 text-3xl font-semibold tracking-tight text-zinc-100">{workspace.workspaceName}</h2>
-            <p className="mt-2 text-zinc-400">Canlı build durumları ve son üretim projeleri.</p>
-            <Link href="/game-factory" className="mt-4 inline-flex rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition-transform hover:scale-[1.02] active:scale-[0.98]">Yeni Proje</Link>
+          <section className="rounded-2xl border border-white/5 bg-zinc-900/40 p-7 backdrop-blur-xl shadow-[0_0_30px_-10px_rgba(139,92,246,0.2)]">
+            <div className="mb-5 flex items-start justify-between">
+              <div>
+                <p className="inline-flex rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-xs font-medium text-violet-300">Workspace Active</p>
+                <h2 className="mt-4 bg-gradient-to-r from-white to-zinc-500 bg-clip-text text-4xl font-semibold tracking-tight text-transparent">{workspace.workspaceName}</h2>
+                <p className="mt-2 text-zinc-500">Real-time build intelligence and release orchestration.</p>
+              </div>
+              <Link href="/game-factory" className="inline-flex items-center gap-2 rounded-xl border border-violet-500/30 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_0_22px_-8px_rgba(139,92,246,0.8)] transition hover:brightness-110">Create Project <ArrowUpRight className="h-4 w-4" /></Link>
+            </div>
           </section>
 
-          <section className="rounded-3xl border border-white/10 bg-zinc-900/50 p-5 shadow-2xl shadow-black/50 backdrop-blur-xl">
+          <section className="rounded-2xl border border-white/5 bg-zinc-900/40 p-5 backdrop-blur-xl">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-xl font-semibold tracking-tight text-zinc-100">Unity Build Durumları</h3>
-              <span className="text-xs text-zinc-400">Toplam: {projects.length}</span>
+              <h3 className="text-xl font-semibold tracking-tight text-zinc-100">Recent Build Pipelines</h3>
+              <span className="rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-xs text-violet-300">{projects.length} Total</span>
             </div>
+
             <div className="space-y-3">
               {projects.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-950/50 p-10 text-center">
+                <div className="rounded-2xl border border-zinc-800 bg-black/40 p-10 text-center">
                   <Ghost className="mx-auto h-10 w-10 text-zinc-600" />
-                  <p className="mt-3 text-sm text-zinc-400">Henüz proje bulunmuyor.</p>
-                  <Link href="/game-factory/new" className="mt-4 inline-flex rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black transition-transform hover:scale-[1.02] hover:bg-zinc-200 active:scale-[0.98]">Create New</Link>
+                  <p className="mt-3 text-sm text-zinc-500">No projects yet. Start your first autonomous build flow.</p>
+                  <Link href="/game-factory/new" className="mt-4 inline-flex rounded-xl border border-violet-500/30 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_0_22px_-8px_rgba(139,92,246,0.8)]">Create New</Link>
                 </div>
               ) : (
                 projects.map((project) => (
-                  <article key={project.id} className="flex items-center justify-between rounded-2xl border border-white/10 bg-zinc-950/70 p-4 shadow-lg shadow-black/40">
+                  <article key={project.id} className="flex items-center justify-between rounded-xl border border-zinc-800 bg-black/40 px-4 py-3">
                     <div>
-                      <p className="font-semibold text-zinc-100 tracking-tight">{project.name}</p>
-                      <p className="text-xs text-zinc-400">{toTurkishDate(project.created_at)}</p>
+                      <p className="tracking-tight text-zinc-100">{project.name}</p>
+                      <p className="text-xs text-zinc-500">{toTurkishDate(project.created_at)}</p>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-zinc-300">
-                      <span className="relative flex h-3 w-3">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-75" />
-                        <span className="relative inline-flex h-3 w-3 rounded-full bg-violet-500" />
-                      </span>
-                      {project.status ?? 'processing'}
-                    </div>
+                    <span className="rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-xs text-violet-300">{project.status ?? 'processing'}</span>
                   </article>
                 ))
               )}

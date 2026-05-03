@@ -33,13 +33,7 @@ function SignInContent() {
         return;
       }
 
-      const bootstrapResponse = await fetch('/api/bootstrap', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${data.session.access_token}`
-        }
-      });
-
+      const bootstrapResponse = await fetch('/api/bootstrap', { method: 'POST', headers: { Authorization: `Bearer ${data.session.access_token}` } });
       if (!bootstrapResponse.ok) {
         setErrorMessage('Çalışma alanı hazırlanamadı. Lütfen tekrar deneyin.');
         return;
@@ -49,11 +43,8 @@ function SignInContent() {
       const redirectResponse = await fetch('/api/auth/redirect', { cache: 'no-store' });
       if (redirectResponse.ok) {
         const redirectPayload = (await redirectResponse.json()) as { redirectTo?: string };
-        if (typeof redirectPayload.redirectTo === 'string' && redirectPayload.redirectTo.startsWith('/')) {
-          redirectTo = redirectPayload.redirectTo;
-        }
+        if (typeof redirectPayload.redirectTo === 'string' && redirectPayload.redirectTo.startsWith('/')) redirectTo = redirectPayload.redirectTo;
       }
-
       window.location.assign(redirectTo);
     } catch {
       setErrorMessage('Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.');
@@ -65,40 +56,35 @@ function SignInContent() {
   const urlError = searchParams.get('error');
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-5xl items-center justify-center px-4 py-10">
-      <section className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-900/50 p-8 shadow-2xl shadow-black/50 backdrop-blur-xl">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-black px-4 py-10 text-zinc-100">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-900/20 via-black to-black" />
+      <section className="relative z-10 w-full max-w-md rounded-2xl border border-white/5 bg-zinc-900/40 p-8 backdrop-blur-xl shadow-[0_0_30px_-10px_rgba(139,92,246,0.2)]">
         <p className="text-xs uppercase tracking-[0.2em] text-violet-300">Welcome Back</p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-zinc-100">Koschei AI Giriş</h1>
-        <p className="mt-2 text-sm text-zinc-400">E-posta ve şifren ile hesabına güvenle giriş yap.</p>
+        <h1 className="mt-3 bg-gradient-to-r from-white to-zinc-500 bg-clip-text text-3xl font-semibold tracking-tight text-transparent">Sign in to Koschei</h1>
+        <p className="mt-2 text-sm text-zinc-500">Access your premium build control room.</p>
 
         <form className="mt-7 space-y-4" onSubmit={handleSubmit}>
-          <label className="block text-sm text-zinc-400">
-            E-posta
+          <label className="block text-sm text-zinc-400">E-posta
             <div className="relative mt-2">
               <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-              <input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="w-full rounded-lg border border-zinc-800 bg-zinc-950 py-2 pl-10 pr-3 text-sm text-zinc-100 transition-all outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/50" placeholder="ornek@koschei.ai" />
+              <input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="w-full rounded-xl border border-zinc-800 bg-black/50 py-2.5 pl-10 pr-3 text-sm text-zinc-100 outline-none transition focus:border-violet-500/50" placeholder="ornek@koschei.ai" />
             </div>
           </label>
-
-          <label className="block text-sm text-zinc-400">
-            Şifre
+          <label className="block text-sm text-zinc-400">Şifre
             <div className="relative mt-2">
               <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-              <input required type="password" minLength={6} value={password} onChange={(event) => setPassword(event.target.value)} className="w-full rounded-lg border border-zinc-800 bg-zinc-950 py-2 pl-10 pr-3 text-sm text-zinc-100 transition-all outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/50" placeholder="••••••••" />
+              <input required type="password" minLength={6} value={password} onChange={(event) => setPassword(event.target.value)} className="w-full rounded-xl border border-zinc-800 bg-black/50 py-2.5 pl-10 pr-3 text-sm text-zinc-100 outline-none transition focus:border-violet-500/50" placeholder="••••••••" />
             </div>
           </label>
-
-          <button disabled={loading} type="submit" className="w-full rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 font-semibold text-white transition-transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50">
-            {loading ? 'Giriş yapılıyor...' : 'Giriş yap'}
-          </button>
+          <button disabled={loading} type="submit" className="w-full rounded-xl border border-violet-500/30 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 px-4 py-2.5 font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_0_22px_-8px_rgba(139,92,246,0.8)] transition hover:brightness-110 disabled:opacity-50">{loading ? 'Giriş yapılıyor...' : 'Giriş yap'}</button>
         </form>
 
         {errorMessage ? <p className="mt-4 text-sm text-red-300">{errorMessage}</p> : null}
         {urlError ? <p className="mt-2 text-sm text-red-300">Hata: {urlError}</p> : null}
 
-        <div className="mt-6 space-y-2 text-sm text-zinc-400">
-          <p>Hesabın yok mu? <Link href="/signup" className="text-violet-300 transition-transform hover:scale-[1.02] hover:text-violet-200">Kayıt ol</Link></p>
-          <p><Link href="/reset-password" className="text-violet-300 transition-transform hover:scale-[1.02] hover:text-violet-200">Şifreni mi unuttun?</Link></p>
+        <div className="mt-6 space-y-2 text-sm text-zinc-500">
+          <p>Hesabın yok mu? <Link href="/signup" className="text-violet-300 hover:text-violet-200">Kayıt ol</Link></p>
+          <p><Link href="/reset-password" className="text-violet-300 hover:text-violet-200">Şifreni mi unuttun?</Link></p>
         </div>
       </section>
     </main>
