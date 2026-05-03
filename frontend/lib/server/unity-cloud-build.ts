@@ -134,6 +134,15 @@ export async function triggerBuild(
   return mapBuild({ ...data, buildtargetid: data.buildtargetid ?? targetId });
 }
 
+export async function triggerUnityCloudBuild(options?: { envVars?: UnityBuildEnvVars }) {
+  const buildTarget = process.env.UNITY_BUILD_TARGET_ID?.trim();
+  if (!buildTarget) {
+    throw new Error('UNITY_BUILD_TARGET_ID eksik.');
+  }
+
+  return triggerBuild(buildTarget, options);
+}
+
 export async function getBuildStatus(buildTargetIdOrName: string, buildNumber: number): Promise<UnityBuildResponse> {
   const { orgId, projectId } = getConfig();
   const targetId = await resolveBuildTargetId(buildTargetIdOrName);
