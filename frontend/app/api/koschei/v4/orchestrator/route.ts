@@ -1,6 +1,4 @@
 import { NextResponse } from 'next/server';
-import { Octokit } from '@octokit/rest';
-
 import { runTextWithAiEngine } from '@/lib/ai-engine';
 import { triggerUnityCloudBuild } from '@/lib/server/unity-cloud-build';
 
@@ -66,14 +64,23 @@ export async function POST(request: Request) {
     const fileName = `${baseName}_${timestamp}.cs`;
     const path = `unity-client/Assets/Scripts/KoscheiGenerated/${fileName}`;
 
-    const octokit = new Octokit({ auth: githubToken });
-    await octokit.repos.createOrUpdateFileContents({
-      owner,
-      repo,
-      path,
-      message: `feat(koschei-v4): generate ${fileName}`,
-      content: Buffer.from(sanitizedCode, 'utf8').toString('base64')
+    const githubApiResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${githubToken}`,
+        Accept: 'application/vnd.github+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: `feat(koschei-v4): generate ${fileName}`,
+        content: Buffer.from(sanitizedCode, 'utf8').toString('base64')
+      })
     });
+
+    if (!githubApiResponse.ok) {
+      const errorText = await githubApiResponse.text();
+      throw new Error(`GitHub dosya yazma hatası: ${githubApiResponse.status} ${errorText}`);
+    }
 
     const unityBuild = await triggerUnityCloudBuild();
 
