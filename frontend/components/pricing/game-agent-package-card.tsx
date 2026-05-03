@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { CheckCircle2 } from 'lucide-react';
 import type { GameAgentPlan } from '@/lib/game-agent-plans';
 
 type Props = {
@@ -37,10 +38,15 @@ export function GameAgentPackageCard({ plan }: Props) {
       <h3 className="mt-1 text-2xl font-semibold tracking-tight text-zinc-100">{plan.name}</h3>
       <p className="mt-1 text-sm text-zinc-400">{plan.summary}</p>
       <p className="mt-2 text-xl font-bold text-violet-300">{plan.priceLabel}</p>
-      <h4 className="mt-4 text-sm font-semibold text-zinc-100">Dahil:</h4>
-      <ul className="mt-2 space-y-1 text-sm text-zinc-300">{plan.includes.map((feature) => <li key={feature}>• {feature}</li>)}</ul>
-      <h4 className="mt-4 text-sm font-semibold text-zinc-100">Dahil Değil:</h4>
-      <ul className="mt-2 space-y-1 text-sm text-zinc-400">{plan.excludes.map((feature) => <li key={feature}>• {feature}</li>)}</ul>
+      <h4 className="mt-4 text-sm font-semibold text-zinc-100">Dahil (Üst Düzey Çözüm):</h4>
+      <ul className="mt-2 space-y-2 text-sm text-zinc-200">
+        {plan.includes.map((feature) => (
+          <li key={feature} className="flex items-start gap-2">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 flex-none text-lime-400 drop-shadow-[0_0_8px_rgba(163,230,53,0.85)]" />
+            <span>{feature}</span>
+          </li>
+        ))}
+      </ul>
       <button
         type="button"
         onClick={handleCheckout}

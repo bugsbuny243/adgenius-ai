@@ -33,6 +33,7 @@ export async function POST(request: Request) {
         package_price_label: plan.priceLabel,
         source: 'pricing_page',
         product_scope: 'game_agent',
+        entitlement_tier: plan.planKey,
         requires_owner_approval: true
       }
     });
