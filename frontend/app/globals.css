@@ -50,3 +50,8 @@ body {
   opacity: 0;
   animation: terminal-in 380ms ease forwards;
 }
+
+
+.module-card {
+  @apply rounded-sm border border-white/10 bg-white/5 p-4 backdrop-blur-md opacity-0 animate-boot-grid transition hover:shadow-neon-cyan;
+}
