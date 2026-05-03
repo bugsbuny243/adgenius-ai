@@ -13,3 +13,17 @@ body {
 .panel {
   @apply rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-md;
 }
+
+@keyframes gradient-shift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(20px, -12px, 0) scale(1.08);
+  }
+}
+
+.gradient-shift {
+  animation: gradient-shift 9s ease-in-out infinite;
+}

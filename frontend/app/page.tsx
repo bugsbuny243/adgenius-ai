@@ -9,7 +9,11 @@ const features = [
 
 export default function HomePage() {
   return (
-    <main className="panel space-y-10">
+    <main className="relative space-y-14 overflow-hidden rounded-3xl border border-white/10 bg-[#070811]/80 p-6 md:p-10">
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(139,92,246,0.28),transparent_45%),radial-gradient(circle_at_80%_10%,rgba(59,130,246,0.25),transparent_42%),radial-gradient(circle_at_50%_80%,rgba(79,70,229,0.2),transparent_48%)]" />
+      <div className="gradient-shift pointer-events-none absolute -left-28 -top-24 -z-10 h-[420px] w-[420px] rounded-full bg-violet-500/20 blur-3xl" />
+      <div className="gradient-shift pointer-events-none absolute -bottom-20 right-0 -z-10 h-[420px] w-[420px] rounded-full bg-blue-500/20 blur-3xl [animation-delay:2s]" />
+
       <PublicSiteNav />
 
       <section className="space-y-5 rounded-3xl border border-white/10 bg-white/5 p-6 md:p-8">
