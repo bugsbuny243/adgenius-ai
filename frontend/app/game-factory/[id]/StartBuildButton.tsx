@@ -7,6 +7,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 export function StartBuildButton({ projectId, workspaceId }: { projectId: string; workspaceId?: string | null }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPaywall, setShowPaywall] = useState(false);
   const router = useRouter();
 
   async function onClick() {
@@ -34,6 +35,10 @@ export function StartBuildButton({ projectId, workspaceId }: { projectId: string
 
       const payload = (await response.json()) as { ok: boolean; error?: string };
 
+      if (response.status === 403) {
+        setShowPaywall(true);
+        return;
+      }
       if (!response.ok || !payload.ok) throw new Error(payload.error ?? 'Build başlatılamadı.');
 
       router.push(`/game-factory/${projectId}/builds`);
@@ -53,6 +58,24 @@ export function StartBuildButton({ projectId, workspaceId }: { projectId: string
         Yeni Build Başlat
       </button>
       {error ? <p className="text-xs text-red-300">{error}</p> : null}
+      {showPaywall ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-md rounded-xl border border-white/20 bg-zinc-900 p-5">
+            <h3 className="text-lg font-semibold">Aktif Paket Gerekli</h3>
+            <p className="mt-2 text-sm text-white/80">Bu işlem için aktif bir pakete ihtiyacınız var.</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" className="rounded-lg border border-white/20 px-3 py-2 text-sm" onClick={() => setShowPaywall(false)}>Kapat</button>
+              <button
+                type="button"
+                className="rounded-lg bg-neon px-3 py-2 text-sm font-semibold text-ink"
+                onClick={() => router.push('/pricing')}
+              >
+                Paketleri Gör
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

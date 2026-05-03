@@ -12,6 +12,7 @@ app.use(express.json({ limit: '2mb' }));
 
 const REFRESHABLE_STATUSES = ['queued', 'claimed', 'running', 'succeeded', 'failed', 'cancelled', 'started', 'success', 'failure'];
 const VALID_PAYMENT_STATUSES = ['approved', 'rejected', 'cancelled'] as const;
+const PAID_PLAN_NAMES = new Set(['starter', 'pro', 'studio', 'enterprise']);
 
 const REQUEST_WINDOW_MS = 60_000;
 const MAX_REQUESTS_PER_IP = 20;
@@ -53,28 +54,17 @@ async function requireOwner(req: express.Request, res: express.Response) {
 }
 
 async function hasActiveGameAgentPackage(userId: string, workspaceId: string): Promise<boolean> {
-  const [{ data: subscription }, { data: approvedOrder }] = await Promise.all([
-    serviceRoleClient
-      .from('subscriptions')
-      .select('status, plan_name')
-      .eq('workspace_id', workspaceId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    serviceRoleClient
-      .from('payment_orders')
-      .select('status')
-      .eq('user_id', userId)
-      .eq('provider', 'shopier')
-      .eq('status', 'approved')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-  ]);
+  const { data: subscription } = await serviceRoleClient
+    .from('subscriptions')
+    .select('status, plan_name')
+    .eq('workspace_id', workspaceId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   const status = String(subscription?.status ?? '').toLowerCase();
   const planName = String(subscription?.plan_name ?? '').toLowerCase();
-  return (['active', 'trialing', 'approved'].includes(status) && planName !== 'free') || Boolean(approvedOrder);
+  return ['active', 'trialing', 'approved'].includes(status) && PAID_PLAN_NAMES.has(planName);
 }
 
 function normalizeLegacyStatus(status: string | null): string {
@@ -651,6 +641,13 @@ app.patch('/owner/package-purchases/:purchaseId/approve', async (req, res) => {
   const purchaseId = String(req.params.purchaseId ?? '').trim();
   if (!purchaseId) return void res.status(400).json({ ok: false, error: 'purchase_id_required' });
 
+  const { data: purchase, error: purchaseError } = await serviceRoleClient
+    .from('package_purchases')
+    .select('id, user_id, package_key, package_name')
+    .eq('id', purchaseId)
+    .maybeSingle();
+  if (purchaseError || !purchase) return void res.status(404).json({ ok: false, error: purchaseError?.message ?? 'purchase_not_found' });
+
   const nowIso = new Date().toISOString();
   const { error } = await serviceRoleClient
     .from('package_purchases')
@@ -658,6 +655,28 @@ app.patch('/owner/package-purchases/:purchaseId/approve', async (req, res) => {
     .eq('id', purchaseId);
 
   if (error) return void res.status(400).json({ ok: false, error: error.message });
+
+  const planName = String(purchase.package_key ?? purchase.package_name ?? '').trim().toLowerCase();
+  if (PAID_PLAN_NAMES.has(planName)) {
+    const { data: membership } = await serviceRoleClient
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('user_id', purchase.user_id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (membership?.workspace_id) {
+      await serviceRoleClient.from('subscriptions').insert({
+        workspace_id: membership.workspace_id,
+        user_id: purchase.user_id,
+        plan_name: planName,
+        status: 'approved'
+      });
+      await serviceRoleClient.from('profiles').update({ active_package_name: planName }).eq('id', purchase.user_id);
+    }
+  }
+
   res.json({ ok: true });
 });
 
