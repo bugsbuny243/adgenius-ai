@@ -3,8 +3,7 @@ import { PublicSiteNav } from '@/components/public-site-nav';
 
 export const metadata: Metadata = {
   title: 'Kullanım Koşulları | Koschei',
-  description:
-    'Koschei / TradePiGloball kullanım koşulları: hizmet kapsamı, kullanıcı sorumlulukları, entegrasyonlar ve hesap kuralları.'
+  description: 'Koschei kullanım koşulları.'
 };
 
 export default function TermsPage() {

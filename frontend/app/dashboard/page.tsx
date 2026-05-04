@@ -1,4 +1,8 @@
+<<<<<<< codex/rewrite-frontend-files-with-tailwind-css
 import { Activity, ArrowUpRight, Bot, CheckCircle2, Cpu, Gauge, Orbit, Plus, RadioTower, Sparkles, TriangleAlert } from 'lucide-react';
+=======
+import { Activity, Bot, Cpu, RadioTower } from 'lucide-react';
+>>>>>>> main
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
@@ -10,12 +14,6 @@ export const metadata: Metadata = { robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-function statusPill(status: 'online' | 'warning' | 'offline') {
-  if (status === 'online') return 'border-emerald-300/35 bg-emerald-300/10 text-emerald-200';
-  if (status === 'warning') return 'border-amber-300/35 bg-amber-300/10 text-amber-200';
-  return 'border-rose-300/35 bg-rose-300/10 text-rose-200';
-}
-
 export default async function DashboardPage() {
   const supabase = await createSupabaseReadonlyServerClient();
   const {
@@ -26,23 +24,15 @@ export default async function DashboardPage() {
   const workspace = await getWorkspaceContextOrNull();
   if (!workspace) redirect('/signin');
 
-  const { data } = await supabase
-    .from('game_projects')
-    .select('id, name, status, created_at')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(8);
-
-  const projects = data ?? [];
-  const activeProjects = projects.filter((p) => !String(p.status).includes('succeeded') && !String(p.status).includes('failed')).length;
-  const successfulProjects = projects.filter((p) => String(p.status).includes('succeeded')).length;
-  const pipelineHealth = projects.length > 0 ? Math.round((successfulProjects / projects.length) * 100) : 100;
+  const { count } = await supabase.from('game_projects').select('*', { count: 'exact', head: true }).eq('user_id', user.id);
+  const activeProjects = count ?? 0;
 
   return (
-    <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-4 py-6 sm:px-6 lg:flex-row lg:px-8 lg:py-8">
+    <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 bg-[#020617] px-4 py-6 sm:px-6 lg:flex-row lg:px-8 lg:py-8">
       <Nav />
 
       <section className="flex-1 space-y-6">
+<<<<<<< codex/rewrite-frontend-files-with-tailwind-css
         <header className="relative overflow-hidden rounded-3xl bg-white/5 p-7 backdrop-blur-xl border border-white/10 shadow-[0_0_55px_-24px_rgba(6,182,212,0.55)]">
           <div className="pointer-events-none absolute -top-20 right-0 h-64 w-64 rounded-full bg-cyan-500/20 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-20 left-20 h-64 w-64 rounded-full bg-violet-500/20 blur-3xl" />
@@ -96,7 +86,56 @@ export default async function DashboardPage() {
               <div className="flex items-center justify-between text-slate-200"><span className="flex items-center gap-2"><RadioTower className="h-4 w-4 text-cyan-300" /> API Mesh</span><span className={`rounded-full border px-2.5 py-1 text-xs ${statusPill('online')}`}>online</span></div>
               <div className="flex items-center justify-between text-slate-200"><span className="flex items-center gap-2"><Cpu className="h-4 w-4 text-violet-300" /> Worker Queue</span><span className={`rounded-full border px-2.5 py-1 text-xs ${statusPill(activeProjects > 0 ? 'online' : 'warning')}`}>{activeProjects > 0 ? 'online' : 'warning'}</span></div>
               <div className="flex items-center justify-between text-slate-200"><span className="flex items-center gap-2"><Bot className="h-4 w-4 text-cyan-300" /> Inference Core</span><span className={`rounded-full border px-2.5 py-1 text-xs ${statusPill('online')}`}>online</span></div>
+=======
+        <header className="rounded-3xl bg-white/5 p-8 backdrop-blur-xl border border-white/10 shadow-[0_0_44px_-16px_rgba(139,92,246,0.6)]">
+          <p className="text-xs uppercase tracking-[0.25em] text-cyan-300">Command Center</p>
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-white md:text-5xl">{workspace.workspaceName}</h1>
+          <p className="mt-3 max-w-2xl text-slate-300">KOSCHEI V5 üretim telemetrisi, model koordinasyonu ve proje takibi tek bakışta.</p>
+          <Link
+            href="/game-factory/new"
+            className="mt-6 inline-flex rounded-xl border border-cyan-300/40 bg-gradient-to-r from-cyan-500 to-violet-500 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_34px_-10px_rgba(6,182,212,0.9)]"
+          >
+            New Brief
+          </Link>
+        </header>
+
+        <section className="grid auto-rows-[minmax(140px,auto)] grid-cols-1 gap-4 md:grid-cols-6">
+          <article className="md:col-span-2 rounded-2xl bg-white/5 p-5 backdrop-blur-xl border border-white/10">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-slate-200">Railway Server (Online)</p>
+              <RadioTower className="h-5 w-5 text-cyan-300" />
             </div>
+            <p className="mt-4 inline-flex rounded-full border border-cyan-300/30 bg-cyan-500/10 px-3 py-1 text-xs text-cyan-200">Operational</p>
+          </article>
+
+          <article className="md:col-span-2 rounded-2xl bg-white/5 p-5 backdrop-blur-xl border border-white/10">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-slate-200">Hugging Face 70B Engine</p>
+              <Bot className="h-5 w-5 text-violet-300" />
+            </div>
+            <p className="mt-4 inline-flex rounded-full border border-violet-300/30 bg-violet-500/10 px-3 py-1 text-xs text-violet-200">Inference Active</p>
+          </article>
+
+          <article className="md:col-span-2 rounded-2xl bg-white/5 p-5 backdrop-blur-xl border border-white/10">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-slate-200">Active Projects</p>
+              <Activity className="h-5 w-5 text-cyan-300" />
+            </div>
+            <p className="mt-4 text-4xl font-bold text-white">{activeProjects}</p>
+          </article>
+
+          <article className="md:col-span-4 rounded-2xl bg-white/5 p-6 backdrop-blur-xl border border-white/10">
+            <h2 className="text-xl font-bold text-white">Operations Matrix</h2>
+            <p className="mt-3 text-slate-300">Deployment pipeline stable. Queue latency minimal. Model throughput nominal across all generation nodes.</p>
+          </article>
+
+          <article className="md:col-span-2 rounded-2xl bg-white/5 p-6 backdrop-blur-xl border border-white/10">
+            <div className="flex items-center gap-2 text-slate-200">
+              <Cpu className="h-5 w-5 text-violet-300" />
+              <h2 className="font-semibold">System Signal</h2>
+>>>>>>> main
+            </div>
+            <p className="mt-4 text-sm text-slate-300">All critical services are synced with cyan/violet priority routing.</p>
           </article>
         </section>
       </section>
