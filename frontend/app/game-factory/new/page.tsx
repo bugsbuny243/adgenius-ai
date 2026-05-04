@@ -1,4 +1,4 @@
-```react
+
 'use client';
 
 import { CheckCircle2, Cpu, Rocket, Sparkles, Wand2 } from 'lucide-react';
