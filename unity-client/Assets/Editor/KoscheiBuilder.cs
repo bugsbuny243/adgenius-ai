@@ -2,6 +2,7 @@ using UnityEditor;
 using UnityEngine;
 using System.Linq;
 using System;
+using Koschei.Editor; // Baş Mimar'ın bulunduğu kütüphane
 
 public class KoscheiBuilder
 {
@@ -9,15 +10,8 @@ public class KoscheiBuilder
     {
         Debug.Log("[Koschei Ajanı] Ayarlar yapılıyor, Local Build devralacak...");
 
-        string[] scenes = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray();
-        if (scenes.Length == 0)
-        {
-            Debug.Log("[Koschei Ajanı] Sahne bulunamadı, varsayılan SampleScene ekleniyor.");
-            EditorBuildSettings.scenes = new EditorBuildSettingsScene[] {
-                new EditorBuildSettingsScene("Assets/Scenes/SampleScene.unity", true)
-            };
-        }
-
+        // Sahne listesine müdahale etmiyoruz çünkü Baş Mimar (KoscheiSceneArchitect) zaten otonom sahneyi ayarladı.
+        
         PlayerSettings.SetScriptingBackend(BuildTargetGroup.Android, ScriptingImplementation.IL2CPP);
         PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARMv7 | AndroidArchitecture.ARM64;
         EditorUserBuildSettings.buildAppBundle = true;
@@ -43,13 +37,37 @@ public class KoscheiBuilder
 
     public static void BuildAndroid()
     {
+        Debug.Log("🏭 [Koschei Fabrikası] Üretim Bandı Çalıştırıldı!");
+
+        // 1. ADIM: OTONOM MİMARİ İNŞAATI BAŞLAT (ZİNCİRLEME REAKSİYON)
+        try
+        {
+            Debug.Log("🤖 [Koschei Fabrikası] Baş Mimar çağrılıyor, sahne koddan inşa edilecek...");
+            KoscheiSceneArchitect.ConstructSceneFromCode();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError("💥 [Koschei Fabrikası] Sahne inşası sırasında kritik hata: " + ex.Message);
+            throw; // Sahne dizilemezse müşteriye boş APK gitmemesi için işlemi iptal et
+        }
+
+        // 2. ADIM: DERLEME AYARLARINI (KEYSTORE VB.) YAP
         PreExport();
+
+        // 3. ADIM: BAŞ MİMARIN DİZDİĞİ YEPYENİ SAHNEYİ AL
         string[] scenes = EditorBuildSettings.scenes.Where(sc => sc.enabled).Select(sc => sc.path).ToArray();
+        
+        if (scenes.Length == 0)
+        {
+            throw new Exception("Sahne listesi boş! Baş Mimar sahneyi Build listesine ekleyemedi.");
+        }
+
         string outDir = "Builds/Android";
         System.IO.Directory.CreateDirectory(outDir);
         string output = Environment.GetEnvironmentVariable("KOSCHEI_OUTPUT_PATH");
         if (string.IsNullOrEmpty(output)) output = outDir + "/game.aab";
 
+        // 4. ADIM: AAB PAKETİNİ DIŞARI BAS
         var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
         {
             scenes = scenes,
