@@ -1,14 +1,14 @@
+```react
 'use client';
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Rocket, Cpu, Sparkles } from 'lucide-react';
+import { Rocket, Cpu, Sparkles, ShieldAlert } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 
 /**
- * KOSCHEI V5 - Yeni Oyun Oluşturma Sayfası
- * Bu dosya Next.js build sürecinde "is not a module" hatasını çözmek için 
- * tertemiz bir şekilde yeniden oluşturulmuştur.
+ * KOSCHEI V5 - Temiz Üretim Bandı
+ * 'project_name' hatası kesin olarak silindi.
  */
 
 export default function NewGamePage() {
@@ -16,65 +16,61 @@ export default function NewGamePage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  
+  // Supabase'i güvenli şekilde alıyoruz
   const supabase = createSupabaseBrowserClient();
 
-  const handleCreateGame = async () => {
+  const handleCreate = async () => {
     if (!prompt.trim()) return;
+    
+    if (!supabase) {
+      setError("Bağlantı hatası: Supabase istemcisi yüklenemedi.");
+      return;
+    }
     
     setIsGenerating(true);
     setError(null);
 
     try {
-      if (!supabase) {
-        throw new Error('Veritabanı bağlantısı başlatılamadı.');
-      }
-
-      // 1. Üretim emrini veritabanına mühürle
-      const { data, error: insertError } = await supabase
+      // SADECE var olan sütunları gönderiyoruz
+      const { error: dbError } = await supabase
         .from('unity_build_jobs')
         .insert([{
           prompt: prompt,
-          status: 'queued',
-          project_name: 'Koschei_Autonomous_Project',
-          created_at: new Date().toISOString()
-        }])
-        .select()
-        .single();
+          status: 'queued'
+        }]);
 
-      if (insertError) throw insertError;
+      if (dbError) throw dbError;
 
-      // 2. Başarılıysa dashboard'a sür
+      // Başarılıysa dashboard'a yönlendir
       router.push('/dashboard');
     } catch (err: any) {
-      console.error('Üretim hatası:', err);
-      setError(err.message || 'Proje başlatılamadı. Lütfen tekrar deneyin.');
+      console.error('Üretim Başlatılamadı:', err);
+      setError(err.message || "İşlem başarısız. Lütfen tekrar deneyin.");
     } finally {
       setIsGenerating(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#020617] text-slate-100 p-6 md:p-12">
-      <div className="max-w-3xl mx-auto space-y-10">
-        <div className="space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-sm font-medium">
+    <div className="min-h-screen bg-[#020617] text-white flex flex-col items-center justify-center p-6">
+      <div className="w-full max-w-2xl space-y-8">
+        
+        <div className="text-center space-y-4">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-bold uppercase tracking-widest">
             <Sparkles size={14} />
-            <span>Koschei Otonom Üretim Bandı v5</span>
+            Koschei Autonomous
           </div>
-          <h1 className="text-5xl font-extrabold tracking-tight bg-gradient-to-br from-white to-slate-500 bg-clip-text text-transparent">
-            Yeni Bir Dünya İnşa Et
-          </h1>
-          <p className="text-slate-400 text-lg">
-            Sadece ne hayal ettiğini yaz. Koschei kodları yazar, sahneyi dizer ve APK'yı fırından çıkarır.
-          </p>
+          <h1 className="text-6xl font-black tracking-tighter">ATEŞLE!</h1>
+          <p className="text-slate-400">Oyunun ruhunu buraya dök, gerisini makineye bırak.</p>
         </div>
 
         <div className="relative group">
-          <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500 to-violet-600 rounded-3xl blur opacity-25 group-hover:opacity-40 transition duration-1000"></div>
-          <div className="relative bg-slate-900/80 border border-white/10 p-2 rounded-3xl backdrop-blur-xl">
+          <div className="absolute -inset-1 bg-gradient-to-r from-cyan-600 to-violet-600 rounded-3xl blur opacity-25 group-hover:opacity-40 transition duration-1000"></div>
+          <div className="relative bg-slate-900 border border-white/10 rounded-3xl overflow-hidden">
             <textarea
-              className="w-full bg-transparent border-none focus:ring-0 text-xl p-6 min-h-[250px] placeholder:text-slate-600"
-              placeholder="Örn: KOSCHEI V5: GTA PROTOKOLÜ... Şehirde geçen, arabaya binilebilen bir açık dünya oyunu yap."
+              className="w-full h-64 bg-transparent p-8 text-xl text-white placeholder:text-slate-700 outline-none resize-none"
+              placeholder="Örn: Açık dünya, Unity3D projesi..."
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
             />
@@ -82,31 +78,34 @@ export default function NewGamePage() {
         </div>
 
         {error && (
-          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
+          <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-sm">
+            <ShieldAlert size={18} />
             {error}
           </div>
         )}
 
         <button
-          onClick={handleCreateGame}
+          onClick={handleCreate}
           disabled={isGenerating || !prompt.trim()}
-          className="w-full group relative flex items-center justify-center gap-3 bg-white text-black font-black text-xl py-6 rounded-2xl hover:bg-cyan-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
+          className="w-full bg-white text-black h-20 rounded-2xl font-black text-2xl flex items-center justify-center gap-4 hover:bg-cyan-400 transition-all disabled:opacity-30"
         >
           {isGenerating ? (
             <>
               <Cpu className="animate-spin" />
-              <span>FABRİKA ÇALIŞIYOR...</span>
+              <span>SİSTEM MEŞGUL...</span>
             </>
           ) : (
             <>
-              <Rocket className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+              <Rocket />
               <span>ÜRETİMİ BAŞLAT</span>
             </>
           )}
         </button>
+
       </div>
     </div>
   );
 }
 
 
+```
