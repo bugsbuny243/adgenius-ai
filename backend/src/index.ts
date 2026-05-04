@@ -198,7 +198,7 @@ app.post('/game-factory/generate', async (req, res) => {
       app_name: prompt.slice(0, 80),
       package_name: `com.koschei.${Date.now()}`,
       status: 'draft',
-      metadata: { source: 'backend_generate', prompt, generatedScriptPath: 'Assets/Koschei/Generated/AIGeneratedController.cs' }
+      metadata: { source: 'backend_generate', prompt, generatedScriptPath: 'unity-client/Assets/Editor/AIGeneratedController.cs' }
     })
     .select('id, app_name, status, created_at')
     .single();
