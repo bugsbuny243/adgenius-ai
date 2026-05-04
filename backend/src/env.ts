@@ -22,7 +22,6 @@ const REQUIRED_ENV_KEYS = [
 type RequiredKey = (typeof REQUIRED_ENV_KEYS)[number];
 
 type BackendEnv = Record<RequiredKey, string> & {
-  OPENAI_API_KEY: string | null;
   GROQ_API_KEY: string | null;
 };
 
@@ -40,12 +39,7 @@ function optional(name: string): string | null {
 export function loadEnv(): BackendEnv {
   const env = Object.fromEntries(REQUIRED_ENV_KEYS.map((key) => [key, required(key)])) as Record<RequiredKey, string>;
   const aiProvider = env.AI_PROVIDER.toLowerCase();
-  const openai = optional('OPENAI_API_KEY');
   const groq = optional('GROQ_API_KEY');
-
-  if (aiProvider === 'openai' && !openai) {
-    throw new Error('Missing required backend env: OPENAI_API_KEY (AI_PROVIDER=openai)');
-  }
 
   if (aiProvider === 'groq' && !groq) {
     throw new Error('Missing required backend env: GROQ_API_KEY (AI_PROVIDER=groq)');
@@ -53,7 +47,6 @@ export function loadEnv(): BackendEnv {
 
   return {
     ...env,
-    OPENAI_API_KEY: openai,
     GROQ_API_KEY: groq
   };
 }
