@@ -1,4 +1,3 @@
-```react
 'use client';
 
 import React, { useState } from 'react';
@@ -106,6 +105,3 @@ export default function NewGamePage() {
     </div>
   );
 }
-
-
-```
