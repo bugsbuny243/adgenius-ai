@@ -5,6 +5,7 @@ import { loadEnv } from './env.js';
 import { getBuildStatus, getBuilds, triggerBuild, UnityApiError, type UnityBuildResponse, type UnityBuildStatus } from './unity-bridge.js';
 import { decryptCredentials, encryptCredentials, serializeEncryptedCredentials, tryParseEncryptedCredentials } from './credentials-encryption.js';
 import { GooglePlayPublisherProvider, validateGooglePlayServiceAccount } from './google-play.js';
+import { writeUnityGeneratedController } from './unity-repo-config.js';
 
 const env = loadEnv();
 const app = express();
@@ -117,6 +118,54 @@ function isValidPositiveInt(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }
 
+function extractCSharpCode(rawText: string): string {
+  const fencedBlock = rawText.match(/```(?:csharp|cs)?\s*([\s\S]*?)```/i);
+  return (fencedBlock?.[1] ?? rawText).trim();
+}
+
+function enforceMonoBehaviourClass(code: string): string {
+  if (!/class\s+AIGeneratedController\b/.test(code)) throw new Error('AI çıktısı AIGeneratedController class içermiyor.');
+  if (!/\bMonoBehaviour\b/.test(code)) throw new Error('AI çıktısı MonoBehaviour içermiyor.');
+  return code;
+}
+
+async function generateUnityControllerScript(prompt: string): Promise<string> {
+  const provider = process.env.AI_PROVIDER?.trim().toLowerCase();
+  if (provider !== 'huggingface') throw new Error('Unsupported AI provider.');
+
+  const hfToken = process.env.HF_TOKEN?.trim() || process.env.HUGGINGFACE_API_TOKEN?.trim();
+  if (!hfToken) throw new Error('Hugging Face token eksik.');
+
+  const model = process.env.HF_MODEL?.trim() || 'meta-llama/Llama-3.1-8B-Instruct';
+  const systemPrompt = [
+    'You are a senior Unity gameplay programmer.',
+    'Return only one complete C# file for Unity.',
+    'The script must compile and define: public class AIGeneratedController : MonoBehaviour.',
+    'Include using UnityEngine; and practical gameplay logic derived from the prompt.',
+    'Do not include explanations.'
+  ].join(' ');
+
+  const response = await fetch(`https://api-inference.huggingface.co/models/${encodeURIComponent(model)}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${hfToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      inputs: `${systemPrompt}\n\nUser prompt:\n${prompt}`,
+      parameters: { max_new_tokens: 900, return_full_text: false, temperature: 0.3 }
+    })
+  });
+
+  if (!response.ok) throw new Error(`Hugging Face isteği başarısız: ${response.status}`);
+  const payload = (await response.json()) as Array<{ generated_text?: string }> | { generated_text?: string };
+  const generatedText = Array.isArray(payload) ? payload[0]?.generated_text : payload.generated_text;
+  if (!generatedText) throw new Error('Hugging Face geçerli kod döndürmedi.');
+
+  const code = enforceMonoBehaviourClass(extractCSharpCode(generatedText));
+  return code;
+}
+
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 app.post('/game-factory/generate', async (req, res) => {
@@ -132,6 +181,15 @@ app.post('/game-factory/generate', async (req, res) => {
   const prompt = String(req.body?.prompt ?? '').trim();
   if (!prompt) return void res.status(400).json({ ok: false, error: 'prompt zorunlu.' });
 
+  let generatedControllerCode: string;
+  try {
+    generatedControllerCode = await generateUnityControllerScript(prompt);
+    await writeUnityGeneratedController(generatedControllerCode, prompt);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'AI script üretilemedi.';
+    return void res.status(502).json({ ok: false, error: message });
+  }
+
   const { data: project, error } = await userClient
     .from('unity_game_projects')
     .insert({
@@ -140,7 +198,7 @@ app.post('/game-factory/generate', async (req, res) => {
       app_name: prompt.slice(0, 80),
       package_name: `com.koschei.${Date.now()}`,
       status: 'draft',
-      metadata: { source: 'backend_generate', prompt }
+      metadata: { source: 'backend_generate', prompt, generatedScriptPath: 'Assets/Koschei/Generated/AIGeneratedController.cs' }
     })
     .select('id, app_name, status, created_at')
     .single();
@@ -172,6 +230,17 @@ app.post('/game-factory/build', async (req, res) => {
 
   if (!project) return void res.status(404).json({ ok: false, error: 'Proje bulunamadı.' });
   if (project.approval_status !== 'approved') return void res.status(403).json({ ok: false, error: 'Proje onay bekliyor.' });
+
+  const prompt = String(req.body?.prompt ?? '').trim();
+  if (!prompt) return void res.status(400).json({ ok: false, error: 'prompt zorunlu.' });
+
+  try {
+    const generatedControllerCode = await generateUnityControllerScript(prompt);
+    await writeUnityGeneratedController(generatedControllerCode, prompt);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'AI script GitHub repoya yazılamadı.';
+    return void res.status(502).json({ ok: false, error: message });
+  }
 
   const buildTargetId = env.UNITY_BUILD_TARGET_ID;
   let unityResponse: Awaited<ReturnType<typeof triggerBuild>>;
