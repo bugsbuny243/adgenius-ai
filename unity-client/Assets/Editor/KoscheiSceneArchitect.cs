@@ -35,7 +35,7 @@ namespace Koschei.Editor
             GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
             ground.name = "Ground";
             ground.transform.localScale = new Vector3(10, 1, 10);
-            ground.GetComponent<Renderer>().sharedMaterial.color = Color.darkGray;
+            ground.GetComponent<Renderer>().sharedMaterial.color = Color.gray;
 
             // 5. Oyuncu/Ana Karakteri Yarat
             GameObject player = GameObject.CreatePrimitive(PrimitiveType.Capsule);
