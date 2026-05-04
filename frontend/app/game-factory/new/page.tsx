@@ -134,21 +134,25 @@ export default function NewGameFactoryPage() {
               onChange={(event) => setPrompt(event.target.value)}
               rows={8}
               placeholder="Example: Endless 2D runner with evolving biomes, collectible upgrades, ad monetization, and neon cyber visuals."
+<<<<<<< codex/rewrite-frontend-files-with-tailwind-css
+              className="w-full bg-black/40 border border-slate-800 rounded-xl p-4 text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none transition"
+=======
               className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none"
+>>>>>>> main
             />
             <div className="flex gap-2">
-              <button type="button" onClick={() => setPlatform('android')} className={`rounded-xl border px-4 py-2 text-sm font-semibold transition ${platform === 'android' ? 'border-cyan-300/45 bg-cyan-300/15 text-cyan-100' : 'border-white/20 text-slate-300 hover:border-white/35'}`}>
+              <button type="button" onClick={() => setPlatform('android')} className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${platform === 'android' ? 'bg-cyan-500/20 border border-cyan-500/50 text-cyan-100 shadow-[0_0_20px_-8px_rgba(6,182,212,1)]' : 'bg-black/40 border border-slate-800 text-slate-300 hover:border-slate-700'}`}>
                 Android
               </button>
-              <button type="button" disabled className="cursor-not-allowed rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-500">iOS (Soon)</button>
+              <button type="button" disabled className="cursor-not-allowed rounded-xl bg-black/40 border border-slate-800 px-4 py-2 text-sm text-slate-500">iOS (Soon)</button>
             </div>
             <button
               type="button"
               disabled={isCreateDisabled}
               onClick={createBrief}
-              className="inline-flex items-center gap-2 rounded-xl border border-cyan-200/40 bg-cyan-300/15 px-5 py-2.5 font-semibold text-cyan-100 shadow-[0_0_30px_-10px_rgba(34,211,238,0.9)] transition hover:bg-cyan-300/25 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/60 bg-cyan-500/25 px-5 py-3 font-semibold text-cyan-100 shadow-[0_0_30px_-8px_rgba(6,182,212,1)] transition hover:bg-cyan-500/35 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Wand2 className="h-4 w-4" /> {loading ? 'Generating...' : 'Generate Brief'}
+              <Wand2 className="h-4 w-4" /> {loading ? 'Oluşturuluyor...' : 'Oluştur'}
             </button>
           </div>
         )}
