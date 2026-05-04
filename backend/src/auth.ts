@@ -12,7 +12,7 @@ export const serviceRoleClient = createClient(env.SUPABASE_URL, env.SUPABASE_SER
   auth: { autoRefreshToken: false, persistSession: false }
 });
 
-export type AuthContext = { userId: string; workspaceId: string; userEmail: string | null };
+export type AuthContext = { userId: string; workspaceId: string; userEmail: string | null; accessToken: string };
 
 export async function requireAuth(req: Request, res: Response): Promise<AuthContext | null> {
   const header = req.header('authorization');
@@ -45,5 +45,12 @@ export async function requireAuth(req: Request, res: Response): Promise<AuthCont
     return null;
   }
 
-  return { userId: user.id, workspaceId: membership.workspace_id, userEmail: user.email ?? null };
+  return { userId: user.id, workspaceId: membership.workspace_id, userEmail: user.email ?? null, accessToken: token };
+}
+
+export function createUserClient(accessToken: string) {
+  return createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    auth: { autoRefreshToken: false, persistSession: false }
+  });
 }
