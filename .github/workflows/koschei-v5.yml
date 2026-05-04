@@ -1,0 +1,55 @@
+name: "🛰️ KOSCHEI V5 - Karantina ve Sıfır Hata Protokolü"
+
+# Koschei ana koda (main) her yeni bir oyun veya yama gönderdiğinde otomatik tetiklenir
+on:
+  push:
+    branches:
+      - main
+      - production
+
+jobs:
+  quarantine_test:
+    name: "🧪 Aşama 1: Karantina ve Sanal Bot İstilası"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "📥 Proje Kodlarını (Repo) Çek"
+        uses: actions/checkout@v4
+
+      - name: "⚙️ Headless Sunucu Ortamını Hazırla (Simülasyon)"
+        run: |
+          echo "V5 Test Odası Başlatılıyor..."
+          chmod +x ./scripts/setup_headless_server.sh
+          ./scripts/setup_headless_server.sh
+
+      - name: "🤖 Cehennem Testi: 50 Sanal Botu İçeri Sal"
+        run: |
+          echo "SİSTEM ZORLAMASI BAŞLADI: 50 otonom bot sunucuya bağlanıyor..."
+          echo "Eylemler: Rastgele ateş etme, harita yükleme, envanter senkronizasyonu."
+          chmod +x ./scripts/v5_stress_test.sh
+          # Sunucuyu 3 dakika boyunca %100 yükte çalıştırır
+          ./scripts/v5_stress_test.sh --bots 50 --duration 180s > server_test.log
+
+      - name: "📊 Log Analizi (Ölüm Kalım Kararı)"
+        id: log_check
+        run: |
+          echo "Test sonuçları taranıyor..."
+          # Loglarda 'Fatal Error', 'Memory Leak' veya düşük FPS aranır
+          if grep -qE "Fatal Error|Memory Leak|FPS < 60|NullReference" server_test.log; then
+            echo "🚨 KIRMIZI ALARM: HATA TESPİT EDİLDİ! Oyun Karantinada Kaldı."
+            exit 1
+          else
+            echo "✅ KUSURSUZ: Sistem stabil, çökme yok."
+          fi
+
+  self_healing:
+    name: "🛠️ Aşama 2: Otonom Tamir (Self-Healing)"
+    runs-on: ubuntu-latest
+    needs: quarantine_test
+    if: failure() # Sadece üstteki test başarısız olursa çalışır
+
+    steps:
+      - name: "🚨 Hatayı Koschei AI Orchestrator'a Fırlat"
+        run: |
+          echo "Karantina testi başarısız oldu. Otonom tamir süreci tetikleniyor..."
+          echo "Orchestrator'a hata raporu gönderildi (simülasyon)."
