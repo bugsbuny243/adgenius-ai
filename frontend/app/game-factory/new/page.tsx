@@ -134,11 +134,7 @@ export default function NewGameFactoryPage() {
               onChange={(event) => setPrompt(event.target.value)}
               rows={8}
               placeholder="Example: Endless 2D runner with evolving biomes, collectible upgrades, ad monetization, and neon cyber visuals."
-<<<<<<< codex/rewrite-frontend-files-with-tailwind-css
               className="w-full bg-black/40 border border-slate-800 rounded-xl p-4 text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none transition"
-=======
-              className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none"
->>>>>>> main
             />
             <div className="flex gap-2">
               <button type="button" onClick={() => setPlatform('android')} className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${platform === 'android' ? 'bg-cyan-500/20 border border-cyan-500/50 text-cyan-100 shadow-[0_0_20px_-8px_rgba(6,182,212,1)]' : 'bg-black/40 border border-slate-800 text-slate-300 hover:border-slate-700'}`}>
