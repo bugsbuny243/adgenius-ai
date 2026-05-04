@@ -1,4 +1,18 @@
-import { Activity, ArrowUpRight, Bot, CheckCircle2, Cpu, Gauge, Orbit, Plus, RadioTower, Sparkles, TriangleAlert } from 'lucide-react';
+import {
+  Activity,
+  ArrowUpRight,
+  Bot,
+  CheckCircle2,
+  CircleDashed,
+  Cpu,
+  Gauge,
+  Orbit,
+  Plus,
+  RadioTower,
+  Sparkles,
+  TriangleAlert,
+  WandSparkles
+} from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
@@ -38,20 +52,19 @@ export default async function DashboardPage() {
     .limit(5);
 
   return (
-    <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 bg-[#020617] px-4 py-6 sm:px-6 lg:flex-row lg:px-8 lg:py-8">
+    <main className="mx-auto flex w-full max-w-[1650px] flex-col gap-6 bg-[#020617] px-4 py-6 sm:px-6 lg:flex-row lg:px-8 lg:py-8">
       <Nav />
 
       <section className="flex-1 space-y-6">
-        <header className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-7 shadow-[0_0_55px_-24px_rgba(6,182,212,0.55)] backdrop-blur-xl">
-          <div className="pointer-events-none absolute -top-20 right-0 h-64 w-64 rounded-full bg-cyan-500/20 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-20 left-20 h-64 w-64 rounded-full bg-violet-500/20 blur-3xl" />
+        <header className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-7 shadow-[0_0_65px_-24px_rgba(6,182,212,0.55)] backdrop-blur-xl">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,rgba(6,182,212,0.2),transparent_40%),radial-gradient(circle_at_100%_0%,rgba(139,92,246,0.16),transparent_35%)]" />
           <p className="relative inline-flex items-center gap-2 rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3 py-1 text-xs tracking-[0.2em] text-cyan-200">
-            <Sparkles className="h-3.5 w-3.5" /> COMMAND CENTER
+            <Sparkles className="h-3.5 w-3.5" /> USER COMMAND CENTER
           </p>
           <div className="relative mt-5 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h1 className="text-4xl font-black tracking-tight text-white sm:text-5xl">{workspace.workspaceName}</h1>
-              <p className="mt-3 max-w-2xl text-sm text-slate-300 sm:text-base">Otonom oyun üretim hattınızın canlı operasyon paneli.</p>
+              <p className="mt-3 max-w-2xl text-sm text-slate-300 sm:text-base">Üretim, kalite ve yayın operasyonlarının tamamı burada: hızlı, temiz, futuristik.</p>
             </div>
             <Link href="/game-factory/new" className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-500/50 bg-cyan-500/20 px-4 py-2.5 text-sm font-semibold text-cyan-100 shadow-[0_0_25px_-8px_rgba(6,182,212,0.95)] transition hover:bg-cyan-500/30">
               <Plus className="h-4 w-4" /> Yeni Proje
@@ -59,44 +72,61 @@ export default async function DashboardPage() {
           </div>
         </header>
 
-        <section className="grid auto-rows-[minmax(160px,auto)] grid-cols-1 gap-4 md:grid-cols-3">
-          <article className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-            <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Active Projects</p>
-            <div className="mt-4 flex items-end justify-between"><p className="text-4xl font-bold text-white">{activeProjects}</p><Activity className="h-5 w-5 text-cyan-400" /></div>
-          </article>
-          <article className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-            <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Pipeline Health</p>
-            <div className="mt-4 flex items-end justify-between"><p className="text-4xl font-bold text-white">{pipelineHealth}%</p><Gauge className="h-5 w-5 text-violet-400" /></div>
-          </article>
-          <article className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-            <p className="text-xs uppercase tracking-[0.24em] text-slate-400">System Uptime</p>
-            <div className="mt-4 flex items-end justify-between"><p className="text-4xl font-bold text-white">99.97%</p><Orbit className="h-5 w-5 text-cyan-400" /></div>
+        <section className="grid auto-rows-[minmax(160px,auto)] grid-cols-1 gap-4 md:grid-cols-6">
+          {[
+            { label: 'Active Projects', value: activeProjects, icon: Activity, color: 'text-cyan-400' },
+            { label: 'Pipeline Health', value: `${pipelineHealth}%`, icon: Gauge, color: 'text-violet-400' },
+            { label: 'System Uptime', value: '99.97%', icon: Orbit, color: 'text-cyan-300' }
+          ].map((metric) => (
+            <article key={metric.label} className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl md:col-span-2">
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-400">{metric.label}</p>
+              <div className="mt-4 flex items-end justify-between">
+                <p className="text-4xl font-bold text-white">{metric.value}</p>
+                <metric.icon className={`h-5 w-5 ${metric.color}`} />
+              </div>
+            </article>
+          ))}
+
+          <article className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl md:col-span-4">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-white">Son Projeler</h2>
+              <Link href="/game-factory" className="inline-flex items-center gap-1 text-sm text-cyan-300 hover:text-cyan-200">Hepsi <ArrowUpRight className="h-4 w-4" /></Link>
+            </div>
+            <div className="space-y-2.5">
+              {(projects ?? []).length === 0 ? (
+                <div className="rounded-xl border border-white/10 bg-black/30 p-6 text-sm text-slate-400">Henüz proje yok. İlk projeni aç ve pipeline ışıklarını yak.</div>
+              ) : (
+                (projects ?? []).map((project) => {
+                  const failed = String(project.status).includes('failed');
+                  return (
+                    <Link key={project.id} href={`/game-factory/${project.id}`} className="group flex items-center justify-between rounded-xl border border-white/10 bg-black/30 px-4 py-3 transition hover:border-cyan-500/40 hover:bg-black/45">
+                      <div>
+                        <p className="font-medium text-slate-100 group-hover:text-white">{project.name}</p>
+                        <p className="text-xs text-slate-500">{new Date(project.created_at).toLocaleDateString('tr-TR')}</p>
+                      </div>
+                      {failed ? <TriangleAlert className="h-4 w-4 text-rose-300" /> : <CheckCircle2 className="h-4 w-4 text-emerald-300" />}
+                    </Link>
+                  );
+                })
+              )}
+            </div>
           </article>
 
           <article className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl md:col-span-2">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white">Recent Projects</h2>
-              <Link href="/game-factory" className="inline-flex items-center gap-1 text-sm text-cyan-300 hover:text-cyan-200">Open all <ArrowUpRight className="h-4 w-4" /></Link>
-            </div>
-            <div className="space-y-2.5">
-              {(projects ?? []).length === 0 ? <div className="rounded-xl border border-white/10 bg-black/30 p-6 text-sm text-slate-400">No projects yet. Initialize one to activate telemetry.</div> : (projects ?? []).map((project) => {
-                const failed = String(project.status).includes('failed');
-                return <Link key={project.id} href={`/game-factory/${project.id}`} className="group flex items-center justify-between rounded-xl border border-white/10 bg-black/30 px-4 py-3 transition hover:border-cyan-500/40 hover:bg-black/45">
-                    <div><p className="font-medium text-slate-100 group-hover:text-white">{project.name}</p><p className="text-xs text-slate-500">{new Date(project.created_at).toLocaleDateString('en-US')}</p></div>
-                    {failed ? <TriangleAlert className="h-4 w-4 text-rose-300" /> : <CheckCircle2 className="h-4 w-4 text-emerald-300" />}
-                  </Link>;
-              })}
-            </div>
-          </article>
-
-          <article className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
-            <h2 className="text-lg font-semibold text-white">System Status</h2>
+            <h2 className="text-lg font-semibold text-white">Sistem Durumu</h2>
             <div className="mt-4 space-y-3 text-sm">
               <div className="flex items-center justify-between text-slate-200"><span className="flex items-center gap-2"><RadioTower className="h-4 w-4 text-cyan-300" /> API Mesh</span><span className={`rounded-full border px-2.5 py-1 text-xs ${statusPill('online')}`}>online</span></div>
               <div className="flex items-center justify-between text-slate-200"><span className="flex items-center gap-2"><Cpu className="h-4 w-4 text-violet-300" /> Worker Queue</span><span className={`rounded-full border px-2.5 py-1 text-xs ${statusPill(activeProjects > 0 ? 'online' : 'warning')}`}>{activeProjects > 0 ? 'online' : 'warning'}</span></div>
               <div className="flex items-center justify-between text-slate-200"><span className="flex items-center gap-2"><Bot className="h-4 w-4 text-cyan-300" /> Inference Core</span><span className={`rounded-full border px-2.5 py-1 text-xs ${statusPill('online')}`}>online</span></div>
             </div>
-            <p className="mt-4 text-sm text-slate-300">All critical services are synced with cyan/violet priority routing.</p>
+            <p className="mt-4 text-sm text-slate-300">Kritik servisler senkronize: düşük gecikme, yüksek görsel kalite, stabil release hattı.</p>
+          </article>
+
+          <article className="rounded-2xl border border-fuchsia-300/20 bg-fuchsia-500/10 p-6 md:col-span-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="inline-flex items-center gap-2 text-sm font-semibold text-fuchsia-100"><WandSparkles className="h-4 w-4" /> Wow Modu: Tasarım + Operasyon birlikte optimize edildi</p>
+              <span className="inline-flex items-center gap-2 rounded-full border border-fuchsia-200/30 px-3 py-1 text-xs text-fuchsia-50"><CircleDashed className="h-3.5 w-3.5" /> Ready for next launch</span>
+            </div>
           </article>
         </section>
       </section>
