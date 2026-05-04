@@ -9,95 +9,37 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <main className="panel space-y-6">
+    <main className="px-4 py-6 sm:px-6 lg:px-8">
       <PublicSiteNav />
-
-      <header className="space-y-2">
-        <h1 className="text-3xl font-bold">Gizlilik Politikası</h1>
-        <p className="max-w-3xl text-sm text-white/70">
-          Son güncelleme: 23 Nisan 2026. Bu politika, Koschei / TradePiGloball ({' '}
-          <span className="font-medium">tradepigloball.co</span>) hizmetini kullanırken kişisel verilerin nasıl
-          işlendiğini açıklar.
+      <div className="max-w-3xl mx-auto py-16 px-6 prose prose-invert prose-cyan rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10">
+        <h1>Gizlilik Politikası</h1>
+        <p>
+          Son güncelleme: 23 Nisan 2026. Bu politika, Koschei / TradePiGloball (<strong>tradepigloball.co</strong>)
+          hizmetini kullanırken kişisel verilerin nasıl işlendiğini açıklar.
         </p>
-      </header>
-
-      <section className="space-y-3 rounded-2xl border border-white/10 bg-black/20 p-5">
-        <h2 className="text-xl font-semibold">1. Toplanan bilgiler</h2>
-        <p className="text-white/75">
-          Hizmeti sunabilmek için hesap bilgileri (ör. ad, e-posta), çalışma alanı/proje verileri, kullanıcı tarafından
-          oluşturulan içerikler ve teknik kayıtlar (giriş zamanı, cihaz/oturum bilgileri, hata kayıtları) işlenebilir.
+        <h2>1. Toplanan bilgiler</h2>
+        <p>Hizmeti sunabilmek için hesap bilgileri, çalışma alanı/proje verileri, kullanıcı içerikleri ve teknik kayıtlar işlenebilir.</p>
+        <h2>2. Google hesabı ve OAuth verileri</h2>
+        <p>Google OAuth ile yalnızca kullanıcı tarafından yetkilendirilen kapsamlar üzerinden erişim sağlanır.</p>
+        <p>Hassas token verileri istemci arayüzünde ifşa edilmez, güvenli sunucu tarafında korunur.</p>
+        <h2>3. Verileri nasıl kullanıyoruz</h2>
+        <p>Veriler; kimlik doğrulama, proje/workspace yönetimi, entegrasyonlar, güvenlik izleme, hata ayıklama ve destek için işlenir.</p>
+        <h2>4. Veri saklama ve güvenlik</h2>
+        <p>Veriler hizmet gereksinimleri doğrultusunda saklanır, erişim kontrolü ve teknik güvenlik önlemleri uygulanır.</p>
+        <h2>5. Üçüncü taraf servisler</h2>
+        <p>Altyapı ve entegrasyonlar için üçüncü taraf servisler kullanılabilir ve kendi gizlilik politikalarına tabidir.</p>
+        <h2>6. Kullanıcı hakları ve erişimi kaldırma</h2>
+        <p>Kullanıcılar veri taleplerini iletebilir, Google hesap erişimini dilediği zaman geri çekebilir.</p>
+        <h2>7. Çocukların gizliliği</h2>
+        <p>Hizmet 13 yaş altına yönelik değildir; bu yaş grubuna ait veriler tespit edilirse silme/kısıtlama işlemleri uygulanır.</p>
+        <h2>8. Politika değişiklikleri</h2>
+        <p>Politika güncellemeleri sitede yayımlanır ve güncel metin bu sayfada tutulur.</p>
+        <h2>9. İletişim</h2>
+        <p>
+          Gizlilik talepleri için: <a href="mailto:onur24sel@gmail.com">onur24sel@gmail.com</a>
         </p>
-      </section>
-
-      <section className="space-y-3 rounded-2xl border border-white/10 bg-black/20 p-5">
-        <h2 className="text-xl font-semibold">2. Google hesabı ve OAuth verileri</h2>
-        <p className="text-white/75">
-          Google OAuth ile yalnızca kullanıcı tarafından açıkça yetkilendirilen kapsamlar (scopes) üzerinden erişim
-          sağlanır. Bu erişim, YouTube/Blogger gibi bağlı entegrasyon özelliklerini çalıştırmak için kullanılır.
-        </p>
-        <p className="text-white/75">
-          Hassas erişim belirteçleri (token) istemci arayüzünde ifşa edilmez; güvenli sunucu tarafı mekanizmalarda
-          saklanır ve yalnızca yetkili işlemler sırasında kullanılır.
-        </p>
-      </section>
-
-      <section className="space-y-3 rounded-2xl border border-white/10 bg-black/20 p-5">
-        <h2 className="text-xl font-semibold">3. Verileri nasıl kullanıyoruz</h2>
-        <p className="text-white/75">
-          Veriler; kimlik doğrulama, çalışma alanı yönetimi, içerik üretimi desteği, entegrasyon işlemleri, güvenlik
-          izleme, hata ayıklama ve kullanıcı desteği amaçlarıyla işlenir.
-        </p>
-      </section>
-
-      <section className="space-y-3 rounded-2xl border border-white/10 bg-black/20 p-5">
-        <h2 className="text-xl font-semibold">4. Veri saklama ve güvenlik</h2>
-        <p className="text-white/75">
-          Veriler, hizmetin işletilmesi için gerekli süre boyunca tutulur. Yetkisiz erişime karşı erişim kontrolü, kayıt
-          izleme ve teknik güvenlik önlemleri uygulanır. Yasal yükümlülükler veya uyuşmazlık çözümü için gereken
-          kayıtlar daha uzun süre saklanabilir.
-        </p>
-      </section>
-
-      <section className="space-y-3 rounded-2xl border border-white/10 bg-black/20 p-5">
-        <h2 className="text-xl font-semibold">5. Üçüncü taraf servisler</h2>
-        <p className="text-white/75">
-          Altyapı, analitik veya entegrasyon hizmetleri kapsamında üçüncü taraf servislerden yararlanabiliriz. Bu
-          servisler kendi gizlilik politikalarına tabidir ve yalnızca ilgili hizmetin gerektirdiği ölçüde veri işler.
-        </p>
-      </section>
-
-      <section className="space-y-3 rounded-2xl border border-white/10 bg-black/20 p-5">
-        <h2 className="text-xl font-semibold">6. Kullanıcı hakları ve erişimi kaldırma</h2>
-        <p className="text-white/75">
-          Kullanıcılar hesap/veri taleplerini iletebilir ve Google hesap erişimini Google hesap ayarları üzerinden geri
-          çekebilir. Erişim geri çekildiğinde, bağlantılı özellikler ilgili izinler olmadan çalışmaz.
-        </p>
-      </section>
-
-      <section className="space-y-3 rounded-2xl border border-white/10 bg-black/20 p-5">
-        <h2 className="text-xl font-semibold">7. Çocukların gizliliği</h2>
-        <p className="text-white/75">
-          Hizmet, 13 yaş altı çocuklara yönelik değildir. Bu yaş grubuna ait verilerin yanlışlıkla işlendiğini fark
-          edersek uygun şekilde silme/kısıtlama işlemleri yapılır.
-        </p>
-      </section>
-
-      <section className="space-y-3 rounded-2xl border border-white/10 bg-black/20 p-5">
-        <h2 className="text-xl font-semibold">8. Politika değişiklikleri</h2>
-        <p className="text-white/75">
-          Bu politika zaman zaman güncellenebilir. Önemli değişiklikler yürürlüğe girmeden önce sitede yayımlanır ve
-          güncel metin her zaman bu sayfada tutulur.
-        </p>
-      </section>
-
-      <section className="space-y-3 rounded-2xl border border-white/10 bg-black/20 p-5">
-        <h2 className="text-xl font-semibold">9. İletişim</h2>
-        <p className="text-white/75">
-          Gizlilik talepleri ve sorularınız için: <a className="text-neon hover:underline" href="mailto:onur24sel@gmail.com">onur24sel@gmail.com</a>
-        </p>
-      </section>
-
-      <p className="text-xs text-white/60">Not: Bu metin bilgilendirme amaçlıdır, hukuki danışmanlık değildir.</p>
+        <p><small>Not: Bu metin bilgilendirme amaçlıdır, hukuki danışmanlık değildir.</small></p>
+      </div>
     </main>
   );
 }
