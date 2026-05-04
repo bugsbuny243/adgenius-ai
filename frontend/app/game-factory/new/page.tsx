@@ -118,7 +118,7 @@ export default function NewGameFactoryPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 py-7 sm:px-6 lg:px-8">
+    <main className="mx-auto min-h-screen w-full max-w-5xl bg-[#020617] px-4 py-7 sm:px-6 lg:px-8">
       <section className="rounded-3xl border border-cyan-300/20 bg-white/[0.04] p-6 shadow-[0_0_60px_-30px_rgba(34,211,238,0.85)] backdrop-blur-2xl sm:p-8">
         <div className="mb-6 flex flex-wrap items-center gap-3">
           <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/35 bg-cyan-300/10 px-3 py-1 text-xs tracking-[0.18em] text-cyan-100"><Sparkles className="h-3.5 w-3.5" />BRIEF GENERATOR</span>
@@ -134,7 +134,7 @@ export default function NewGameFactoryPage() {
               onChange={(event) => setPrompt(event.target.value)}
               rows={8}
               placeholder="Example: Endless 2D runner with evolving biomes, collectible upgrades, ad monetization, and neon cyber visuals."
-              className="w-full rounded-2xl border border-white/15 bg-black/35 px-4 py-3 text-slate-100 outline-none ring-cyan-300/30 transition focus:ring"
+              className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none"
             />
             <div className="flex gap-2">
               <button type="button" onClick={() => setPlatform('android')} className={`rounded-xl border px-4 py-2 text-sm font-semibold transition ${platform === 'android' ? 'border-cyan-300/45 bg-cyan-300/15 text-cyan-100' : 'border-white/20 text-slate-300 hover:border-white/35'}`}>

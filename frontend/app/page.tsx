@@ -1,60 +1,54 @@
-import { ArrowRight, Sparkles, Chrome } from 'lucide-react';
+'use client';
+
 import Link from 'next/link';
 import { PublicSiteNav } from '@/components/public-site-nav';
 
-const terminalLines = [
-  '$ koschei deploy --target=android',
-  '✓ AI brief synthesized in 2.1s',
-  '✓ Unity cloud build started',
-  '✓ Assets optimized + signed',
-  '→ Play Console package staged'
-] as const;
-
 export default function HomePage() {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-zinc-950 text-zinc-100">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-900/20 via-zinc-950 to-zinc-950" />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:14px_24px]" />
+    <main className="relative min-h-screen overflow-hidden bg-[#020617] text-white">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(6,182,212,0.18),transparent_38%),radial-gradient(circle_at_80%_10%,rgba(139,92,246,0.22),transparent_32%),radial-gradient(circle_at_50%_80%,rgba(6,182,212,0.1),transparent_42%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:36px_36px]" />
 
-      <div className="relative z-10 mx-auto max-w-7xl px-4 py-6 md:px-8">
+      <div className="relative z-10 mx-auto max-w-7xl px-6 py-6">
         <PublicSiteNav />
 
-        <section className="mt-10 grid items-center gap-8 lg:grid-cols-[1.08fr_0.92fr]">
-          <div className="space-y-6">
-            <span className="inline-flex rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-violet-300">Premium AI Shipping</span>
-            <h1 className="bg-gradient-to-r from-white to-zinc-500 bg-clip-text text-5xl font-semibold tracking-tight text-transparent md:text-7xl">From Prompt to
+        <section className="grid min-h-[82vh] items-center gap-8 py-8 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="space-y-8">
+            <span className="inline-flex rounded-full border border-cyan-400/40 bg-cyan-500/10 px-4 py-1.5 text-xs font-medium uppercase tracking-[0.26em] text-cyan-200">
+              Autonomous AI Ops
+            </span>
+            <h1 className="text-5xl font-black leading-tight tracking-tight md:text-7xl">
+              KOSCHEI V5:
               <br />
-              Production Build.
+              <span className="bg-gradient-to-r from-cyan-300 via-white to-violet-300 bg-clip-text text-transparent">
+                Otonom Oyun Fabrikası
+              </span>
             </h1>
-            <p className="max-w-2xl text-zinc-500">Koschei is a cyber-grade SaaS control room for creating, building, and shipping Unity games with autonomous AI workflows.</p>
-
-            <div className="flex flex-wrap gap-3">
-              <Link href="/signup" className="inline-flex items-center gap-2 rounded-xl border border-violet-500/30 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:border-violet-500/50 hover:shadow-[0_0_20px_-5px_rgba(139,92,246,0.3)]">
-                Get Started <ArrowRight className="h-4 w-4" />
+            <p className="max-w-2xl text-lg text-slate-300">
+              Cyberpunk hızında, Apple seviyesinde zarafetle. Brief&apos;ten build&apos;e kadar tüm üretim hattını tek bir premium komuta katmanından yönetin.
+            </p>
+            <div>
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center rounded-xl border border-cyan-300/50 bg-gradient-to-r from-cyan-500 to-violet-500 px-7 py-3 text-sm font-semibold text-white shadow-[0_0_38px_-8px_rgba(6,182,212,0.85)] transition hover:scale-[1.02] hover:shadow-[0_0_50px_-10px_rgba(139,92,246,0.9)]"
+              >
+                Enter Command Dashboard
               </Link>
-              <Link href="/signin" className="rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm text-zinc-300 transition hover:border-white/20 hover:text-zinc-100 hover:bg-white/10">Sign in</Link>
-            </div>
-
-            <div className="mt-8 flex gap-4">
-              <div className="space-y-2">
-                <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">Supported Platforms</p>
-                <div className="flex gap-2 flex-wrap">
-                  <span className="inline-flex items-center gap-1 rounded-full border border-zinc-800 bg-zinc-900/30 px-2.5 py-1 text-xs text-zinc-300">📱 Android</span>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-zinc-800 bg-zinc-900/30 px-2.5 py-1 text-xs text-zinc-300">🌐 WebGL</span>
-                </div>
-              </div>
             </div>
           </div>
 
-          <aside className="rounded-2xl border border-white/5 bg-zinc-900/50 p-6 backdrop-blur-xl shadow-[0_0_30px_-10px_rgba(139,92,246,0.2)]">
-            <div className="mb-4 flex items-center justify-between border-b border-white/5 pb-4">
-              <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">Build Telemetry</p>
-              <span className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-xs text-violet-300"><Sparkles className="h-3 w-3" />Live</span>
+          <aside className="space-y-4">
+            <div className="rounded-2xl bg-white/5 p-6 backdrop-blur-xl border border-white/10">
+              <p className="text-xs uppercase tracking-[0.22em] text-cyan-300">Neural Build Telemetry</p>
+              <p className="mt-3 text-sm text-slate-300">Railway orchestration online · 70B inference responding · deploy channels synchronized.</p>
             </div>
-            <div className="space-y-2 text-sm text-zinc-300">
-              {terminalLines.map((line) => (
-                <p key={line} className="rounded-lg border border-zinc-800 bg-black/30 px-3 py-2 font-mono">{line}</p>
-              ))}
+            <div className="rounded-2xl bg-white/5 p-6 backdrop-blur-xl border border-white/10">
+              <p className="text-xs uppercase tracking-[0.22em] text-violet-300">Quantum Pipeline</p>
+              <ul className="mt-3 space-y-2 text-sm text-slate-300">
+                <li>✓ Brief synthesis ready</li>
+                <li>✓ Asset pass optimized</li>
+                <li>→ Store package staging</li>
+              </ul>
             </div>
           </aside>
         </section>
