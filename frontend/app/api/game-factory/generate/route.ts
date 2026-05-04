@@ -73,7 +73,7 @@ export async function POST(request: Request) {
       user_id: context.userId,
       unity_game_project_id: projectId,
       prompt,
-      model: process.env.GROQ_MODEL?.trim() || null,
+      model: process.env.KOSCHEI_LOCAL_AI_MODEL?.trim() || "meta-llama/Meta-Llama-3.1-405B-Instruct",
       brief_json: gameBrief,
       target_platform: orchestrationMetadata.target_platforms.join(','),
       metadata: orchestrationMetadata

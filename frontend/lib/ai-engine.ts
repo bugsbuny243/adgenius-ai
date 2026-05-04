@@ -19,6 +19,14 @@ type RunTextOptions = {
   systemPrompt: string | null;
 };
 
+type ChatMessage = { role: 'system' | 'user'; content: string };
+type ChatCompletionParams = {
+  model: string;
+  temperature: number;
+  response_format?: { type: 'json_object' };
+  messages: ChatMessage[];
+};
+
 export type GameBrief = {
   target_engine: 'Unity' | 'Godot';
   target_platforms: Array<'Android' | 'WebGL' | 'StandaloneWindows64'>;
@@ -40,6 +48,9 @@ export type AiRunResult = {
   };
 };
 
+const DEFAULT_MODEL = 'meta-llama/Meta-Llama-3.1-405B-Instruct';
+const DEFAULT_TGI_BASE_URL = 'http://127.0.0.1:8080/v1';
+
 const GAME_DESIGNER_SYSTEM_PROMPT = [
   'Sen kıdemli bir Unity Oyun Sistem Mimarısın (Multi-Platform).',
   'Kullanıcıdan gelen tek cümlelik oyun fikrini analiz et ve SADECE geçerli bir JSON nesnesi döndür.',
@@ -51,38 +62,30 @@ const GAME_DESIGNER_SYSTEM_PROMPT = [
   'JSON dışı hiçbir metin, markdown veya kod bloğu yazma.'
 ].join(' ');
 
-type GroqClient = {
+type OpenAIClient = {
   chat: {
     completions: {
-      create: (params: {
-        model: string;
-        temperature: number;
-        response_format: { type: 'json_object' };
-        messages: Array<{ role: 'system' | 'user'; content: string }>;
-      }) => Promise<{ choices: Array<{ message?: { content?: string | null } }> }>;
+      create: (params: ChatCompletionParams) => Promise<{ choices: Array<{ message?: { content?: string | null } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } }>;
     };
   };
 };
 
-let cachedGroqClient: GroqClient | null = null;
+let cachedClient: OpenAIClient | null = null;
 
-async function getGroqClient(): Promise<GroqClient> {
-  if (cachedGroqClient) return cachedGroqClient;
-  const apiKey = process.env.GROQ_API_KEY?.trim();
-  if (!apiKey) {
-    throw new Error('missing_groq_key');
-  }
+async function getLocalAiClient(): Promise<OpenAIClient> {
+  if (cachedClient) return cachedClient;
+  const apiKey = process.env.KOSCHEI_LOCAL_AI_TOKEN?.trim();
+  if (!apiKey) throw new Error('missing_local_ai_token');
 
+  const baseURL = process.env.KOSCHEI_LOCAL_AI_URL?.trim() || DEFAULT_TGI_BASE_URL;
   const req = (globalThis as { __non_webpack_require__?: (id: string) => unknown }).__non_webpack_require__
     || (Function('return require')() as (id: string) => unknown);
-  const mod = req('groq-sdk') as { default?: new (options: { apiKey: string }) => GroqClient };
-  const GroqCtor = mod?.default;
-  if (!GroqCtor) {
-    throw new Error('missing_groq_sdk');
-  }
+  const mod = req('openai') as { default?: new (options: { apiKey: string; baseURL: string }) => OpenAIClient };
+  const OpenAICtor = mod?.default;
+  if (!OpenAICtor) throw new Error('missing_openai_sdk');
 
-  cachedGroqClient = new GroqCtor({ apiKey });
-  return cachedGroqClient;
+  cachedClient = new OpenAICtor({ apiKey, baseURL });
+  return cachedClient;
 }
 
 function extractJsonObject(raw: string): string {
@@ -90,7 +93,7 @@ function extractJsonObject(raw: string): string {
   const first = trimmed.indexOf('{');
   const last = trimmed.lastIndexOf('}');
   if (first < 0 || last < first) {
-    throw new Error('invalid_groq_response');
+    throw new Error('invalid_local_ai_response');
   }
   return trimmed.slice(first, last + 1);
 }
@@ -105,20 +108,18 @@ function parseGameBrief(raw: string): GameBrief {
     ))
     : [];
 
-  if (
-    !parsed ||
-    typeof parsed.target_engine !== 'string' ||
-    !allowedEngines.has(parsed.target_engine as GameBrief['target_engine']) ||
-    targetPlatforms.length === 0 ||
-    typeof parsed.gameplay_goals !== 'string' ||
-    typeof parsed.visual_style !== 'string' ||
-    typeof parsed.controls !== 'string' ||
-    typeof parsed.store_short_description !== 'string' ||
-    typeof parsed.store_full_description !== 'string' ||
-    typeof parsed.mechanics !== 'object' ||
-    parsed.mechanics === null ||
-    Array.isArray(parsed.mechanics)
-  ) {
+  if (!parsed
+    || typeof parsed.target_engine !== 'string'
+    || !allowedEngines.has(parsed.target_engine as GameBrief['target_engine'])
+    || targetPlatforms.length === 0
+    || typeof parsed.gameplay_goals !== 'string'
+    || typeof parsed.visual_style !== 'string'
+    || typeof parsed.controls !== 'string'
+    || typeof parsed.store_short_description !== 'string'
+    || typeof parsed.store_full_description !== 'string'
+    || typeof parsed.mechanics !== 'object'
+    || parsed.mechanics === null
+    || Array.isArray(parsed.mechanics)) {
     throw new Error('invalid_game_brief_shape');
   }
 
@@ -136,17 +137,11 @@ function parseGameBrief(raw: string): GameBrief {
 
 export async function generateGameBriefWithGroq(prompt: string): Promise<GameBrief> {
   const userPrompt = prompt.trim();
-  if (!userPrompt) {
-    throw new Error('prompt_required');
-  }
+  if (!userPrompt) throw new Error('prompt_required');
 
-  const model = process.env.GROQ_MODEL?.trim();
-  if (!model) {
-    throw new Error('missing_groq_model');
-  }
-
-  const groq = await getGroqClient();
-  const completion = await groq.chat.completions.create({
+  const model = process.env.KOSCHEI_LOCAL_AI_MODEL?.trim() || DEFAULT_MODEL;
+  const client = await getLocalAiClient();
+  const completion = await client.chat.completions.create({
     model,
     temperature: 0.3,
     response_format: { type: 'json_object' },
@@ -157,9 +152,7 @@ export async function generateGameBriefWithGroq(prompt: string): Promise<GameBri
   });
 
   const content = completion.choices[0]?.message?.content;
-  if (!content) {
-    throw new Error('empty_groq_response');
-  }
+  if (!content) throw new Error('empty_local_ai_response');
 
   return parseGameBrief(content);
 }
@@ -167,45 +160,100 @@ export async function generateGameBriefWithGroq(prompt: string): Promise<GameBri
 const PROFILE_FAST: AgentRunProfile = {
   alias: 'koschei-fast',
   displayLabel: 'Hızlı mod',
-  model: process.env.GROQ_MODEL_FAST?.trim() || process.env.GROQ_MODEL?.trim() || 'llama-3.3-70b-versatile',
+  model: process.env.KOSCHEI_LOCAL_AI_MODEL_FAST?.trim() || process.env.KOSCHEI_LOCAL_AI_MODEL?.trim() || DEFAULT_MODEL,
   enableResearchMode: false,
   maxOutputTokens: 2_048,
   temperature: 0.8
 };
-// ... existing OpenAI engine kept as-is below
+
 function resolveReasoningEffort(): ReasoningEffort {
-  const configured = process.env.GROQ_REASONING_EFFORT?.trim().toLowerCase();
+  const configured = process.env.KOSCHEI_REASONING_EFFORT?.trim().toLowerCase();
   if (configured === 'minimal' || configured === 'low' || configured === 'medium' || configured === 'high') {
     return configured;
   }
   return 'medium';
 }
+
 const PROFILE_DEEP: AgentRunProfile = {
   alias: 'koschei-deep',
   displayLabel: 'Derin analiz modu',
-  model: process.env.GROQ_MODEL_REASONING?.trim() || process.env.GROQ_MODEL?.trim() || 'llama-3.3-70b-versatile',
+  model: process.env.KOSCHEI_LOCAL_AI_MODEL_REASONING?.trim() || process.env.KOSCHEI_LOCAL_AI_MODEL?.trim() || DEFAULT_MODEL,
   enableResearchMode: false,
   maxOutputTokens: 4_096,
   reasoningEffort: resolveReasoningEffort(),
   temperature: 0.35
 };
+
 const PROFILE_RESEARCH: AgentRunProfile = {
   alias: 'koschei-research',
   displayLabel: 'Araştırma destekli mod',
-  model: process.env.GROQ_MODEL_REASONING?.trim() || process.env.GROQ_MODEL?.trim() || 'llama-3.3-70b-versatile',
+  model: process.env.KOSCHEI_LOCAL_AI_MODEL_REASONING?.trim() || process.env.KOSCHEI_LOCAL_AI_MODEL?.trim() || DEFAULT_MODEL,
   enableResearchMode: true,
   maxOutputTokens: 4_096,
   reasoningEffort: resolveReasoningEffort(),
   temperature: 0.3
 };
+
 const NANO_MODES = new Set(['classification', 'route', 'router', 'triage']);
 const DEEP_AGENT_SLUGS = new Set(['yazilim', 'rapor']);
 const RESEARCH_AGENT_SLUGS = new Set(['arastirma']);
 const RESEARCH_MODES = new Set(['research', 'trend', 'benchmark']);
 const DEEP_MODES = new Set(['orchestrator', 'script', 'title-hook', 'seo', 'qa-safety', 'analysis']);
-function resolveRunProfile(agentSlug: string, agentMode?: string | null): AgentRunProfile { const normalizedSlug = agentSlug.trim().toLowerCase(); const normalizedMode = typeof agentMode === 'string' ? agentMode.trim().toLowerCase() : ''; if (RESEARCH_AGENT_SLUGS.has(normalizedSlug) || RESEARCH_MODES.has(normalizedMode)) return PROFILE_RESEARCH; if (DEEP_AGENT_SLUGS.has(normalizedSlug) || DEEP_MODES.has(normalizedMode)) return PROFILE_DEEP; if (NANO_MODES.has(normalizedMode)) return { ...PROFILE_FAST, model: process.env.GROQ_MODEL_LIGHT?.trim() || process.env.GROQ_MODEL?.trim() || 'llama-3.1-8b-instant', maxOutputTokens: 800, temperature: 0.2 }; return PROFILE_FAST; }
-function takeText(value: unknown): string { if (typeof value !== 'string') return ''; return value.trim(); }
-function extractUsage(response: unknown): { inputTokens: number | null; outputTokens: number | null } { if (!response || typeof response !== 'object') return { inputTokens: null, outputTokens: null }; const usage = (response as { usage?: { prompt_tokens?: number; completion_tokens?: number } }).usage; return { inputTokens: typeof usage?.prompt_tokens === 'number' ? usage.prompt_tokens : null, outputTokens: typeof usage?.completion_tokens === 'number' ? usage.completion_tokens : null }; }
-async function runInternal(options: RunTextOptions): Promise<AiRunResult> { const provider = process.env.AI_PROVIDER?.trim().toLowerCase() || 'groq'; if (provider !== 'groq') throw new Error('unsupported_provider'); const profile = resolveRunProfile(options.agentSlug, options.agentMode); const groq = await getGroqClient(); const response = await groq.chat.completions.create({ model: profile.model, temperature: profile.temperature, messages: [{ role: 'system', content: options.systemPrompt?.trim() || '' }, { role: 'user', content: options.userInput }] }); return { text: takeText(response.choices[0]?.message?.content), alias: profile.alias, displayLabel: profile.displayLabel, usage: extractUsage(response) }; }
+
+function resolveRunProfile(agentSlug: string, agentMode?: string | null): AgentRunProfile {
+  const normalizedSlug = agentSlug.trim().toLowerCase();
+  const normalizedMode = typeof agentMode === 'string' ? agentMode.trim().toLowerCase() : '';
+  if (RESEARCH_AGENT_SLUGS.has(normalizedSlug) || RESEARCH_MODES.has(normalizedMode)) return PROFILE_RESEARCH;
+  if (DEEP_AGENT_SLUGS.has(normalizedSlug) || DEEP_MODES.has(normalizedMode)) return PROFILE_DEEP;
+  if (NANO_MODES.has(normalizedMode)) {
+    return {
+      ...PROFILE_FAST,
+      model: process.env.KOSCHEI_LOCAL_AI_MODEL_LIGHT?.trim() || process.env.KOSCHEI_LOCAL_AI_MODEL?.trim() || DEFAULT_MODEL,
+      maxOutputTokens: 800,
+      temperature: 0.2
+    };
+  }
+  return PROFILE_FAST;
+}
+
+function takeText(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  return value.trim();
+}
+
+function extractUsage(response: unknown): { inputTokens: number | null; outputTokens: number | null } {
+  if (!response || typeof response !== 'object') return { inputTokens: null, outputTokens: null };
+  const usage = (response as { usage?: { prompt_tokens?: number; completion_tokens?: number } }).usage;
+  return {
+    inputTokens: typeof usage?.prompt_tokens === 'number' ? usage.prompt_tokens : null,
+    outputTokens: typeof usage?.completion_tokens === 'number' ? usage.completion_tokens : null
+  };
+}
+
+async function runInternal(options: RunTextOptions): Promise<AiRunResult> {
+  const provider = process.env.AI_PROVIDER?.trim().toLowerCase() || 'local-tgi';
+  if (provider !== 'local-tgi' && provider !== 'openai-compatible') throw new Error('unsupported_provider');
+  const profile = resolveRunProfile(options.agentSlug, options.agentMode);
+  const client = await getLocalAiClient();
+
+  const systemContent = options.systemPrompt?.trim() || 'Respond with valid JSON only. JSON output required.';
+  const response = await client.chat.completions.create({
+    model: profile.model,
+    temperature: profile.temperature,
+    response_format: { type: 'json_object' },
+    messages: [
+      { role: 'system', content: systemContent.includes('JSON') ? systemContent : `${systemContent} Respond using valid JSON only.` },
+      { role: 'user', content: options.userInput }
+    ]
+  });
+
+  return {
+    text: takeText(response.choices[0]?.message?.content),
+    alias: profile.alias,
+    displayLabel: profile.displayLabel,
+    usage: extractUsage(response)
+  };
+}
+
 export async function runTextWithAiEngine(options: RunTextOptions): Promise<AiRunResult> { return runInternal(options); }
 export async function runTextStreamWithAiEngine(options: RunTextOptions): Promise<AiRunResult> { return runInternal(options); }
