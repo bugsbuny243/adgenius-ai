@@ -25,6 +25,10 @@ export default function NewGamePage() {
     setError(null);
 
     try {
+      if (!supabase) {
+        throw new Error('Veritabanı bağlantısı başlatılamadı.');
+      }
+
       // 1. Üretim emrini veritabanına mühürle
       const { data, error: insertError } = await supabase
         .from('unity_build_jobs')
