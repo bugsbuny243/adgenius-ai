@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { createDecipheriv, createHash, randomUUID } from 'node:crypto';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -78,5 +78,35 @@ export async function runLocalAndroidBuild(args: {
     throw error;
   } finally {
     await cleanupRuntimeKeystore(runtimeKeystorePath);
+  }
+}
+
+export async function runLocalWebGLBuild(args: {
+  projectId: string;
+  jobId: string;
+}) {
+  const serviceRole = getSupabaseServiceRoleClient();
+  await serviceRole.from('unity_build_jobs').update({ status: 'processing', started_at: new Date().toISOString() }).eq('id', args.jobId);
+
+  try {
+    const script = path.join(process.cwd(), 'unity-client/server/build_webgl.sh');
+    const buildId = randomUUID();
+    const outputPath = path.join('/builds', `${args.projectId}-${buildId}-webgl.zip`);
+
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn('bash', [script], {
+        env: {
+          ...process.env,
+          KOSCHEI_OUTPUT_PATH: outputPath
+        },
+        stdio: 'inherit'
+      });
+      child.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`Build script failed (${code})`))));
+    });
+
+    await serviceRole.from('unity_build_jobs').update({ status: 'completed', artifact_url: outputPath, finished_at: new Date().toISOString() }).eq('id', args.jobId);
+  } catch (error) {
+    await serviceRole.from('unity_build_jobs').update({ status: 'failed', error_message: error instanceof Error ? error.message : 'build failed' }).eq('id', args.jobId);
+    throw error;
   }
 }
