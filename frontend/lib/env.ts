@@ -1,5 +1,5 @@
 const PUBLIC_ENV_KEYS = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'NEXT_PUBLIC_SITE_URL'] as const;
-const SERVER_ENV_KEYS = ['BACKEND_API_URL', 'SUPABASE_URL', 'SUPABASE_ANON_KEY', 'AI_PROVIDER', 'GROQ_API_KEY'] as const;
+const SERVER_ENV_KEYS = ['BACKEND_API_URL', 'SUPABASE_URL', 'SUPABASE_ANON_KEY', 'AI_PROVIDER', 'KOSCHEI_LOCAL_AI_TOKEN'] as const;
 
 type PublicEnvKey = (typeof PUBLIC_ENV_KEYS)[number];
 type ServerEnvKey = (typeof SERVER_ENV_KEYS)[number];
@@ -28,7 +28,7 @@ export function getServerEnv(): Record<ServerEnvKey, string | null> {
     SUPABASE_URL: read('SUPABASE_URL') ?? read('NEXT_PUBLIC_SUPABASE_URL'),
     SUPABASE_ANON_KEY: read('SUPABASE_ANON_KEY') ?? read('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
     AI_PROVIDER: read('AI_PROVIDER'),
-    GROQ_API_KEY: read('GROQ_API_KEY')
+    KOSCHEI_LOCAL_AI_TOKEN: read('KOSCHEI_LOCAL_AI_TOKEN')
   };
 }
 
