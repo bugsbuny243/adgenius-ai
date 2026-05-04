@@ -60,7 +60,7 @@ namespace Koschei.Editor
             }
 
             // 7. Sahneyi Klasöre Kaydet
-            string folderPath = "Assets/Koschei/Generated";
+            string folderPath = "unity-client/Assets/Editor";
             if (!Directory.Exists(folderPath))
             {
                 Directory.CreateDirectory(folderPath);

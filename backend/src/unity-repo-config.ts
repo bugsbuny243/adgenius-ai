@@ -1,5 +1,5 @@
-const GENERATED_CONFIG_PATH = 'Assets/Koschei/Generated/koschei-build-config.json';
-const GENERATED_SCRIPT_PATH = 'Assets/Koschei/Generated/AIGeneratedController.cs';
+const GENERATED_CONFIG_PATH = 'unity-client/Assets/Editor/koschei-build-config.json';
+const GENERATED_SCRIPT_PATH = 'unity-client/Assets/Editor/AIGeneratedController.cs';
 
 export interface UnityBuildConfigPayload {
   project_id: string;
