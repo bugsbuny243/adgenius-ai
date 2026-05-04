@@ -81,4 +81,41 @@ public class KoscheiBuilder
 
         Debug.Log("[Koschei Ajanı] Local Android build completed: " + output);
     }
+
+    public static void BuildWebGL()
+    {
+        Debug.Log("🌐 [Koschei Fabrikası] WebGL build başlatıldı!");
+
+        try
+        {
+            KoscheiSceneArchitect.ConstructSceneFromCode();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError("💥 [Koschei Fabrikası] WebGL sahne inşasında hata: " + ex.Message);
+            throw;
+        }
+
+        string[] scenes = EditorBuildSettings.scenes.Where(sc => sc.enabled).Select(sc => sc.path).ToArray();
+        if (scenes.Length == 0)
+        {
+            throw new Exception("Sahne listesi boş! WebGL build için en az bir sahne gerekli.");
+        }
+
+        string outDir = "Builds/WebGL";
+        System.IO.Directory.CreateDirectory(outDir);
+
+        var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+        {
+            scenes = scenes,
+            locationPathName = outDir,
+            target = BuildTarget.WebGL,
+            options = BuildOptions.None
+        });
+
+        if (report.summary.result != UnityEditor.Build.Reporting.BuildResult.Succeeded)
+            throw new Exception("WebGL build failed: " + report.summary.result);
+
+        Debug.Log("[Koschei Ajanı] Local WebGL build completed: " + outDir);
+    }
 }
