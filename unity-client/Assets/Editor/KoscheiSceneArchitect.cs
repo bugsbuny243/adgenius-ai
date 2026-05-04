@@ -42,7 +42,15 @@ namespace Koschei.Editor
             player.name = "KoscheiPlayer";
             player.transform.position = new Vector3(0, 1, 0);
 
-            // 6. YAPAY ZEKA KODUNU ENJEKTE ET (ASIL BÜYÜ BURADA)
+            // 6. Koschei Auto Suite ekle (çok modlu oyun iskeleti)
+            Type autoSuiteType = FindType("Koschei.Generated.KoscheiAutoSuite");
+            if (autoSuiteType != null)
+            {
+                player.AddComponent(autoSuiteType);
+                Debug.Log("✅ [Koschei Architect] KoscheiAutoSuite oyuncuya eklendi.");
+            }
+
+            // 7. YAPAY ZEKA KODUNU ENJEKTE ET (ASIL BÜYÜ BURADA)
             // Backend'deki LLM'in yazdığı ve projeye inen C# class'ını buluyoruz.
             // Standart olarak yapay zekaya kodun adını "AIGeneratedController" yaptıracağız.
             Type aiScriptType = FindType("AIGeneratedController");
@@ -69,7 +77,7 @@ namespace Koschei.Editor
             string scenePath = $"{folderPath}/GeneratedScene.unity";
             EditorSceneManager.SaveScene(newScene, scenePath);
 
-            // 8. Bu yeni sahneyi Unity'nin "Build Settings" listesine 1. sıraya koy!
+            // 9. Bu yeni sahneyi Unity'nin "Build Settings" listesine 1. sıraya koy!
             EditorBuildSettingsScene[] buildScenes = new EditorBuildSettingsScene[1];
             buildScenes[0] = new EditorBuildSettingsScene(scenePath, true);
             EditorBuildSettings.scenes = buildScenes;
