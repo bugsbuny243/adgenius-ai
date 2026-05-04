@@ -84,6 +84,34 @@ async function generateImageWithReplicate(prompt: string): Promise<string> {
   return imageUrl;
 }
 
+async function generateImageWithHuggingFace(prompt: string): Promise<ArrayBuffer> {
+  const token = process.env.HUGGINGFACE_API_KEY?.trim() || process.env.HF_TOKEN?.trim();
+  const model = process.env.HUGGINGFACE_IMAGE_MODEL?.trim() || 'stabilityai/stable-diffusion-xl-base-1.0';
+
+  if (!token) {
+    throw new Error('HUGGINGFACE_API_KEY (veya HF_TOKEN) eksik.');
+  }
+
+  const response = await fetch(`https://api-inference.huggingface.co/models/${encodeURIComponent(model)}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      inputs: `${prompt}, game asset, highly detailed, 8k resolution, unity3d render, professional`
+    })
+  });
+
+  if (!response.ok) {
+    const maybeJson = await response.json().catch(() => null) as { error?: string; estimated_time?: number } | null;
+    const estimated = typeof maybeJson?.estimated_time === 'number' ? ` Model yükleniyor, ${maybeJson.estimated_time}s sonra tekrar deneyin.` : '';
+    throw new Error((maybeJson?.error || `Hugging Face request failed: ${response.status}`) + estimated);
+  }
+
+  return response.arrayBuffer();
+}
+
 export async function POST(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id: projectIdRaw } = await context.params;
@@ -140,22 +168,21 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
 
     const prompt = buildEnvironmentPrompt(brief);
 
-    let temporaryImageUrl: string;
-    try {
-      temporaryImageUrl = await generateImageWithReplicate(prompt);
-    } catch (error) {
-      return errorResponse(error instanceof Error ? error.message : 'AI görsel üretim hatası.', 'AI_PROVIDER_ERROR', 500);
-    }
-
+    const aiProvider = (process.env.AI_IMAGE_PROVIDER?.trim().toLowerCase() || 'replicate');
     let imageBuffer: ArrayBuffer;
     try {
-      const imageResponse = await fetch(temporaryImageUrl);
-      if (!imageResponse.ok) {
-        return errorResponse('AI görseli indirilemedi.', 'UPSTREAM_IMAGE_FETCH_FAILED', 502);
+      if (aiProvider === 'huggingface') {
+        imageBuffer = await generateImageWithHuggingFace(prompt);
+      } else {
+        const temporaryImageUrl = await generateImageWithReplicate(prompt);
+        const imageResponse = await fetch(temporaryImageUrl);
+        if (!imageResponse.ok) {
+          return errorResponse('AI görseli indirilemedi.', 'UPSTREAM_IMAGE_FETCH_FAILED', 502);
+        }
+        imageBuffer = await imageResponse.arrayBuffer();
       }
-      imageBuffer = await imageResponse.arrayBuffer();
-    } catch {
-      return errorResponse('AI görseli indirilemedi.', 'UPSTREAM_IMAGE_FETCH_FAILED', 502);
+    } catch (error) {
+      return errorResponse(error instanceof Error ? error.message : 'AI görsel üretim hatası.', 'AI_PROVIDER_ERROR', 500);
     }
 
     const storagePath = `${projectId}/background-${Date.now()}.png`;
