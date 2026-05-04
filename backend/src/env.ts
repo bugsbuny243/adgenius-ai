@@ -21,9 +21,7 @@ const REQUIRED_ENV_KEYS = [
 
 type RequiredKey = (typeof REQUIRED_ENV_KEYS)[number];
 
-type BackendEnv = Record<RequiredKey, string> & {
-  GROQ_API_KEY: string | null;
-};
+type BackendEnv = Record<RequiredKey, string>;
 
 function required(name: RequiredKey): string {
   const value = process.env[name]?.trim();
@@ -31,22 +29,13 @@ function required(name: RequiredKey): string {
   return value;
 }
 
-function optional(name: string): string | null {
-  const value = process.env[name]?.trim();
-  return value && value.length > 0 ? value : null;
-}
-
 export function loadEnv(): BackendEnv {
-  const env = Object.fromEntries(REQUIRED_ENV_KEYS.map((key) => [key, required(key)])) as Record<RequiredKey, string>;
+  const env = Object.fromEntries(REQUIRED_ENV_KEYS.map((key) => [key, required(key)])) as BackendEnv;
   const aiProvider = env.AI_PROVIDER.toLowerCase();
-  const groq = optional('GROQ_API_KEY');
 
-  if (aiProvider === 'groq' && !groq) {
-    throw new Error('Missing required backend env: GROQ_API_KEY (AI_PROVIDER=groq)');
+  if (aiProvider !== 'huggingface') {
+    throw new Error('Invalid backend env: AI_PROVIDER must be "huggingface"');
   }
 
-  return {
-    ...env,
-    GROQ_API_KEY: groq
-  };
+  return env;
 }
