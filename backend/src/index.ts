@@ -1,6 +1,6 @@
 import express, { type Request } from 'express';
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { requireAuth, serviceRoleClient } from './auth.js';
+import { createUserClient, requireAuth, serviceRoleClient } from './auth.js';
 import { loadEnv } from './env.js';
 import { getBuildStatus, getBuilds, triggerBuild, UnityApiError, type UnityBuildResponse, type UnityBuildStatus } from './unity-bridge.js';
 import { decryptCredentials, encryptCredentials, serializeEncryptedCredentials, tryParseEncryptedCredentials } from './credentials-encryption.js';
@@ -18,10 +18,31 @@ const REQUEST_WINDOW_MS = 60_000;
 const MAX_REQUESTS_PER_IP = 20;
 const rateBuckets = new Map<string, { count: number; resetAt: number }>();
 
-function enforceRateLimit(req: Request, res: express.Response, scope: string): boolean {
+async function enforceRateLimit(req: Request, res: express.Response, scope: string): Promise<boolean> {
   const ip = String(req.header('x-forwarded-for')?.split(',')[0]?.trim() || req.ip || 'unknown');
   const key = `${scope}:${ip}`;
   const now = Date.now();
+  try {
+    const windowStart = new Date(now - REQUEST_WINDOW_MS).toISOString();
+    await serviceRoleClient.from('request_rate_logs').delete().lt('created_at', windowStart);
+    const { error: insertError } = await serviceRoleClient.from('request_rate_logs').insert({ scope, ip_address: ip, created_at: new Date(now).toISOString() });
+    if (!insertError) {
+      const { count, error: countError } = await serviceRoleClient
+        .from('request_rate_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('scope', scope)
+        .eq('ip_address', ip)
+        .gte('created_at', windowStart);
+      if (!countError && (count ?? 0) > MAX_REQUESTS_PER_IP) {
+        res.status(429).json({ ok: false, error: 'Too many requests.' });
+        return false;
+      }
+      return true;
+    }
+  } catch {
+    // fallback to in-memory limiter
+  }
+
   const entry = rateBuckets.get(key);
   if (!entry || entry.resetAt <= now) {
     rateBuckets.set(key, { count: 1, resetAt: now + REQUEST_WINDOW_MS });
@@ -99,9 +120,10 @@ function isValidPositiveInt(value: unknown): value is number {
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 app.post('/game-factory/generate', async (req, res) => {
-  if (!enforceRateLimit(req, res, '/game-factory/generate')) return;
+  if (!(await enforceRateLimit(req, res, '/game-factory/generate'))) return;
   const auth = await requireAuth(req, res);
   if (!auth) return;
+  const userClient = createUserClient(auth.accessToken);
   if (!(await hasActiveGameAgentPackage(auth.userId, auth.workspaceId))) {
     res.status(403).json({ ok: false, error: 'Bu işlem için aktif Game Agent paketi gerekir.' });
     return;
@@ -110,7 +132,7 @@ app.post('/game-factory/generate', async (req, res) => {
   const prompt = String(req.body?.prompt ?? '').trim();
   if (!prompt) return void res.status(400).json({ ok: false, error: 'prompt zorunlu.' });
 
-  const { data: project, error } = await serviceRoleClient
+  const { data: project, error } = await userClient
     .from('unity_game_projects')
     .insert({
       workspace_id: auth.workspaceId,
@@ -128,9 +150,10 @@ app.post('/game-factory/generate', async (req, res) => {
 });
 
 app.post('/game-factory/build', async (req, res) => {
-  if (!enforceRateLimit(req, res, '/game-factory/build')) return;
+  if (!(await enforceRateLimit(req, res, '/game-factory/build'))) return;
   const auth = await requireAuth(req, res);
   if (!auth) return;
+  const userClient = createUserClient(auth.accessToken);
   if (!(await hasActiveGameAgentPackage(auth.userId, auth.workspaceId))) {
     res.status(403).json({ ok: false, error: 'Bu işlem için aktif Game Agent paketi gerekir.' });
     return;
@@ -139,7 +162,7 @@ app.post('/game-factory/build', async (req, res) => {
   const projectId = String(req.body?.projectId ?? '').trim();
   if (!projectId) return void res.status(400).json({ ok: false, error: 'projectId zorunlu.' });
 
-  const { data: project } = await serviceRoleClient
+  const { data: project } = await userClient
     .from('unity_game_projects')
     .select('id, approval_status')
     .eq('id', projectId)
@@ -160,7 +183,7 @@ app.post('/game-factory/build', async (req, res) => {
     const unityError = error instanceof UnityApiError ? error : new UnityApiError('Unity build tetikleme hatası.');
     const queuedAt = new Date().toISOString();
     await serviceRoleClient.from('unity_build_jobs').insert({ unity_game_project_id: projectId, workspace_id: auth.workspaceId, user_id: auth.userId, requested_by: auth.userId, build_target: 'android', build_type: 'release', status: 'failed', queued_at: queuedAt, error_message: unityError.message });
-    await serviceRoleClient.from('unity_game_projects').update({ status: 'failed' }).eq('id', projectId).eq('workspace_id', auth.workspaceId).eq('user_id', auth.userId);
+    await userClient.from('unity_game_projects').update({ status: 'failed' }).eq('id', projectId).eq('workspace_id', auth.workspaceId).eq('user_id', auth.userId);
     return void res.status(502).json({ ok: false, error: 'Unity build başlatılamadı.' });
   }
 
@@ -186,18 +209,19 @@ app.post('/game-factory/build', async (req, res) => {
     .single();
 
   if (jobError || !insertedJob) return void res.status(400).json({ ok: false, error: jobError?.message ?? 'Build kaydı oluşturulamadı.' });
-  await serviceRoleClient.from('unity_game_projects').update({ status: 'building' }).eq('id', projectId);
+  await userClient.from('unity_game_projects').update({ status: 'building' }).eq('id', projectId);
   res.json({ ok: true, jobId: insertedJob.id, unityBuildNumber: unityBuildNumber ?? null });
 });
 
 app.post('/game-factory/builds/refresh', async (req, res) => {
-  if (!enforceRateLimit(req, res, '/game-factory/builds/refresh')) return;
+  if (!(await enforceRateLimit(req, res, '/game-factory/builds/refresh'))) return;
   const auth = await requireAuth(req, res);
   if (!auth) return;
+  const userClient = createUserClient(auth.accessToken);
   const projectId = String(req.body?.projectId ?? '').trim();
   if (!projectId) return void res.status(400).json({ ok: false, error: 'projectId zorunlu.' });
 
-  const { data: project } = await serviceRoleClient
+  const { data: project } = await userClient
     .from('unity_game_projects')
     .select('id, package_name')
     .eq('id', projectId)
@@ -217,6 +241,15 @@ app.post('/game-factory/builds/refresh', async (req, res) => {
     .limit(20);
 
   if (jobsError) return void res.status(400).json({ ok: false, error: jobsError.message });
+
+  const timeoutThreshold = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+  await serviceRoleClient
+    .from('unity_build_jobs')
+    .update({ status: 'failed', error_message: 'Job timed out', finished_at: new Date().toISOString() })
+    .eq('workspace_id', auth.workspaceId)
+    .eq('unity_game_project_id', projectId)
+    .in('status', ['queued', 'running'])
+    .lt('created_at', timeoutThreshold);
 
   const jobsToRefresh = (jobs ?? []).filter((job) => {
     const normalized = normalizeLegacyStatus(job.status);
@@ -270,7 +303,7 @@ app.post('/game-factory/builds/refresh', async (req, res) => {
 
       const projectStatus = mapUnityStatusToProjectStatus(unity.status);
       if (projectStatus) {
-        await serviceRoleClient.from('unity_game_projects').update({ status: projectStatus }).eq('id', job.unity_game_project_id).eq('workspace_id', auth.workspaceId).eq('user_id', auth.userId);
+        await userClient.from('unity_game_projects').update({ status: projectStatus }).eq('id', job.unity_game_project_id).eq('workspace_id', auth.workspaceId).eq('user_id', auth.userId);
       }
 
       if ((patch.status === 'succeeded' || unity.status === 'success') && unityDownloadUrl) {

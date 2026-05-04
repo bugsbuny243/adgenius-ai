@@ -2,6 +2,10 @@ import { serviceRoleClient } from '../../src/auth.js';
 import { getBuildStatus } from '../../src/unity-bridge.js';
 import { publishAutomated } from '../../src/google-play.js';
 
+const BACKOFF_STEPS_MS = [10_000, 30_000, 60_000, 300_000] as const;
+let backoffIndex = 0;
+let timer: NodeJS.Timeout | null = null;
+
 async function validateArtifact(url: string) {
   const lower = url.toLowerCase();
   if (!lower.endsWith('.aab') && !lower.endsWith('.apk')) throw new Error('Artifact .aab veya .apk değil.');
@@ -9,7 +13,7 @@ async function validateArtifact(url: string) {
   if (!res.ok) throw new Error(`Artifact erişilemez: ${res.status}`);
 }
 
-async function tick() {
+async function tick(): Promise<number> {
   const { data: jobs } = await serviceRoleClient
     .from('unity_build_jobs')
     .select('id, unity_game_project_id, metadata, artifact_url, status')
@@ -58,7 +62,17 @@ async function tick() {
       await serviceRoleClient.from('unity_build_jobs').update({ status: 'failed', error_message: error instanceof Error ? error.message : 'worker_error' }).eq('id', job.id);
     }
   }
+
+  return jobs?.length ?? 0;
 }
 
-setInterval(() => { void tick(); }, 15000);
-void tick();
+async function loop() {
+  try {
+    const count = await tick();
+    backoffIndex = count > 0 ? 0 : Math.min(backoffIndex + 1, BACKOFF_STEPS_MS.length - 1);
+  } finally {
+    timer = setTimeout(() => void loop(), BACKOFF_STEPS_MS[backoffIndex]);
+  }
+}
+
+void loop();
