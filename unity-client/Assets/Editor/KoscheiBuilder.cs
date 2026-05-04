@@ -5,18 +5,11 @@ using System;
 
 public class KoscheiBuilder
 {
-    // Unity Cloud Build derlemeye başlamadan hemen önce bu metodu çağıracak
     public static void PreExport()
     {
-        Debug.Log("[Koschei Ajanı] Ayarlar yapılıyor, Cloud Build devralacak...");
+        Debug.Log("[Koschei Ajanı] Ayarlar yapılıyor, Local Build devralacak...");
 
-        // 1. SAHNE AYARLARI (Sahne hatasını çözen koruma)
-        string[] scenes = EditorBuildSettings.scenes
-            .Where(s => s.enabled)
-            .Select(s => s.path)
-            .ToArray();
-
-        // Eğer sahne yoksa, varsayılan sahneyi zorla ekle
+        string[] scenes = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray();
         if (scenes.Length == 0)
         {
             Debug.Log("[Koschei Ajanı] Sahne bulunamadı, varsayılan SampleScene ekleniyor.");
@@ -25,22 +18,17 @@ public class KoscheiBuilder
             };
         }
 
-        // 2. GOOGLE PLAY STANDARTLARI (AAB, 64-bit, IL2CPP)
         PlayerSettings.SetScriptingBackend(BuildTargetGroup.Android, ScriptingImplementation.IL2CPP);
         PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARMv7 | AndroidArchitecture.ARM64;
-        EditorUserBuildSettings.buildAppBundle = true; 
+        EditorUserBuildSettings.buildAppBundle = true;
 
-        // 3. DİNAMİK KULLANICI AYARLARI (Railway API'den gelecek şifreler)
         string bundleId = Environment.GetEnvironmentVariable("KOSCHEI_BUNDLE_ID");
         string keystorePath = Environment.GetEnvironmentVariable("KOSCHEI_KEYSTORE_PATH");
         string keystorePass = Environment.GetEnvironmentVariable("KOSCHEI_KEYSTORE_PASS");
         string keyAlias = Environment.GetEnvironmentVariable("KOSCHEI_KEYALIAS");
         string keyPass = Environment.GetEnvironmentVariable("KOSCHEI_KEYPASS");
 
-        if (!string.IsNullOrEmpty(bundleId))
-        {
-            PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.Android, bundleId);
-        }
+        if (!string.IsNullOrEmpty(bundleId)) PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.Android, bundleId);
 
         if (!string.IsNullOrEmpty(keystorePath))
         {
@@ -51,10 +39,28 @@ public class KoscheiBuilder
             PlayerSettings.Android.keyaliasPass = keyPass;
             Debug.Log("[Koschei Ajanı] Kullanıcıya özel Keystore ayarlandı.");
         }
+    }
 
-        Debug.Log("[Koschei Ajanı] Görev tamam! Motoru kapatmıyorum, derlemeyi Cloud Build'e bırakıyorum.");
-        
-        // DİKKAT: BuildPlayer ve Exit(0) komutlarını sildik! 
-        // Artık Unity kapanmayacak ve Cloud Build işini yapıp o klasörü dolduracak.
+    public static void BuildAndroid()
+    {
+        PreExport();
+        string[] scenes = EditorBuildSettings.scenes.Where(sc => sc.enabled).Select(sc => sc.path).ToArray();
+        string outDir = "Builds/Android";
+        System.IO.Directory.CreateDirectory(outDir);
+        string output = Environment.GetEnvironmentVariable("KOSCHEI_OUTPUT_PATH");
+        if (string.IsNullOrEmpty(output)) output = outDir + "/game.aab";
+
+        var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+        {
+            scenes = scenes,
+            locationPathName = output,
+            target = BuildTarget.Android,
+            options = BuildOptions.None
+        });
+
+        if (report.summary.result != UnityEditor.Build.Reporting.BuildResult.Succeeded)
+            throw new Exception("Android build failed: " + report.summary.result);
+
+        Debug.Log("[Koschei Ajanı] Local Android build completed: " + output);
     }
 }
