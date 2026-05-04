@@ -1,79 +1,109 @@
-
+```react```
 'use client';
 
-import { CheckCircle2, Cpu, Rocket, Sparkles, Wand2 } from 'lucide-react';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Rocket, Cpu, Sparkles } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+
+/**
+ * KOSCHEI V5 - Yeni Oyun Oluşturma Sayfası
+ * Bu dosya Next.js build sürecinde "is not a module" hatasını çözmek için 
+ * tertemiz bir şekilde yeniden oluşturulmuştur.
+ */
 
 export default function NewGamePage() {
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createSupabaseBrowserClient();
 
-  const handleCreate = async () => {
-    if (!prompt) return;
-    setIsGenerating(true);
+  const handleCreateGame = async () => {
+    if (!prompt.trim()) return;
     
-    try {
-      // Proje oluşturma mantığı burada tetikleniyor
-      const { data, error } = await supabase
-        .from('unity_build_jobs')
-        .insert([{ 
-          prompt: prompt, 
-          status: 'queued',
-          project_name: 'Koschei_GTA_Project' 
-        }])
-        .select();
+    setIsGenerating(true);
+    setError(null);
 
-      if (error) throw error;
-      
-      // Başarılıysa dashboard'a yönlendir
+    try {
+      // 1. Üretim emrini veritabanına mühürle
+      const { data, error: insertError } = await supabase
+        .from('unity_build_jobs')
+        .insert([{
+          prompt: prompt,
+          status: 'queued',
+          project_name: 'Koschei_Autonomous_Project',
+          created_at: new Date().toISOString()
+        }])
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      // 2. Başarılıysa dashboard'a sür
       router.push('/dashboard');
-    } catch (err) {
-      console.error("Proje oluşturma hatası:", err);
-      // Hata mesajını kullanıcıya göster
-      alert("Proje oluşturulamadı. Lütfen internet bağlantınızı ve yetkilerinizi kontrol edin.");
+    } catch (err: any) {
+      console.error('Üretim hatası:', err);
+      setError(err.message || 'Proje başlatılamadı. Lütfen tekrar deneyin.');
     } finally {
       setIsGenerating(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-[#020617] text-white p-8">
-      <div className="max-w-4xl mx-auto space-y-8">
-        <header className="space-y-2">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-violet-500 bg-clip-text text-transparent">
-            Yeni Oyun Fabrikası
+    <div className="min-h-screen bg-[#020617] text-slate-100 p-6 md:p-12">
+      <div className="max-w-3xl mx-auto space-y-10">
+        <div className="space-y-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-sm font-medium">
+            <Sparkles size={14} />
+            <span>Koschei Otonom Üretim Bandı v5</span>
+          </div>
+          <h1 className="text-5xl font-extrabold tracking-tight bg-gradient-to-br from-white to-slate-500 bg-clip-text text-transparent">
+            Yeni Bir Dünya İnşa Et
           </h1>
-          <p className="text-slate-400 text-lg">Konseptinizi yazın, Koschei otonom olarak inşa etsin.</p>
-        </header>
+          <p className="text-slate-400 text-lg">
+            Sadece ne hayal ettiğini yaz. Koschei kodları yazar, sahneyi dizer ve APK'yı fırından çıkarır.
+          </p>
+        </div>
 
-        <section className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-xl">
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="KOSCHEI V5: GTA PROTOKOLÜ..."
-            className="w-full bg-black/40 border border-slate-800 rounded-xl p-4 text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none min-h-[200px]"
-          />
-          
-          <button
-            onClick={handleCreate}
-            disabled={isGenerating}
-            className="mt-6 w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-xl font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-          >
-            {isGenerating ? (
+        <div className="relative group">
+          <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500 to-violet-600 rounded-3xl blur opacity-25 group-hover:opacity-40 transition duration-1000"></div>
+          <div className="relative bg-slate-900/80 border border-white/10 p-2 rounded-3xl backdrop-blur-xl">
+            <textarea
+              className="w-full bg-transparent border-none focus:ring-0 text-xl p-6 min-h-[250px] placeholder:text-slate-600"
+              placeholder="Örn: KOSCHEI V5: GTA PROTOKOLÜ... Şehirde geçen, arabaya binilebilen bir açık dünya oyunu yap."
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {error && (
+          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
+            {error}
+          </div>
+        )}
+
+        <button
+          onClick={handleCreateGame}
+          disabled={isGenerating || !prompt.trim()}
+          className="w-full group relative flex items-center justify-center gap-3 bg-white text-black font-black text-xl py-6 rounded-2xl hover:bg-cyan-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
+        >
+          {isGenerating ? (
+            <>
               <Cpu className="animate-spin" />
-            ) : (
-              <Rocket />
-            )}
-            {isGenerating ? "İnşa Ediliyor..." : "Oluştur"}
-          </button>
-        </section>
+              <span>FABRİKA ÇALIŞIYOR...</span>
+            </>
+          ) : (
+            <>
+              <Rocket className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+              <span>ÜRETİMİ BAŞLAT</span>
+            </>
+          )}
+        </button>
       </div>
-    </main>
+    </div>
   );
 }
 
-```
+
