@@ -1,4 +1,5 @@
 const GENERATED_CONFIG_PATH = 'Assets/Koschei/Generated/koschei-build-config.json';
+const GENERATED_SCRIPT_PATH = 'Assets/Koschei/Generated/AIGeneratedController.cs';
 
 export interface UnityBuildConfigPayload {
   project_id: string;
@@ -92,4 +93,33 @@ export async function writeUnityBuildConfig(payload: UnityBuildConfigPayload): P
 
   const verified = await verifyFileExists(apiPath, branch);
   if (!verified) throw new Error('Unity build config doğrulanamadı.');
+}
+
+export async function writeUnityGeneratedController(sourceCode: string, prompt: string): Promise<void> {
+  const { owner, repo, branch } = getGithubRepoConfig();
+  const encodedPath = GENERATED_SCRIPT_PATH.split('/').map((part) => encodeURIComponent(part)).join('/');
+  const apiPath = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodedPath}`;
+
+  const content = `${sourceCode.trim()}\n`;
+  const sha = await getExistingFileSha(apiPath, branch);
+  const commitPrefix = prompt.replace(/\s+/g, ' ').trim().slice(0, 72);
+  const commitMessage = commitPrefix.length > 0
+    ? `feat: update AI generated controller (${commitPrefix})`
+    : `feat: update AI generated controller ${new Date().toISOString()}`;
+
+  const response = await githubContentsRequest(apiPath, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: commitMessage,
+      content: Buffer.from(content, 'utf8').toString('base64'),
+      branch,
+      ...(sha ? { sha } : {})
+    })
+  });
+
+  if (!response.ok) throw new Error('AI generated controller dosyası yazılamadı.');
+
+  const verified = await verifyFileExists(apiPath, branch);
+  if (!verified) throw new Error('AI generated controller doğrulanamadı.');
 }
