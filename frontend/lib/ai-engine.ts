@@ -23,7 +23,7 @@ type ChatMessage = { role: 'system' | 'user'; content: string };
 type ChatCompletionParams = {
   model: string;
   temperature: number;
-  response_format?: { type: 'json_object' };
+  response_format: { type: 'json_object' };
   messages: ChatMessage[];
 };
 
@@ -48,8 +48,8 @@ export type AiRunResult = {
   };
 };
 
-const DEFAULT_MODEL = 'meta-llama/Meta-Llama-3.1-405B-Instruct';
-const DEFAULT_TGI_BASE_URL = 'http://127.0.0.1:8080/v1';
+const DEFAULT_MODEL = 'meta-llama/Meta-Llama-3.1-70B-Instruct';
+const HUGGING_FACE_BASE_URL = 'https://api-inference.huggingface.co/v1/';
 
 const GAME_DESIGNER_SYSTEM_PROMPT = [
   'Sen kıdemli bir Unity Oyun Sistem Mimarısın (Multi-Platform).',
@@ -72,12 +72,12 @@ type OpenAIClient = {
 
 let cachedClient: OpenAIClient | null = null;
 
-async function getLocalAiClient(): Promise<OpenAIClient> {
+async function getHuggingFaceClient(): Promise<OpenAIClient> {
   if (cachedClient) return cachedClient;
-  const apiKey = process.env.KOSCHEI_LOCAL_AI_TOKEN?.trim();
-  if (!apiKey) throw new Error('missing_local_ai_token');
+  const apiKey = process.env.HF_TOKEN?.trim();
+  if (!apiKey) throw new Error('missing_hf_token');
 
-  const baseURL = process.env.KOSCHEI_LOCAL_AI_URL?.trim() || DEFAULT_TGI_BASE_URL;
+  const baseURL = HUGGING_FACE_BASE_URL;
   const req = (globalThis as { __non_webpack_require__?: (id: string) => unknown }).__non_webpack_require__
     || (Function('return require')() as (id: string) => unknown);
   const mod = req('openai') as { default?: new (options: { apiKey: string; baseURL: string }) => OpenAIClient };
@@ -93,7 +93,7 @@ function extractJsonObject(raw: string): string {
   const first = trimmed.indexOf('{');
   const last = trimmed.lastIndexOf('}');
   if (first < 0 || last < first) {
-    throw new Error('invalid_local_ai_response');
+    throw new Error('invalid_hf_response');
   }
   return trimmed.slice(first, last + 1);
 }
@@ -135,12 +135,12 @@ function parseGameBrief(raw: string): GameBrief {
   };
 }
 
-export async function generateGameBriefWithGroq(prompt: string): Promise<GameBrief> {
+export async function generateGameBriefWithAi(prompt: string): Promise<GameBrief> {
   const userPrompt = prompt.trim();
   if (!userPrompt) throw new Error('prompt_required');
 
-  const model = process.env.KOSCHEI_LOCAL_AI_MODEL?.trim() || DEFAULT_MODEL;
-  const client = await getLocalAiClient();
+  const model = process.env.KOSCHEI_MODEL?.trim() || DEFAULT_MODEL;
+  const client = await getHuggingFaceClient();
   const completion = await client.chat.completions.create({
     model,
     temperature: 0.3,
@@ -152,7 +152,7 @@ export async function generateGameBriefWithGroq(prompt: string): Promise<GameBri
   });
 
   const content = completion.choices[0]?.message?.content;
-  if (!content) throw new Error('empty_local_ai_response');
+  if (!content) throw new Error('empty_hf_response');
 
   return parseGameBrief(content);
 }
@@ -160,7 +160,7 @@ export async function generateGameBriefWithGroq(prompt: string): Promise<GameBri
 const PROFILE_FAST: AgentRunProfile = {
   alias: 'koschei-fast',
   displayLabel: 'Hızlı mod',
-  model: process.env.KOSCHEI_LOCAL_AI_MODEL_FAST?.trim() || process.env.KOSCHEI_LOCAL_AI_MODEL?.trim() || DEFAULT_MODEL,
+  model: process.env.KOSCHEI_MODEL_FAST?.trim() || process.env.KOSCHEI_MODEL?.trim() || DEFAULT_MODEL,
   enableResearchMode: false,
   maxOutputTokens: 2_048,
   temperature: 0.8
@@ -177,7 +177,7 @@ function resolveReasoningEffort(): ReasoningEffort {
 const PROFILE_DEEP: AgentRunProfile = {
   alias: 'koschei-deep',
   displayLabel: 'Derin analiz modu',
-  model: process.env.KOSCHEI_LOCAL_AI_MODEL_REASONING?.trim() || process.env.KOSCHEI_LOCAL_AI_MODEL?.trim() || DEFAULT_MODEL,
+  model: process.env.KOSCHEI_MODEL_REASONING?.trim() || process.env.KOSCHEI_MODEL?.trim() || DEFAULT_MODEL,
   enableResearchMode: false,
   maxOutputTokens: 4_096,
   reasoningEffort: resolveReasoningEffort(),
@@ -187,7 +187,7 @@ const PROFILE_DEEP: AgentRunProfile = {
 const PROFILE_RESEARCH: AgentRunProfile = {
   alias: 'koschei-research',
   displayLabel: 'Araştırma destekli mod',
-  model: process.env.KOSCHEI_LOCAL_AI_MODEL_REASONING?.trim() || process.env.KOSCHEI_LOCAL_AI_MODEL?.trim() || DEFAULT_MODEL,
+  model: process.env.KOSCHEI_MODEL_REASONING?.trim() || process.env.KOSCHEI_MODEL?.trim() || DEFAULT_MODEL,
   enableResearchMode: true,
   maxOutputTokens: 4_096,
   reasoningEffort: resolveReasoningEffort(),
@@ -208,7 +208,7 @@ function resolveRunProfile(agentSlug: string, agentMode?: string | null): AgentR
   if (NANO_MODES.has(normalizedMode)) {
     return {
       ...PROFILE_FAST,
-      model: process.env.KOSCHEI_LOCAL_AI_MODEL_LIGHT?.trim() || process.env.KOSCHEI_LOCAL_AI_MODEL?.trim() || DEFAULT_MODEL,
+      model: process.env.KOSCHEI_MODEL_LIGHT?.trim() || process.env.KOSCHEI_MODEL?.trim() || DEFAULT_MODEL,
       maxOutputTokens: 800,
       temperature: 0.2
     };
@@ -231,10 +231,10 @@ function extractUsage(response: unknown): { inputTokens: number | null; outputTo
 }
 
 async function runInternal(options: RunTextOptions): Promise<AiRunResult> {
-  const provider = process.env.AI_PROVIDER?.trim().toLowerCase() || 'local-tgi';
-  if (provider !== 'local-tgi' && provider !== 'openai-compatible') throw new Error('unsupported_provider');
+  const provider = process.env.AI_PROVIDER?.trim().toLowerCase() || 'huggingface';
+  if (provider !== 'huggingface' && provider !== 'openai-compatible') throw new Error('unsupported_provider');
   const profile = resolveRunProfile(options.agentSlug, options.agentMode);
-  const client = await getLocalAiClient();
+  const client = await getHuggingFaceClient();
 
   const systemContent = options.systemPrompt?.trim() || 'Respond with valid JSON only. JSON output required.';
   const response = await client.chat.completions.create({
@@ -257,3 +257,7 @@ async function runInternal(options: RunTextOptions): Promise<AiRunResult> {
 
 export async function runTextWithAiEngine(options: RunTextOptions): Promise<AiRunResult> { return runInternal(options); }
 export async function runTextStreamWithAiEngine(options: RunTextOptions): Promise<AiRunResult> { return runInternal(options); }
+
+export async function generateGameBriefWithGroq(prompt: string): Promise<GameBrief> {
+  return generateGameBriefWithAi(prompt);
+}
